@@ -110,35 +110,46 @@ mod_correct_ui <- function(id) {
         )
         )
       ),
-    card(
+    card(layout_sidebar(
+      sidebar = ui_sidebar_block(
+        title = "2.6 Identify Control Group",
+        help = c(
+          "If your data contains a control group please select the name of the control group in the dropdown menu on the right. Fold changes will be computed and added to a separate tab in the corrected data Excel file.",
+          "If you data does NOT contain a control group check the 'No control group' box."
+        )
+      ),
       layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "2.6 Identify Control Group",
-          tooltip(
-            checkboxInput(ns("no_control"), "No control group", FALSE),
-            "Check the box if The data does not have a control group.", 
-            placement = "right"
-          ),
-          conditionalPanel(
-          condition = sprintf("!input['%s']", ns("no_control")),
-          uiOutput(ns("control_class_selector"))
-          ),
-          width = 400
-        ),
-        layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "Download Corrected and Transformed Data",
           tooltip(
-            checkboxInput(ns("keep_corrected_qcs"), "Include QCs in corrected data file", FALSE),
-            "Check the box if you want corrected QC values in the downloaded corrected data file.", 
+            checkboxInput(
+              ns("keep_corrected_qcs"),
+              "Include QCs in corrected data file",
+              FALSE
+            ),
+            "Check the box if you want corrected QC values in the downloaded corrected data file.",
             placement = "right"
           ),
-          uiOutput(ns("download_corr_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
+          uiOutput(
+            ns("download_corr_btn"),
+            container = div,
+            style = "position: absolute; bottom: 15px; right: 15px;"
+          ),
           tags$h6("Corrected data can also be downloaded on tab 4. Export All"),
           width = 400,
-          position = "right")
-        ))
-    ),
+          position = "right"
+        ),
+            tooltip(
+              checkboxInput(ns("no_control"), "No control group", FALSE),
+              "Check the box if The data does not have a control group.",
+              placement = "right"
+            ),
+            conditionalPanel(condition = sprintf("!input['%s']", ns("no_control")), uiOutput(ns(
+              "control_class_selector"
+            )))
+         
+      )
+    )), 
     card(actionButton(ns("next_visualization"), "Next: Evaluate and Visualize Correction",
                       class="btn-primary btn-lg"))
   )}

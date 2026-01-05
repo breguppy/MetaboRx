@@ -36,7 +36,8 @@ mod_visualize_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "3.4 Select Figure Format",
-          ui_fig_format(ns)
+          help = c("Figures will be downloaded in the format selected on the right."),
+          width = 400
         ),
         layout_sidebar(
           sidebar = ui_sidebar_block(
@@ -45,6 +46,7 @@ mod_visualize_ui <- function(id) {
             help = c("All figures can also be downloaded on tab 4. Export All"),
             position = "right"
           ),
+          ui_fig_format(ns),
           uiOutput(ns("progress_ui"))
         ))
     ),
