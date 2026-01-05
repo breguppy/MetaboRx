@@ -74,7 +74,7 @@ mod_import_ui <- function(id) {
       sidebar = ui_sidebar_block(
         title = "1.4 Raw Data Metabolite Correlations",
         ui_corr_slider(ns),
-        help = c("To investigate linear relationships between metabolites Pearson's r is computed for each pair.",
+        help = c("To investigate linear relationships between metabolites, Pearson's r is computed for each pair.",
                  "All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlation to be displayed here.",
                  "To view all pairwise correlation, download the Excel displayed on the right."),
         width = 400

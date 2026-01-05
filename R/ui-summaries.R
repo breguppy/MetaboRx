@@ -10,14 +10,44 @@ metric_card <- function(label, value) {
   )
 }
 # Reusable warning card generator
-warn_card <- function(title, body, body_tags = NULL) {
-  tags$div(
+warn_card <- function(title,
+                      body,
+                      body_tags = NULL,
+                      info_title = NULL,
+                      info_content = NULL,
+                      info_placement = "auto",
+                      info_class = "popover-responsive") {
+  has_info <- !is.null(info_title) || !is.null(info_content)
+  
+  header <- shiny::tags$div(
+    style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+    shiny::tags$span(title),
+    if (has_info) {
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        info_content %||% shiny::tags$p(""),
+        title = info_title %||% "",
+        placement = info_placement,
+        options = list(
+          container = "body",
+          customClass = info_class
+        )
+      )
+    }
+  )
+  
+  shiny::tags$div(
     class = "card border-warning mb-3",
     style = "margin-top: 10px;",
-    tags$div(class = "card-header", title),
-    tags$div(
+    shiny::tags$div(class = "card-header", header),
+    shiny::tags$div(
       class = "card-body",
-      tags$p(class = "card-text", body),
+      shiny::tags$p(class = "card-text", body),
       body_tags
     )
   )
@@ -64,11 +94,13 @@ ui_basic_info <- function(df,
   replaced_card <- NULL
   if (total_replaced > 0) {
     replaced_card <- warn_card(
-      title = "Replaced non-numeric or zero metabolite values",
+      title = "Replaced non-numeric or zeros values in metabolite columns",
       body  = paste0(
         total_replaced,
         " values were converted to missing (NA) prior to processing."
-      )
+      ),
+      info_title = "What values are marked as missing?",
+      info_content = shiny::tags$p("0, NA, NaN, or any other non-numeric value is counted as a missing value. You can choose an imputation method in the next tab.")
     )
   }
   
@@ -81,7 +113,9 @@ ui_basic_info <- function(df,
       body_tags = tags$p(
         style = "font-weight: 600; margin-top: 8px;",
         paste(sort(unique(non_numeric_cols)), collapse = ", ")
-      )
+      ),
+      info_title = "What makes a column non-numeric?",
+      info_content = shiny::tags$p("If every value in a 'metabolite' column is not a number, then the column is removed from the dataset.")
     )
   }
   
@@ -112,7 +146,12 @@ ui_basic_info <- function(df,
         "%d column pairs appear equal or nearly equal based on non-missing values.",
         nrow(duplicate_mets)
       ),
-      body_tags = dup_badges
+      body_tags = dup_badges,
+      info_title = "What does it mean for 2 metabolites to be equal or nearly equal?",
+      info_content = shiny::tagList(
+        shiny::tags$p("For every sample, the values for the two meatbolite are equal to each other or within 1e-3 of each other."),
+        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
+      )
     )
   }
   
@@ -144,14 +183,24 @@ ui_basic_info <- function(df,
     } else {
       tags$p(
         style = "font-weight: 600; margin-top: 8px; margin-bottom: 0;",
-        "All metabolites have average above 3 times the average of blanks."
+        "All metabolites have QC average above 3 times the average of blanks."
       )
     }
     
     blank_card <- warn_card(
       title = "Blank samples detected",
       body  = blank_body,
-      body_tags = blank_tags
+      body_tags = blank_tags,
+      info_title = "Why do we flag metabolites with QC average less than 3x the blank average?",
+      info_content = shiny::tagList(
+        shiny::tags$p("Metabolites with QC average less than 3x the blank average may indicate the metabolite is:"),
+        shiny::tags$ul(
+          shiny::tags$li("low abunance/near the limit of detection in QC samples"),
+          shiny::tags$li("carried over to blank samples from previous samples"), 
+          shiny::tags$li("a potential contaminate")
+        ),
+        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
+    )
     )
   }
   
@@ -299,7 +348,10 @@ ui_corr_range_info <- function(all_cor, range) {
         range[1],
         range[2]
       ),
-      body_tags = cor_badges
+      body_tags = cor_badges,
+      info_title = "Why flag metabolites with strong positive linear correlations?",
+      info_content =
+        shiny::tags$p("A strong positive linear correlation means that as one metabolite increases, the other metabolite consistently increases proportionally. Two metababolites might have a strong positive linear correlation if they are from the same chromotography peak, but viewed under different filters. If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound.")
     )
   
   } 

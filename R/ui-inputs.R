@@ -142,7 +142,7 @@ ui_tc_corr_slider <- function(ns) {
 ui_filter_slider <- function(ns) {
   tooltip(
     sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites above this missing % are removed.", 
+    "Metabolites with missing % above this threshold are removed.", 
     placement = "right"
   )
 }
