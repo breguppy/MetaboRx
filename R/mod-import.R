@@ -10,6 +10,28 @@ mod_import_ui <- function(id) {
         sidebar = ui_sidebar_block(
           title = "1.1 Upload Raw Data",
           ui_file_upload(ns),
+          shiny::tags$div(
+            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+            shiny::tags$strong("Data requirements"),
+            bslib::popover(
+              shiny::tags$button(
+                type = "button",
+                class = "btn btn-link p-0",
+                style = "text-decoration:none;",
+                shiny::icon("circle-info")
+              ),
+              shiny::tags$p("Your upload must match one of these structures:"),
+              shiny::tags$p("Columns can be in any order."),
+              shiny::tags$img(
+                src = image_src <- knitr::image_uri(system.file("www/example_data_structure.png", package = "QCcorrection")),  
+                style = "width: 100%; height: auto; display: block;"
+              ),
+              title = "Required data structure",
+              placement = "auto",
+              options = list(container = "body",
+                             customClass = "popover-responsive") 
+            )
+          ),
           help = c(
             "Raw data must be on the first sheet of .xls or .xlsx file.",
             "Data must begin and end with QC samples when sorted by injection order."
