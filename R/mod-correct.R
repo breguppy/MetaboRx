@@ -56,8 +56,7 @@ mod_correct_ui <- function(id) {
           sidebar = ui_sidebar_block(
              title = "Download Transformed RSD Summary",
           uiOutput(ns("download_tc_rsd_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("RSD summary before and after correction and transformation for samples and QCs. ",
-                   "RSD summary can also be downloaded on tab 4. Export All"),
+          help = c("RSD summary before and after correction and transformation for samples and QCs."),
           width = 400,
           position = "right"
           ),
@@ -78,7 +77,6 @@ mod_correct_ui <- function(id) {
           sidebar = ui_sidebar_block(
             title = "Download Extreme Value Summary",
             uiOutput(ns("download_ev_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("Extreme value summary can also be downloaded on tab 4. Export All"),
             width = 400,
             position = "right"
           ),
@@ -135,7 +133,7 @@ mod_correct_ui <- function(id) {
             container = div,
             style = "position: absolute; bottom: 15px; right: 15px;"
           ),
-          tags$h6("Corrected data can also be downloaded on tab 4. Export All"),
+          help = c("Create Excel file with correction settings, corrected data, transformed data, fold changes, and MetaboAnalyst ready tabs."),
           width = 400,
           position = "right"
         ),
