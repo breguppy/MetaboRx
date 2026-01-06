@@ -107,7 +107,7 @@ ui_withhold_count <- function(ns, max_withhold) {
 ui_corr_slider <- function(ns) {
   tooltip(
     sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute MEtabolite Correlations' button.", 
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
   )
 }
@@ -130,7 +130,7 @@ ui_tc_corr_slider <- function(ns) {
   ),
   tooltip(
     sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's R within this range will be displayed here.", 
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
   )
   )
@@ -467,42 +467,87 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   choices <- if (has_istd) {
     list(
       "Internal Standard Normalization" = "ISTD_norm",
-      "Total Ratiometically Normalized (TRN)" = "TRN",
+      "Total Ratiometrically Normalized (TRN)" = "TRN",
       "None" = "none"
     )
   } else {
     list(
-      "Total Ratiometic Normalization (TRN)" = "TRN",
+      "Total Ratiometric Normalization (TRN)" = "TRN",
       "None" = "none"
     )
   }
   
-  tagList(
-    radioButtons(
+  label_with_info <- shiny::tagList(
+    shiny::span("Method"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p("Post-correction transformations/normalizations:"),
+        shiny::tags$ul(
+          if (has_istd) shiny::tags$li(
+            shiny::strong("Internal Standard Normalization: "),
+            "For each sample (row), compute the mean of internal standard columns (ISTD*/ITSD*), ",
+            "then divide each non-internal standard metabolite by that mean."
+          ),
+          shiny::tags$li(
+            shiny::strong("Total Ratio Normalization (TRN): "),
+            "For each sample (row), compute the total signal as the sum across included metabolite columns, ",
+            "then scale each included metabolite by its proportion of that total and multiply by the number ",
+            "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
+          ),
+          shiny::tags$li(
+            shiny::strong("None: "),
+            "Leaves corrected metabolite values unchanged."
+          ),
+        ),
+        shiny::tags$hr(),
+        shiny::tags$p(
+          shiny::strong("Exclude internal standards checkbox: "),
+          "When checked, ISTD/ITSD columns are excluded from the TRN total-signal calculation and are not transformed."
+        ),
+        shiny::tags$p(
+          shiny::strong("Withhold from TRN: "),
+          "Use this if a column should not contribute to the TRN total (e.g., TIC)."
+        )
+      ),
+      title = "Transformation methods",
+      placement = "right",
+      options = list(container = "body", customClass = "popover-responsive")
+    )
+  )
+  
+  shiny::tagList(
+    shiny::radioButtons(
       ns("transform"),
-      "Method",
-      choices  = choices,
+      label = label_with_info,
+      choices = choices,
       selected = "none"
     ),
-    tooltip(
-      checkboxInput(
+    bslib::tooltip(
+      shiny::checkboxInput(
         ns("ex_ISTD"),
-        "Exclude Internal Standards from post-correction transformation/normalization.",
+        "Exclude internal standards from post-correction transformation.",
         TRUE
       ),
-      "Check this box if you do not want internal standards to be included in the transformation or normalization calculation.",
+      "Check this box if you do not want internal standards to be included in the transformation calculation.",
       placement = "right"
     ),
-    conditionalPanel(
+    shiny::conditionalPanel(
       condition = sprintf("input['%s'] === 'TRN'", ns("transform")),
-      tooltip(
-        checkboxInput(ns("trn_withhold_checkbox"), "Withhold column(s) from TRN", FALSE),
+      bslib::tooltip(
+        shiny::checkboxInput(ns("trn_withhold_checkbox"), "Withhold column(s) from TRN", FALSE),
         "Check this box if there are any columns that should not count in TRN (i.e. TIC column). Sample, batch, class and order are already excluded.",
         placement = "right"
       )
     )
   )
 }
+
 
 #' Options for outlier detection
 #' @keywords internal
