@@ -8,7 +8,57 @@ mod_visualize_ui <- function(id) {
     value = "tab_visualize",
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "3.1 Visualize Correction with Metabolite Scatter Plots",
+        title = "3.1 Scatter Plot Evaluation",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("How to read this plot")),
+            shiny::tags$p("Dots are samples. In both panels, samples are organized in injection order on the x-axis with ",
+                          "QC samples colored blue and other samples colored yellow.",
+                          "Regardless of the correction method selected, the top panel of the figure shows ",
+                          "the selected metabolite's intensity values in the raw data. The bottom panel shows the metabolite's ",
+                          "scaled intensity values after correction. If mutiple batches are present in the dataset, the background ",
+                          "of the plot will alternate light gray and white to indicate different batches."),
+            shiny::tags$p(shiny::strong("Note: "), "the scale in the y-axes is different between the top and bottom plots."),
+            shiny::tags$hr(),
+            shiny::tags$p(
+              shiny::strong("Correction method: Local polynomial fit (LOESS)", ), 
+                          "For this correction method, the scatter plots will also show a smooth blue line. ",
+                          "The blue line is the local polynomial fit (LOESS) for QC samples and it summarizes QC signal drift over time. ",
+                          "The blue ribbon/shading around the line (if visible) shows uncertainty in that trend; narrow means ",
+                          "stable, wide means variable."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction, the QC line should flatten and the ribbon should narrow."
+            ),
+            shiny::tags$hr(),
+            shiny::tags$p(
+              shiny::strong("Correction method: Random forest"), 
+              "For this correction method, the scatter plots will also show dashed and solid horizonal lines. ",
+              "The tighter black dashed line is \u00B11 standard deviation (SD) around the QC mean. ",
+              "The wider dark red solid line is \u00B12 SD around the QC mean. ",
+              "These horizontal lines show how far QC values typically vary."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "After correction, QC points should be more stable (less drift over order) and more tightly ",
+              "clustered within the SD bands compared with the raw panel."
+            ),
+            title = "What information does the metabolite scatter plot show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
+        shing::tags$h6("Visualize correction with metabolite scatter plots"),
         uiOutput(ns("met_plot_selectors")),
         width = 400
       ),

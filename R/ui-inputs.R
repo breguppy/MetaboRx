@@ -377,28 +377,28 @@ ui_correction_method <- function(df, ns = identity) {
   
   if (num_batches == 1) {
     if (any(qc_per_batch$qc_in_batch <= 5)) {
-      choices <- list("Local Polynomial Fit (LOESS)" = "LOESS")
+      choices <- list("Local polynomial Fit (LOESS)" = "LOESS")
       selected <- "LOESS"
     } else {
       choices <- list(
-        "Random Forest" = "RF",
-        "Local Polynomial Fit (LOESS)" = "LOESS"
+        "Random forest" = "RF",
+        "Local polynomial Fit (LOESS)" = "LOESS"
       )
       selected <- "RF"
     }
   } else {
     if (any(qc_per_batch$qc_in_batch < 5)) {
       choices <- list(
-        "Random Forest" = "RF",
-        "Local Polynomial Fit (LOESS)" = "LOESS"
+        "Random forest" = "RF",
+        "Local polynomial Fit (LOESS)" = "LOESS"
       )
       selected <- "RF"
     } else {
       choices <- list(
-        "Random Forest" = "RF",
-        "Local Polynomial Fit (LOESS)" = "LOESS",
-        "Batchwise Random Forest" = "BW_RF",
-        "Batchwise Local polynomial fit (LOESS)" = "BW_LOESS"
+        "Random forest" = "RF",
+        "Local polynomial fit (LOESS)" = "LOESS",
+        "Batchwise random forest" = "BW_RF",
+        "Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
       )
       selected <- "RF"
     }
