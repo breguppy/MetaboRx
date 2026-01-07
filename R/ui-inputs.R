@@ -573,7 +573,6 @@ ui_detect_outliers_options <- function(ns) {
 #' @noRd
 ui_rsd_eval <- function(ns) {
   tagList(
-    tags$h6("Evaluate correction method by the change in relative standard deviation (RSD)."),
     radioButtons(ns("rsd_plot_type"),
                  "Visualize Changes in RSD by",
                  list("Distribution" = "dist",
@@ -596,7 +595,6 @@ ui_rsd_eval <- function(ns) {
 #' @noRd
 ui_pca_eval <- function(ns){
   tagList(
-    tags$h6("Evaluate correction using principal component analysis (PCA)."),
     radioButtons(ns("pca_compare"), 
                  "Compare raw data to", 
                  list("Corrected data" = "filtered_cor_data", 

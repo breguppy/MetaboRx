@@ -67,6 +67,7 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.2 RSD Evaluation",
+        tags$h6("Evaluate correction method by the change in relative standard deviation (RSD)."),
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Plot guide"),
@@ -118,7 +119,6 @@ mod_visualize_ui <- function(id) {
           )
         ),
         ui_rsd_eval(ns),
-        # info popover for RSD comparison stats.
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Metric guide"),
@@ -152,7 +152,54 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.3 PCA Evaluation",
+        tags$h6("Evaluate correction using principal component analysis (PCA)."),
         # info button for PCA plots and loading plots
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("What is principal component analysis (PCA)?")),
+            shiny::tags$p("PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
+                          "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
+                          "data."),
+            shiny::tags$hr(),
+            shiny::strong("PCA score plots"),
+            shiny::tags$p(
+              "The left panel is the 2D PC plot for the raw data and the right panel is the 2D PC plot for the corrected/transformed and corrected data. ",
+              "The x-axis is PC1 and y-axis is PC2. The percentage in the parentheses on the axis labels is the variance explained for each conponent. ",
+              "Dots in this figure represent samples."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, biological variation should dominate technical variation and signal drift should ",
+              "not be visible in right panel. "
+              ),
+            shiny::tags$ul(
+              shiny::tags$li(shiny::strong("When coloring the plot by class: "), "QC samples should cluster together in the right panel."),
+              shiny::tags$li(shiny::strong("When coloring the plot by batch or order: "), "there should be no distinct color patterns in the right panel if samples were run using a random injection ordering")
+            ),
+            shiny::tags$hr(),
+            shiny::strong("PCA loading plots"),
+            shiny::tags$p(
+              "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
+              "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
+              "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
+              "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",
+              "A positive loading (green) means that a high value in that metabolite corresponds to a high value in that PC. ",
+              "A negative loading (red) means a high value in that metabolite corresponds to a low value in that PC."
+            ),
+            title = "What information does the PCA plots and loading plots show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_pca_eval(ns),
         width = 400
       ),
