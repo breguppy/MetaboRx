@@ -9,6 +9,7 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.1 Scatter Plot Evaluation",
+        shiny::tags$h6("Visualize correction with metabolite scatter plots"),
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Plot guide"),
@@ -58,7 +59,6 @@ mod_visualize_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        shing::tags$h6("Visualize correction with metabolite scatter plots"),
         uiOutput(ns("met_plot_selectors")),
         width = 400
       ),
@@ -67,7 +67,83 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.2 RSD Evaluation",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("How to read this plot")),
+            shiny::tags$p("This page compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
+            "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
+            "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
+            "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
+            "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."),
+            shiny::tags$hr(),
+            shiny::strong("Visualize changes in RSD by: Distrbution"),
+            shiny::tags$p(
+              "The distributions of RSDs in non-QC samples is displayed in the left panel and the distribution of RSDs in ",
+              "QC samples is displayed in the right panel. ",
+              "The blue distribution is RSD in the raw data before any correction or transformations is applied. ",
+              "The orange distrubution is RSD in the corrected or transformed and corrected data. "
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, the orange distributions should be shifted to the left compared to the blue distributions. ",
+              "The orange distribution for QC samples should be tall and skinny with the highest density near zero."
+            ),
+            shiny::tags$hr(),
+            shiny::strong("Visualize changes in RSD by: Scatter Plot"),
+            shiny::tags$p(
+              "In the scatter plot comparison the x-axis is RSD before correction/transformation and correction and the y-axis is RSD after. ",
+              "RSDs for non-QC samples are displayed in the left panel and QC samples in the right panel. ",
+              "Red dots indicate that RSD increased after correction/transformation and correction. ", 
+              "Gray dot indicate no change in RSD after correction/transformation and correction. ",
+              "Green dots indicate a decrease in RSD after correction/transformation. ",
+              "The percentages of increased, no change, and decreased RSDs are shown at the top of each panel."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transofrmation and correction, the majority of RSDs should decrease for QC samples. ",
+              "Non-QC sample RSDs may or may not decrease dramatically after correction/transformation and correction."
+            ),
+            title = "What information does the RSD comparison plots show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_rsd_eval(ns),
+        # info popover for RSD comparison stats.
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("")),
+            shiny::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                          "We include median as a more robust measure of \u0394 RSD."),
+            shiny::tags$p("\u0394 RSD = After RSD - Before RSD. "),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
+              " In this situation, a more negative number is disirable for all four \u0394 metrics."
+            ),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         uiOutput(ns("rsd_comparison_stats")),
         width = 400
       ),
@@ -76,6 +152,7 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.3 PCA Evaluation",
+        # info button for PCA plots and loading plots
         ui_pca_eval(ns),
         width = 400
       ),
@@ -93,7 +170,7 @@ mod_visualize_ui <- function(id) {
           sidebar = ui_sidebar_block(
             title = "Download Figures",
             uiOutput(ns("download_fig_zip_btn")),
-            help = c("All figures can also be downloaded on tab 4. Export All"),
+            help = c("If there are many metabolites, downloading figures may take a few minutes."),
             position = "right"
           ),
           ui_fig_format(ns),
