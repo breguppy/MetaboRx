@@ -8,7 +8,9 @@ app_ui <- function() {
   fluidPage(
     theme = bslib::bs_theme(preset = "cosmo"),
     tags$head(
-      tags$style(HTML("
+      tags$style(
+        HTML(
+          "
       /* default state of tabs */
       .nav-tabs > li > a {
         background-color: #2780E3;   /* unselected tab bg */
@@ -29,18 +31,25 @@ app_ui <- function() {
         color: #ffffff;              /* selected tab text */
         border-color: #1E88E5;
       }
-    "))
-    ),
-    
-    
-    shinyjs::useShinyjs(),
-    titlePanel("QC Correction for Metabolomics Data"),
-    bslib::navset_tab(
-      id = "main_steps",
-      mod_import_ui("import"),
-      mod_correct_ui("correct"),
-      mod_visualize_ui("viz"),
-      mod_export_ui("export")
+
+      .popover.popover-responsive {
+    max-width: min(90vw, 900px);
+    width: min(90vw, 900px);
+  }
+
+  .popover.popover-responsive .popover-body {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .popover.popover-responsive img {
+    max-width: 100%;
+    height: auto;
+  }
+    ")
+      )
+    ), shinyjs::useShinyjs(), titlePanel("Quality Checks for Metabolomics Data"), bslib::navset_tab(
+      id = "main_steps", mod_import_ui("import"), mod_correct_ui("correct"), mod_visualize_ui("viz"), mod_export_ui("export")
     )
   )
 }

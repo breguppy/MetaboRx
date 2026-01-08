@@ -8,7 +8,57 @@ mod_visualize_ui <- function(id) {
     value = "tab_visualize",
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "3.1 Visualize Correction with Metabolite Scatter Plots",
+        title = "3.1 Scatter Plot Evaluation",
+        shiny::tags$h6("Visualize correction with metabolite scatter plots"),
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("How to read this plot")),
+            shiny::tags$p("Dots are samples. In both panels, samples are organized in injection order on the x-axis with ",
+                          "QC samples colored blue and other samples colored yellow.",
+                          "Regardless of the correction method selected, the top panel of the figure shows ",
+                          "the selected metabolite's intensity values in the raw data. The bottom panel shows the metabolite's ",
+                          "scaled intensity values after correction. If mutiple batches are present in the dataset, the background ",
+                          "of the plot will alternate light gray and white to indicate different batches."),
+            shiny::tags$p(shiny::strong("Note: "), "the scale in the y-axes is different between the top and bottom plots."),
+            shiny::tags$hr(),
+            shiny::tags$p(
+              shiny::strong("Correction method: Local polynomial fit (LOESS)", ), 
+                          "For this correction method, the scatter plots will also show a smooth blue line. ",
+                          "The blue line is the local polynomial fit (LOESS) for QC samples and it summarizes QC signal drift over time. ",
+                          "The blue ribbon/shading around the line (if visible) shows uncertainty in that trend; narrow means ",
+                          "stable, wide means variable."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction, the QC line should flatten and the ribbon should narrow."
+            ),
+            shiny::tags$hr(),
+            shiny::tags$p(
+              shiny::strong("Correction method: Random forest"), 
+              "For this correction method, the scatter plots will also show dashed and solid horizonal lines. ",
+              "The tighter black dashed line is \u00B11 standard deviation (SD) around the QC mean. ",
+              "The wider dark red solid line is \u00B12 SD around the QC mean. ",
+              "These horizontal lines show how far QC values typically vary."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "After correction, QC points should be more stable (less drift over order) and more tightly ",
+              "clustered within the SD bands compared with the raw panel."
+            ),
+            title = "What information does the metabolite scatter plot show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         uiOutput(ns("met_plot_selectors")),
         width = 400
       ),
@@ -17,7 +67,83 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.2 RSD Evaluation",
+        tags$h6("Evaluate correction method by the change in relative standard deviation (RSD)."),
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("How to read this plot")),
+            shiny::tags$p("This page compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
+            "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
+            "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
+            "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
+            "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."),
+            shiny::tags$hr(),
+            shiny::strong("Visualize changes in RSD by: Distrbution"),
+            shiny::tags$p(
+              "The distributions of RSDs in non-QC samples is displayed in the left panel and the distribution of RSDs in ",
+              "QC samples is displayed in the right panel. ",
+              "The blue distribution is RSD in the raw data before any correction or transformations is applied. ",
+              "The orange distrubution is RSD in the corrected or transformed and corrected data. "
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, the orange distributions should be shifted to the left compared to the blue distributions. ",
+              "The orange distribution for QC samples should be tall and skinny with the highest density near zero."
+            ),
+            shiny::tags$hr(),
+            shiny::strong("Visualize changes in RSD by: Scatter Plot"),
+            shiny::tags$p(
+              "In the scatter plot comparison the x-axis is RSD before correction/transformation and correction and the y-axis is RSD after. ",
+              "RSDs for non-QC samples are displayed in the left panel and QC samples in the right panel. ",
+              "Red dots indicate that RSD increased after correction/transformation and correction. ", 
+              "Gray dot indicate no change in RSD after correction/transformation and correction. ",
+              "Green dots indicate a decrease in RSD after correction/transformation. ",
+              "The percentages of increased, no change, and decreased RSDs are shown at the top of each panel."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transofrmation and correction, the majority of RSDs should decrease for QC samples. ",
+              "Non-QC sample RSDs may or may not decrease dramatically after correction/transformation and correction."
+            ),
+            title = "What information does the RSD comparison plots show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_rsd_eval(ns),
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("")),
+            shiny::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                          "We include median as a more robust measure of \u0394 RSD."),
+            shiny::tags$p("\u0394 RSD = After RSD - Before RSD. "),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
+              " In this situation, a more negative number is disirable for all four \u0394 metrics."
+            ),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         uiOutput(ns("rsd_comparison_stats")),
         width = 400
       ),
@@ -26,6 +152,54 @@ mod_visualize_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "3.3 PCA Evaluation",
+        tags$h6("Evaluate correction using principal component analysis (PCA)."),
+        # info button for PCA plots and loading plots
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Plot guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p(shiny::strong("What is principal component analysis (PCA)?")),
+            shiny::tags$p("PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
+                          "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
+                          "data."),
+            shiny::tags$hr(),
+            shiny::strong("PCA score plots"),
+            shiny::tags$p(
+              "The left panel is the 2D PC plot for the raw data and the right panel is the 2D PC plot for the corrected/transformed and corrected data. ",
+              "The x-axis is PC1 and y-axis is PC2. The percentage in the parentheses on the axis labels is the variance explained for each conponent. ",
+              "Dots in this figure represent samples."
+            ),
+            shiny::tags$p(
+              shiny::strong("Goal: "),
+              "after correction/transformation and correction, biological variation should dominate technical variation and signal drift should ",
+              "not be visible in right panel. "
+              ),
+            shiny::tags$ul(
+              shiny::tags$li(shiny::strong("When coloring the plot by class: "), "QC samples should cluster together in the right panel."),
+              shiny::tags$li(shiny::strong("When coloring the plot by batch or order: "), "there should be no distinct color patterns in the right panel if samples were run using a random injection ordering")
+            ),
+            shiny::tags$hr(),
+            shiny::strong("PCA loading plots"),
+            shiny::tags$p(
+              "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
+              "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
+              "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
+              "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",
+              "A positive loading (green) means that a high value in that metabolite corresponds to a high value in that PC. ",
+              "A negative loading (red) means a high value in that metabolite corresponds to a low value in that PC."
+            ),
+            title = "What information does the PCA plots and loading plots show?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_pca_eval(ns),
         width = 400
       ),
@@ -43,7 +217,7 @@ mod_visualize_ui <- function(id) {
           sidebar = ui_sidebar_block(
             title = "Download Figures",
             uiOutput(ns("download_fig_zip_btn")),
-            help = c("All figures can also be downloaded on tab 4. Export All"),
+            help = c("If there are many metabolites, downloading figures may take a few minutes."),
             position = "right"
           ),
           ui_fig_format(ns),
@@ -193,6 +367,7 @@ mod_visualize_server <- function(id, data, params) {
          params   = reactive(list(
            rsd_compare = input$rsd_compare,
            rsd_cal     = input$rsd_cal,
+           rsd_plot_type = input$rsd_plot_type,
            pca_compare = input$pca_compare,
            color_col   = input$color_col,
            fig_format  = input$fig_format

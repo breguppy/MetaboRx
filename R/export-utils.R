@@ -9,7 +9,7 @@
     top2 <- metabolite_rsd(d$filtered$df)  %>%
       select(Metabolite, RSD_NonQC_before = RSD_NonQC) %>%
       inner_join(
-        metabolite_rsd(d$filtered_corrected$df) %>%
+        metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
           select(Metabolite, RSD_NonQC_after = RSD_NonQC),
         by = "Metabolite"
       ) %>%
@@ -23,7 +23,7 @@
       filter(class != "QC") %>%
       select(Metabolite, RSD_before = RSD) %>%
       inner_join(
-        class_metabolite_rsd(d$filtered_corrected$df) %>%
+        class_metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
           filter(class != "QC") %>%
           select(Metabolite, RSD_after = RSD),
         by = "Metabolite"
@@ -42,7 +42,7 @@
     filter(class == "QC") %>%
     select(Metabolite, RSD_before = RSD) %>%
     inner_join(
-      class_metabolite_rsd(d$filtered_corrected$df) %>%
+      class_metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
         filter(class == "QC") %>%
         select(Metabolite, RSD_after = RSD),
       by = "Metabolite"

@@ -9,11 +9,42 @@ mod_import_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "1.1 Upload Raw Data",
-          ui_file_upload(ns),
-          help = c(
-            "Raw data must be on the first sheet of .xls or .xlsx file.",
-            "Data must begin and end with QC samples when sorted by injection order."
+          shiny::tags$div(
+            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+            shiny::tags$strong("Data requirements"),
+            bslib::popover(
+              shiny::tags$button(
+                type = "button",
+                class = "btn btn-link p-0",
+                style = "text-decoration:none;",
+                shiny::icon("circle-info")
+              ),
+              shiny::tags$p(shiny::strong("Note: "), "Raw data must be on the first sheet of .xls or .xlsx file."),
+              shiny::tags$p(shiny::strong("Your upload data must have:")),
+              shiny::tags$ul(
+                shiny::tags$li(shiny::strong("Rows = samples"), " (can be in any order)"),
+                shiny::tags$li(shiny::strong("Columns = non-metabolite columns and metabolites"), " (can be in any order)"),
+                shiny::tags$li(shiny::strong("Non-metabolite columns:")),
+                shiny::tags$ul(
+                  shiny::tags$li(shiny::tags$p(shiny::strong("sample column (required): "), "Column that contains unique sample names.")),
+                  shiny::tags$li(shiny::tags$p(shiny::strong("batch column (optional): "), "Column that contains batch information if samples were run in batches.")),
+                  shiny::tags$li(shiny::tags$p(shiny::strong("class column (required): "), "Column that indicated the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blank samples, label them as 'blank'.")),
+                  shiny::tags$li(shiny::tags$p(shiny::strong("injection order column (required): "), "Column that indicates injection order.")),
+                  shiny::tags$li(shiny::tags$p(shiny::strong("additional meta-information columns (optional): "), "Any remaining non-metabolite columns need to be specified."))
+                ),
+                shiny::tags$li(shiny::strong("Note: "), "Data (excluding blank samples) must begin and end with QC samples when sorted by injection order.")
+              ),
+              shiny::tags$img(
+                src = image_src <- knitr::image_uri(system.file("www/example_data_structure.png", package = "QCcorrection")),  
+                style = "width: 100%; height: auto; display: block;"
+              ),
+              title = "Required data structure",
+              placement = "auto",
+              options = list(container = "body",
+                             customClass = "popover-responsive") 
+            )
           ),
+          ui_file_upload(ns),
           width = 400
         ),
         ui_table_scroll("contents", ns)
@@ -33,7 +64,25 @@ mod_import_ui <- function(id) {
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "1.3 Filter Raw Data", 
+        title = "1.3 Filter Missing Values",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Missing Value Filter"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p("Metabolites will low detection rates may not be reliable or insightful. The missing value percentage threshold can be adjusted to the user's desired threshold. Metabolites with missing value percentage above the threshold will be removed from the dataset."),
+            shiny::tags$p("Metabolites that remain in the dataset after filter and have at least 1 missing value for QC samples are also shown on the right. Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
+            title = "Why filter metabolites bases on missing values?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_filter_slider(ns), 
         width = 400
         ),
@@ -41,8 +90,7 @@ mod_import_ui <- function(id) {
         sidebar = ui_sidebar_block(
           title = "Download Missing Value Summary", 
           uiOutput(ns("download_mv_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("Missing value summary by metabolite, sample, class, and batch.",
-                   "Missing value summary can also be downloaded on tab 4. Export All"),
+          help = c("Missing value summary by metabolite, sample, class, and batch."),
           width = 400,
           position = "right"),
         uiOutput(ns("filter_info"))
@@ -51,10 +99,26 @@ mod_import_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "1.4 Raw Data Metabolite Correlations",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Pearson's r correlations"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tags$p("To investigate linear relationships between metabolites, Pearson's r is computed for each pair. A strong positive linear correlation (Pearson's r near 1) means that as one metabolite increases, the other metabolite consistently increases proportionally."),
+            shiny::tags$p("All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlations to be displayed here."),
+            shiny::tags$p("To view all pairwise correlations, download the Excel displayed on the right."),
+            title = "Pearson's r correlations",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         ui_corr_slider(ns),
-        help = c("To investigate linear relationships between metabolites Pearson's r is computed for each pair.",
-                 "All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlation to be displayed here.",
-                 "To view all pairwise correlation, download the Excel displayed on the right."),
         width = 400
       ),
       layout_sidebar(

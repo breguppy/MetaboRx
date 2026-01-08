@@ -34,8 +34,7 @@ mod_correct_ui <- function(id) {
           sidebar = ui_sidebar_block(
             title = "Download Corrected RSD Summary",
             uiOutput(ns("download_cor_rsd_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("RSD summary before and after correction for samples and QCs. ",
-                     "RSD summary can also be downloaded on tab 4. Export All"),
+            help = c("Creates Excel file with RSD summary before and after correction for samples and QCs. "),
             width = 400,
             position = "right"
           ),
@@ -56,8 +55,7 @@ mod_correct_ui <- function(id) {
           sidebar = ui_sidebar_block(
              title = "Download Transformed RSD Summary",
           uiOutput(ns("download_tc_rsd_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("RSD summary before and after correction and transformation for samples and QCs. ",
-                   "RSD summary can also be downloaded on tab 4. Export All"),
+          help = c("Creates Excel file with RSD summary before and after correction and transformation for samples and QCs."),
           width = 400,
           position = "right"
           ),
@@ -69,16 +67,70 @@ mod_correct_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "2.4 Candidate Extreme Values",
+          shiny::tags$div(
+            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+            shiny::tags$strong("How detection works"),
+            bslib::popover(
+              shiny::tags$button(
+                type = "button",
+                class = "btn btn-link p-0",
+                style = "text-decoration:none;",
+                shiny::icon("circle-info")
+              ),
+              shiny::tagList(
+                shiny::tags$p(
+                  "This screen flags potential extreme values using a 2D PCA / Hotelling T² approach fit on non-QC samples.",
+                  "Hotelling’s T² here is computed as the squared Mahalanobis distance in PC1–PC2 space using a PCA model fit on non-QC samples:"
+                ),
+                shiny::tags$ol(
+                  shiny::tags$li(
+                    shiny::strong("Log and Scale Metabolites for non-QC samples: "),
+                    "Applies log2(x + 1), then standardizes using pooled non-QC samples only."
+                  ),
+                  shiny::tags$li(
+                    shiny::strong("PCA fit (non-QC only): "),
+                    "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
+                  ),
+                  shiny::tags$li(
+                    shiny::strong("T² in PC space for all samples: "),
+                    "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance (Hotelling T²)."
+                  ),
+                  shiny::tags$li(
+                    shiny::strong("Ellipse cutoff: "),
+                    "Flags samples outside the (1 − α) ellipse using a χ² cutoff with df = 2 (default α = 0.05 → 95%)."
+                  ),
+                  shiny::tags$li(
+                    shiny::strong("Dual z-score rule (only for outlier samples): "),
+                    "Within samples outside the ellipse, flags metabolite values only when BOTH ",
+                    shiny::strong("|global z| ≥ 3"),
+                    " (pooled non-QC scaling) AND ",
+                    shiny::strong("|class z| ≥ 3"),
+                    " (within that non-QC class)."
+                  )
+                ),
+                shiny::tags$hr(),
+                shiny::tags$p(
+                  shiny::strong("Interpretation: "),
+                  "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
+                ),
+                shiny::tags$p(shiny::strong("Caution: "),
+                              "Candidate extreme values are displayed for the user's benefit. ",
+                              "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it.")
+              ),
+              title = "Candidate extreme value detection",
+              placement = "auto",
+              options = list(container = "body", customClass = "popover-responsive")
+            )
+          ),
+          
           ui_detect_outliers_options(ns),
-          help = c("PCA and Hotelling's T^2 95% ellipse are computes in the PC1-PC2 space using only the non-QC samples.",
-                   "Samples outside the Hotelling's T^2 ellipse are colored red",
-                   "Samples listed in the table are outside the Hotelling's T^2 95% limit AND have at least 1 potential extreme metabolite value meaning global AND class |z| is greater than 3."
-        )),
+          width = 400
+      ),
         layout_sidebar(
           sidebar = ui_sidebar_block(
             title = "Download Extreme Value Summary",
             uiOutput(ns("download_ev_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("Extreme value summary can also be downloaded on tab 4. Export All"),
+            help = c("Creates Excel file with summary of extreme value detection."),
             width = 400,
             position = "right"
           ),
@@ -90,10 +142,26 @@ mod_correct_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "2.5 Post-Correction/Transformation Metabolite Correlation",
+          shiny::tags$div(
+            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+            shiny::tags$strong("Pearson's r correlations"),
+            bslib::popover(
+              shiny::tags$button(
+                type = "button",
+                class = "btn btn-link p-0",
+                style = "text-decoration:none;",
+                shiny::icon("circle-info")
+              ),
+              shiny::tags$p("To investigate linear relationships between metabolites, Pearson's r is computed for each pair. A strong positive linear correlation (Pearson's r near 1) means that as one metabolite increases, the other metabolite consistently increases proportionally."),
+              shiny::tags$p("All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlations to be displayed here."),
+              shiny::tags$p("To view all pairwise correlations, download the Excel displayed on the right."),
+              title = "Pearson's r correlations",
+              placement = "auto",
+              options = list(container = "body",
+                             customClass = "popover-responsive") 
+            )
+          ),
           ui_tc_corr_slider(ns),
-          help = c("To investigate linear relationships between metabolites Pearson's r is computed for each pair.",
-                   "All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlation to be displayed here.",
-                   "To view all pairwise correlation, download the Excel displayed on the right."),
           width = 400
         ),
         layout_sidebar(
@@ -135,7 +203,7 @@ mod_correct_ui <- function(id) {
             container = div,
             style = "position: absolute; bottom: 15px; right: 15px;"
           ),
-          tags$h6("Corrected data can also be downloaded on tab 4. Export All"),
+          help = c("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
           width = 400,
           position = "right"
         ),
@@ -698,6 +766,7 @@ mod_correct_server <- function(id, data, params) {
       corrected          = corrected_r,
       filtered_corrected = filtered_corrected_r,
       transformed        = transformed_r,
+      tc_corr            = tc_correlations_r,
       params             = correct_params
     )
   })

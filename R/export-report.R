@@ -11,13 +11,12 @@ render_report <- function(p,
   if (!dir.exists(out_dir))
     dir.create(out_dir, recursive = TRUE)
   env <- new.env(parent = baseenv())
-  
   shiny::withProgress(message = "Creating correction_report(.pdf/.html)...", value = 0, {
     # build plots
     met_candidates <- .get_top_two(p, d)
     increased_qc <- .increased_qc_rsd(d)
-    met1_plot <- make_met_scatter(d, met_candidates[1])
-    met2_plot <- make_met_scatter(d, met_candidates[2])
+    met1_plot <- make_met_scatter(d, p, met_candidates[1])
+    met2_plot <- make_met_scatter(d, p, met_candidates[2])
     rsd_plot  <- make_rsd_plot(p, d)
     pca_plot  <- make_pca_plot(p, d)
     pca_loading_plot <- make_pca_loading_plot(p, d)

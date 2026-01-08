@@ -107,7 +107,7 @@ ui_withhold_count <- function(ns, max_withhold) {
 ui_corr_slider <- function(ns) {
   tooltip(
     sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's R within this range will be displayed here.", 
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
   )
 }
@@ -130,7 +130,7 @@ ui_tc_corr_slider <- function(ns) {
   ),
   tooltip(
     sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's R within this range will be displayed here.", 
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
   )
   )
@@ -142,7 +142,7 @@ ui_tc_corr_slider <- function(ns) {
 ui_filter_slider <- function(ns) {
   tooltip(
     sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites above this missing % are removed.", 
+    "Metabolites with missing % above this threshold are removed.", 
     placement = "right"
   )
 }
@@ -174,14 +174,50 @@ ui_withhold_selectors <- function(ids, cols, prev, ns) {
 #' @keywords internal
 #' @noRd
 ui_qc_impute <- function(df, metab_cols, ns = identity) {
-  qc_df <- df %>% filter(df$class == "QC")
+  qc_df <- df %>% dplyr::filter(df$class == "QC")
   has_qc_na <- any(is.na(qc_df[, metab_cols]))
   
   if (has_qc_na) {
-    radioButtons(
+    
+    label_with_info <- shiny::tagList(
+      shiny::span("QC Sample Imputation Method"),
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0 ms-1",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        shiny::tagList(
+          shiny::tags$p(
+            "Choose how missing values in QC samples are imputed before correction."
+          ),
+          shiny::tags$ul(
+            shiny::tags$li(shiny::strong("Metabolite median / mean: "),
+                           "Across all samples."),
+            shiny::tags$li(shiny::strong("QC-metabolite median / mean: "),
+                           "Across QC samples only."),
+            shiny::tags$li(shiny::strong("Minimum / half-minimum: "),
+                           "Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small."),
+            shiny::tags$li(shiny::strong("KNN: "),
+                           "k-nearest neighbors imputation."),
+            shiny::tags$li(shiny::strong("Zero: "),
+                           "Not recommended unless biologically justified.")
+          )
+        ),
+        title = "QC imputation methods",
+        placement = "right",
+        options = list(
+          container = "body",
+          customClass = "popover-responsive"
+        )
+      )
+    )
+    
+    shiny::radioButtons(
       ns("qcImputeM"),
-      "QC Sample Imputation Method",
-      list(
+      label = label_with_info,
+      choices = list(
         "metabolite median" = "median",
         "metabolite mean" = "mean",
         "QC-metabolite median" = "class_median",
@@ -191,14 +227,20 @@ ui_qc_impute <- function(df, metab_cols, ns = identity) {
         "KNN" = "KNN",
         "zero" = "zero"
       ),
-      "median",
-      FALSE
+      selected = "median",
+      inline = FALSE
     )
+    
   } else {
-    tags$div(icon("check-circle", class = "text-success"),
-             span("No QC missing values"))
+    
+    shiny::tags$div(
+      shiny::icon("check-circle", class = "text-success"),
+      shiny::span("No QC missing values")
+    )
+    
   }
 }
+
 
 #' Impute missing sample value options for section 2.1 Choose Correction settings
 #' @keywords internal
@@ -208,11 +250,46 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
   has_sam_na <- any(is.na(sam_df[, metab_cols]))
   num_classes <- length(unique(sam_df$class))
   
+  label_with_info <- shiny::tagList(
+    shiny::span("Sample Imputation Method"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p(
+          "Choose how missing values in samples are imputed before correction."
+        ),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::strong("Metabolite median / mean: "),
+                         "Across all samples."),
+          shiny::tags$li(shiny::strong("Class-metabolite median / mean: "),
+                         "Across samples grouping by class."),
+          shiny::tags$li(shiny::strong("Minimum / half-minimum: "),
+                         "Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small."),
+          shiny::tags$li(shiny::strong("KNN: "),
+                         "k-nearest neighbors imputation."),
+          shiny::tags$li(shiny::strong("Zero: "),
+                         "Not recommended unless biologically justified.")
+        )
+      ),
+      title = "Sample imputation methods",
+      placement = "right",
+      options = list(
+        container = "body",
+        customClass = "popover-responsive"
+      )
+    )
+  )
+  
   if (has_sam_na) {
     if (num_classes > 1) {
       radioButtons(
         inputId = ns("samImputeM"),
-        label = "Sample Imputation Method",
+        label = label_with_info,
         choices = list(
           "metabolite median" = "median",
           "metabolite mean" = "mean",
@@ -229,7 +306,7 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
     } else {
       radioButtons(
         inputId = ns("samImputeM"),
-        label = "Sample Imputation Method",
+        label = label_with_info,
         choices = list(
           "metabolite median" = "median",
           "metabolite mean" = "mean",
@@ -253,65 +330,116 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
 #' @noRd
 ui_correction_method <- function(df, ns = identity) {
   qc_per_batch <- df %>%
-    group_by(batch) %>%
-    summarise(qc_in_batch = sum(class == "QC"), .groups = "drop")
-  num_batches <- length(unique(df$batch))
+    dplyr::group_by(batch) %>%
+    dplyr::summarise(qc_in_batch = sum(class == "QC"), .groups = "drop")
+  
+  num_batches <- dplyr::n_distinct(df$batch)
+  
+  label_with_info <- shiny::tagList(
+    shiny::span("Correction Method"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p("QC-based signal drift correction methods:"),
+        shiny::tags$ul(
+          shiny::tags$li(
+            shiny::strong("Random Forest (RF) = QC-RFSC: "),
+            "Fit a random forest model using QC samples (QC intensity vs injection order) to estimate drift and correct samples."
+          ),
+          shiny::tags$li(
+            shiny::strong("Local Polynomial Fit (LOESS) = QC-RLSC: "),
+            "Uses LOESS smoothing on QC samples to estimate drift and correct samples."
+          ),
+          shiny::tags$li(
+            shiny::strong("Batchwise versions (BW_RF / BW_LOESS): "),
+            "Apply the same approach within each batch and then recombine."
+          )
+        ),
+        shiny::tags$p(
+          shiny::strong("Rule of thumb: "),
+          "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
+        )
+      ),
+      title = "What do these methods mean?",
+      placement = "right",
+      options = list(container = "body", customClass = "popover-responsive")
+    )
+  )
+  
+  # Build choices based on your existing logic
+  choices <- NULL
+  selected <- "RF"
   
   if (num_batches == 1) {
     if (any(qc_per_batch$qc_in_batch <= 5)) {
-      radioButtons(
-        inputId = ns("corMethod"),
-        label = "Method",
-        choices = list("Local Polynomial Fit (LOESS)" = "LOESS"),
-        selected = "LOESS"
-      )
+      choices <- list("Local polynomial Fit (LOESS)" = "LOESS")
+      selected <- "LOESS"
     } else {
-      radioButtons(
-        inputId = ns("corMethod"),
-        label = "Method",
-        choices = list(
-          "Random Forest" = "RF",
-          "Local Polynomial Fit (LOESS)" = "LOESS"
-        ),
-        selected = "RF"
+      choices <- list(
+        "Random forest" = "RF",
+        "Local polynomial Fit (LOESS)" = "LOESS"
       )
+      selected <- "RF"
     }
   } else {
     if (any(qc_per_batch$qc_in_batch < 5)) {
-      radioButtons(
-        inputId = ns("corMethod"),
-        label = "Method",
-        choices = list(
-          "Random Forest" = "RF",
-          "Local Polynomial Fit (LOESS)" = "LOESS"
-        ),
-        selected = "RF"
+      choices <- list(
+        "Random forest" = "RF",
+        "Local polynomial Fit (LOESS)" = "LOESS"
       )
+      selected <- "RF"
     } else {
-      radioButtons(
-        inputId = ns("corMethod"),
-        label = "Method",
-        choices = list(
-          "Random Forest" = "RF",
-          "Local Polynomial Fit (LOESS)" = "LOESS",
-          "Batchwise Random Forest" = "BW_RF",
-          "Batchwise Local polynomial fit (LOESS)" = "BW_LOESS"
-        ),
-        selected = "RF"
+      choices <- list(
+        "Random forest" = "RF",
+        "Local polynomial fit (LOESS)" = "LOESS",
+        "Batchwise random forest" = "BW_RF",
+        "Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
       )
+      selected <- "RF"
     }
   }
+  
+  shiny::radioButtons(
+    inputId = ns("corMethod"),
+    label = label_with_info,
+    choices = choices,
+    selected = selected
+  )
 }
+
 
 #' Post-correction filtering
 #' @keywords internal
 #' @noRd
 ui_post_cor_filter <- function(ns) {
-  tagList(
+  shiny::tagList(
     tooltip(
       checkboxInput(ns("remove_imputed"), "Remove imputed values after correction", FALSE),
       "Check this box if you want to the corrected data to have the same missing values as the raw data.", 
       placement = "right"
+    ),
+    shiny::tags$div(
+      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+      shiny::tags$strong("RSD calculation"),
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        shiny::tags$p(shiny::strong("Relative Standard Deviation = RSD: "), 
+                                    "Computed for each metabolite by dividing standard deviation by mean and expressed as a percentage. Describes standard deviation as a percentage of the mean."),
+        title = "RSD% calculation",
+        placement = "auto",
+        options = list(container = "body",
+                       customClass = "popover-responsive") 
+      )
     ),
     tooltip(
       checkboxInput(ns("post_cor_filter"), "Don't filter metabolites based on QC RSD%", FALSE),
@@ -325,7 +453,8 @@ ui_post_cor_filter <- function(ns) {
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
        placement = "right"
       )
-    )
+    ),
+    
   )
 }
 
@@ -338,42 +467,87 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   choices <- if (has_istd) {
     list(
       "Internal Standard Normalization" = "ISTD_norm",
-      "Total Ratiometically Normalized (TRN)" = "TRN",
+      "Total Ratiometrically Normalized (TRN)" = "TRN",
       "None" = "none"
     )
   } else {
     list(
-      "Total Ratiometic Normalization (TRN)" = "TRN",
+      "Total Ratiometric Normalization (TRN)" = "TRN",
       "None" = "none"
     )
   }
   
-  tagList(
-    radioButtons(
+  label_with_info <- shiny::tagList(
+    shiny::span("Method"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p("Post-correction transformations/normalizations:"),
+        shiny::tags$ul(
+          if (has_istd) shiny::tags$li(
+            shiny::strong("Internal Standard Normalization: "),
+            "For each sample (row), compute the mean of internal standard columns (ISTD*/ITSD*), ",
+            "then divide each non-internal standard metabolite by that mean."
+          ),
+          shiny::tags$li(
+            shiny::strong("Total Ratio Normalization (TRN): "),
+            "For each sample (row), compute the total signal as the sum across included metabolite columns, ",
+            "then scale each included metabolite by its proportion of that total and multiply by the number ",
+            "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
+          ),
+          shiny::tags$li(
+            shiny::strong("None: "),
+            "Leaves corrected metabolite values unchanged."
+          ),
+        ),
+        shiny::tags$hr(),
+        shiny::tags$p(
+          shiny::strong("Exclude internal standards checkbox: "),
+          "When checked, ISTD/ITSD columns are excluded from the TRN total-signal calculation and are not transformed."
+        ),
+        shiny::tags$p(
+          shiny::strong("Withhold from TRN: "),
+          "Use this if a column should not contribute to the TRN total (e.g., TIC)."
+        )
+      ),
+      title = "Transformation methods",
+      placement = "right",
+      options = list(container = "body", customClass = "popover-responsive")
+    )
+  )
+  
+  shiny::tagList(
+    shiny::radioButtons(
       ns("transform"),
-      "Method",
-      choices  = choices,
+      label = label_with_info,
+      choices = choices,
       selected = "none"
     ),
-    tooltip(
-      checkboxInput(
+    bslib::tooltip(
+      shiny::checkboxInput(
         ns("ex_ISTD"),
-        "Exclude Internal Standards from post-correction transformation/normalization.",
+        "Exclude internal standards from post-correction transformation.",
         TRUE
       ),
-      "Check this box if you do not want internal standards to be included in the transformation or normalization calculation.",
+      "Check this box if you do not want internal standards to be included in the transformation calculation.",
       placement = "right"
     ),
-    conditionalPanel(
+    shiny::conditionalPanel(
       condition = sprintf("input['%s'] === 'TRN'", ns("transform")),
-      tooltip(
-        checkboxInput(ns("trn_withhold_checkbox"), "Withhold column(s) from TRN", FALSE),
+      bslib::tooltip(
+        shiny::checkboxInput(ns("trn_withhold_checkbox"), "Withhold column(s) from TRN", FALSE),
         "Check this box if there are any columns that should not count in TRN (i.e. TIC column). Sample, batch, class and order are already excluded.",
         placement = "right"
       )
     )
   )
 }
+
 
 #' Options for outlier detection
 #' @keywords internal
@@ -399,7 +573,6 @@ ui_detect_outliers_options <- function(ns) {
 #' @noRd
 ui_rsd_eval <- function(ns) {
   tagList(
-    tags$h6("Evaluate correction method by the change in relative standard deviation (RSD)."),
     radioButtons(ns("rsd_plot_type"),
                  "Visualize Changes in RSD by",
                  list("Distribution" = "dist",
@@ -422,7 +595,6 @@ ui_rsd_eval <- function(ns) {
 #' @noRd
 ui_pca_eval <- function(ns){
   tagList(
-    tags$h6("Evaluate correction using principal component analysis (PCA)."),
     radioButtons(ns("pca_compare"), 
                  "Compare raw data to", 
                  list("Corrected data" = "filtered_cor_data", 

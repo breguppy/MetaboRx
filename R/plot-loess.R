@@ -111,7 +111,7 @@ met_scatter_loess <- function(data_raw, data_cor, i) {
   }
   
   p <- add_loess(p, qc_raw)
-  p <- add_loess(p, qc_cor)
+  #p <- add_loess(p, qc_cor)
   
   p
 }
