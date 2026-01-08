@@ -40,7 +40,10 @@ QCcorrection:::report_text_withheld_columns(params$p, params$d)
 ```{r}
 QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets)
 ```
-
+### Raw Data Metabolite Correlations
+```{r}
+QCcorrection:::ui_corr_range_info(params$d$raw_corr, params$p$raw_corr_threshold)
+```
 ### Missing Value Imputation
 ```{r}
 QCcorrection:::report_text_imputation(params$p, params$d)
@@ -70,6 +73,10 @@ QCcorrection:::report_text_candidate_outliers(params$p, params$d)
 QCcorrection:::ui_outliers(params$p, params$d) # need to add hotelling's plot
 ```
 
+# Transformed and Corrected metabolite correlations
+```{r}
+QCcorrection:::ui_corr_range_info(params$d$tc_corr, params$p$tc_corr_threshold)
+```
 # Correction Evaluation
 
 ### Visualize the Correction with Metabolite Scatter Plots

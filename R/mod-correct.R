@@ -725,6 +725,7 @@ mod_correct_server <- function(id, data, params) {
           transform         = input$transform,
           ex_ISTD           = isTRUE(input$ex_ISTD),
           keep_corrected_qcs= isTRUE(input$keep_corrected_qcs),
+          tc_corr_threshold = input$tc_corr_threshold,
           no_control        = isTRUE(input$no_control),
           control_class     = input$control_class %||% ""
         )
@@ -757,6 +758,7 @@ mod_correct_server <- function(id, data, params) {
       ex_ISTD            = isTRUE(input$ex_ISTD),
       out_data           = input$out_data,
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),
+      tc_corr_threshold = input$tc_corr_threshold,
       no_control         = isTRUE(input$no_control),
       control_class      = input$control_class %||% ""
     ))
