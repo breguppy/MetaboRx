@@ -367,6 +367,7 @@ mod_visualize_server <- function(id, data, params) {
          params   = reactive(list(
            rsd_compare = input$rsd_compare,
            rsd_cal     = input$rsd_cal,
+           rsd_plot_type = input$rsd_plot_type,
            pca_compare = input$pca_compare,
            color_col   = input$color_col,
            fig_format  = input$fig_format

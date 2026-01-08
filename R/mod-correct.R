@@ -766,6 +766,7 @@ mod_correct_server <- function(id, data, params) {
       corrected          = corrected_r,
       filtered_corrected = filtered_corrected_r,
       transformed        = transformed_r,
+      tc_corr            = tc_correlations_r,
       params             = correct_params
     )
   })

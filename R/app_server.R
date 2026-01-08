@@ -26,7 +26,8 @@ app_server <- function(input, output, session) {
          imputed            = .get_or_null(correct$imputed),
          corrected          = .get_or_null(correct$corrected),
          filtered_corrected = .get_or_null(correct$filtered_corrected),
-         transformed        = .get_or_null(correct$transformed)
+         transformed        = .get_or_null(correct$transformed),
+         tc_corr            = .get_or_null(correct$tc_corr)
        )
      )
    })

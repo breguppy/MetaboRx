@@ -48,7 +48,7 @@ app_ui <- function() {
   }
     ")
       )
-    ), shinyjs::useShinyjs(), titlePanel("QC Correction for Metabolomics Data"), bslib::navset_tab(
+    ), shinyjs::useShinyjs(), titlePanel("Quality Checks for Metabolomics Data"), bslib::navset_tab(
       id = "main_steps", mod_import_ui("import"), mod_correct_ui("correct"), mod_visualize_ui("viz"), mod_export_ui("export")
     )
   )

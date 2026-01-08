@@ -362,7 +362,7 @@ ui_correction_method <- function(df, ns = identity) {
         ),
         shiny::tags$p(
           shiny::strong("Rule of thumb: "),
-          "If QCs per batch are low, prefer simpler smoothing; batchwise methods require adequate QCs in every batch."
+          "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
         )
       ),
       title = "What do these methods mean?",
