@@ -17,16 +17,10 @@ params:
     value: !r NULL
   d:
     value: !r NULL
-  descriptions:
-    value: !r character(0)
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_chunk$set(dev = "svg")
-statement <- function(name) {
-  d <- params$descriptions[[name]]
-  if (is.character(d) && nzchar(d)) knitr::asis_output(paste0(d, "\n\n"))
-}
 library(htmltools)
 library(dplyr)
 library(QCcorrection)
@@ -39,7 +33,7 @@ library(QCcorrection)
 
 ```{r}
 QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
-statement("Withheld Columns")
+QCcorrection:::report_text_withheld_columns(params$p, params$d)
 ```
 
 ### Missing Value Filter
@@ -49,12 +43,12 @@ QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filter
 
 ### Missing Value Imputation
 ```{r}
-statement("Imputation Description")
+QCcorrection:::report_text_imputation(params$p, params$d)
 ```
 
 ### Correction Description
 ```{r}
-statement("Correction Description")
+QCcorrection:::report_text_correction(params$p, params$d)
 ```
 
 ### Post-correction Filter
@@ -64,12 +58,12 @@ QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remo
 
 ### Transformation Description
 ```{r}
-statement("Transformation Description")
+QCcorrection:::report_text_transformation(params$p, params$d)
 ```
 
 ### Candidate Extreme Values
 ```{r}
-statement("Candidate Extreme Values")
+QCcorrection:::report_text_candidate_outliers(params$p, params$d)
 ```
 
 ```{r}
@@ -86,7 +80,7 @@ print(params$plots[["Metabolite Scatter 2"]])
 ```
 
 ```{r}
-statement("Metabolite Scatter Plots")
+QCcorrection:::report_text_scatter_intro(params$p, params$d)
 ```
 
 ### RSD Comparison
@@ -97,7 +91,7 @@ print(params$plots[["RSD Comparison"]])
 
 To judge how well the correction method worked, we can visualize the change in variation with the relative standard deviation (RSD) comparison plots. RSD is sometimes called coefficient of variation (CV) and is computed as RSD = (standard deviation / mean) * 100%. High RSD indicates that the values for that metabolite are more spread out around the mean, which may be an expected result in the experimental samples. For QC samples, RSD should decrease after correction.
 ```{r}
-statement("RSD Comparison")
+QCcorrection:::report_text_rsd_intro(params$p, params$d)
 ```
 
 ```{r}
@@ -111,7 +105,7 @@ print(params$plots[["PCA Comparison"]])
 ```
 
 ```{r}
-statement("PCA Comparison")
+QCcorrection:::report_text_pca_intro(params$p, params$d)
 ```
 
 ```{r, echo=FALSE, fig.width=8.75, fig.height=4.417}
