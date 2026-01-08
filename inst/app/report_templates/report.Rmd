@@ -25,25 +25,46 @@ library(htmltools)
 library(dplyr)
 library(QCcorrection)
 ```
-# Preprocessing Steps
-
+# Raw Data
+```{r}
+QCcorrection:::report_text_withheld_columns(params$p, params$d)
+```
 ### Raw Data Summary and Structural Checks
 
 **Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and sample classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
 
 ```{r}
 QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
-QCcorrection:::report_text_withheld_columns(params$p, params$d)
 ```
 
-### Missing Value Filter
+### Filter Missing Values in Raw Data
+This section shows the names of metabolites that were removed from the dataset because the perecentage of missing values was above the set threshold. Metabolites with low detection rates may not be reliable or insightful.
+
+Metabolites that remain in the dataset after filtering and have at least 1 missing value for QC samples are also shown in this section. Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected.
 ```{r}
 QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets)
 ```
+
 ### Raw Data Metabolite Correlations
+This sections shows pairs of metabolites that have Pearson's r correlations within the specified range. To investigate linear relationships between metabolites, Pearson's r is computed for each pair. A strong positive linear correlation (Pearson's r near 1) means that as one metabolite increases, the other metabolite consistently increases proportionally.
+
+All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlations to be displayed here.
+
 ```{r}
-QCcorrection:::ui_corr_range_info(params$d$raw_corr, params$p$raw_corr_threshold)
+if (!is.null(params$d$raw_corr)) {
+  QCcorrection:::ui_corr_range_info(params$d$raw_corr, params$p$raw_corr_threshold)
+} else {
+  htmltools::tags$span(style = "font-weight:bold;", "Metabolite correlations were not computed.")
+}
+
 ```
+
+Two metababolites might have a strong positive linear correlation without a biological explanation if they are from the same chromotography peak, but viewed under different filters or
+they have similar signal drift patterns that confounds biological signal.
+If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound.
+
+# Imputation, Signal Drift Correction, and Transformation.
+
 ### Missing Value Imputation
 ```{r}
 QCcorrection:::report_text_imputation(params$p, params$d)
@@ -54,7 +75,8 @@ QCcorrection:::report_text_imputation(params$p, params$d)
 QCcorrection:::report_text_correction(params$p, params$d)
 ```
 
-### Post-correction Filter
+### Post-correction Filter Based on QC RSD
+Relative Standard Deviation (RSD) is computed for each metabolite by dividing standard deviation by mean and is expressed as a percentage. RSD describes standard deviation as a percentage of the mean. Metabolites with QC RSD above the set threshold are removed from the dataset and are listed here.
 ```{r}
 QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
 ```
@@ -65,19 +87,21 @@ QCcorrection:::report_text_transformation(params$p, params$d)
 ```
 
 ### Candidate Extreme Values
-```{r}
-QCcorrection:::report_text_candidate_outliers(params$p, params$d)
-```
 
 ```{r}
-QCcorrection:::ui_outliers(params$p, params$d) # need to add hotelling's plot
+QCcorrection:::report_text_hotelling_detection(params$p, params$d)
+QCcorrection:::ui_outliers(params$p, params$d) 
 ```
 
-# Transformed and Corrected metabolite correlations
+### Transformed and Corrected Metabolite Correlations
 ```{r}
-QCcorrection:::ui_corr_range_info(params$d$tc_corr, params$p$tc_corr_threshold)
+if (!is.null(params$d$tc_corr)) {
+  QCcorrection:::ui_corr_range_info(params$d$tc_corr, params$p$tc_corr_threshold)
+} else {
+  htmltools::tags$span(style = "font-weight:bold;", "Metabolite correlations were not computed.")
+}
 ```
-# Correction Evaluation
+# Vizualization
 
 ### Visualize the Correction with Metabolite Scatter Plots
 

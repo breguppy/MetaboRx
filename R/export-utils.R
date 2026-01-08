@@ -60,13 +60,14 @@ report_text_withheld_columns <- function(p, d) {
   x <- htmltools::tagList(
     htmltools::tags$span(
       style = "font-weight:bold;",
-      "The following columns are non-metabolite columns providing meta-information about the data:"
+      "Raw data uploaded to the app requires specific non-metabolite columns that provide additional information about the dataset."
     ),
     htmltools::tags$ul(lapply(c(
-      "sample = Identifies sample name",
-      "batch = Identifies batch (large sample sets are separated into batches)",
-      "class = Identifies sample type",
-      "order = Identifies the order in which samples were injected into the instrument"
+      "sample column (required): Column that contains unique sample names.", 
+      "batch column (optional): Column that contains batch information if samples were run in batches.",
+      "class column (required): Column that indicated the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blank samples, label them as 'blank'.",
+      "injection order column (required): Column that indicates injection order.",
+      "additional meta-information columns (optional): Any remaining non-metabolite columns need to be specified."
     ), htmltools::tags$li))
   )
   
@@ -85,27 +86,65 @@ report_text_withheld_columns <- function(p, d) {
 #' @keywords internal
 #' @noRd
 report_text_imputation <- function(p, d) {
-  parts <- character(0)
+  paragraphs <- character(0)
   
   if (!identical(d$imputed$qc_str, "nothing to impute")) {
-    parts <- c(parts, sprintf("Missing QC values are imputed with %s.", d$imputed$qc_str))
+    paragraphs <- c(
+      paragraphs,
+      sprintf("Missing QC values are imputed with %s.", d$imputed$qc_str)
+    )
   } else {
-    parts <- c(parts, "No missing QC values.")
+    paragraphs <- c(
+      paragraphs,
+      "Since there are no missing QC values, no imputation is necessary."
+    )
   }
   
   if (!identical(d$imputed$sam_str, "nothing to impute")) {
-    parts <- c(parts, sprintf("Missing sample values are imputed with %s.", d$imputed$sam_str))
+    paragraphs <- c(
+      paragraphs,
+      sprintf("Missing sample values are imputed with %s.", d$imputed$sam_str)
+    )
   } else {
-    parts <- c(parts, "No missing sample values.")
+    paragraphs <- c(
+      paragraphs,
+      "Since there are no missing sample values, no imputation is necessary."
+    )
   }
   
-  if ((!identical(d$imputed$qc_str, "nothing to impute") || !identical(d$imputed$sam_str, "nothing to impute")) &&
-      isTRUE(p$remove_imputed)) {
-    parts <- c(parts, "Imputed values are removed after correction.")
+  if (
+    (!identical(d$imputed$qc_str, "nothing to impute") ||
+     !identical(d$imputed$sam_str, "nothing to impute")) &&
+    isTRUE(p$remove_imputed)
+  ) {
+    paragraphs <- c(
+      paragraphs,
+      "Imputed values are removed after correction."
+    )
   }
   
-  htmltools::tags$p(paste(parts, collapse = " "))
+  htmltools::tagList(
+    # main paragraph
+    htmltools::tags$p(paste(paragraphs, collapse = " ")),
+    
+    # bold header
+    htmltools::tags$strong("Imputation method descriptions:"),
+    
+    # bullet list
+    htmltools::tags$ul(lapply(
+      c(
+        "Metabolite median / mean: Across all samples.",
+        "QC-metabolite median / mean: Across QC samples only.",
+        "Class-metabolite median / mean: Across samples grouping by class.",
+        "Minimum / half-minimum: Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small.",
+        "KNN: k-nearest neighbors imputation.",
+        "Zero: Not recommended unless biologically justified."
+      ),
+      htmltools::tags$li
+    ))
+  )
 }
+
 
 #' @keywords internal
 #' @noRd
@@ -131,23 +170,6 @@ report_text_transformation <- function(p, d) {
   }
   
   base
-}
-
-#' @keywords internal
-#' @noRd
-report_text_candidate_outliers <- function(p, d) {
-  htmltools::tags$ul(lapply(c(
-    "Possible extreme samples are detected by first grouping samples (QC vs non-QC or by class) and computing RSD.",
-    "Metabolites with unstable QC RSD (greater than 30%) are not tested for extreme values.",
-    "Robust z-scores are computed for each value within metabolite by median centering and scaling (MAD, IQR/1.349, SD, or 1) within each group.",
-    "Candidate extreme values are non-QC sample-metabolite pairs with a z-score beyond the threshold of 4 for metabolites with stable QC RSD (<= 20%) or 5 for metabolites with borderline QC RSD (20% < QC RSD <= 30%).",
-    "Each candidate is then confirmed with a test chosen by group size: Rosner/ESD for n > 25 (records a strength ratio), otherwise Dixon (if uniquely extreme and 3 <= n <= 30) or Grubbs (if extreme).",
-    "Tied or ineligible cases can still be confirmed when the sample's squared Mahalanobis distance is flagged (md_only).",
-    "Squared Mahalanobis distance is computed in the robust PC score space within each group.",
-    "We retain PCs to reach at least 80% variance.",
-    "Then a robust covariance is computed using MCD, OGK, shrinkage, or classical covariance depending on sample size and PCs retained.",
-    "Confirmed candidates are possible extreme values; investigate before removing."
-  ), htmltools::tags$li))
 }
 
 #' @keywords internal
@@ -223,4 +245,61 @@ report_text_pca_intro <- function(p, d) {
     if (p$pca_compare == "filtered_cor_data") "corrected" else "corrected and transformed",
     p$color_col
   ))
+}
+
+
+#' @keywords internal
+#' @noRd
+report_text_hotelling_detection <- function(p, d) {
+  if (identical(p$out_data, "filtered_cor_data")) {
+    d_type <- "corrected data"
+  } else {
+    d_type <- "transformed and corrected data"
+  }
+  htmltools::tagList(
+    
+    htmltools::tags$p(
+      paste("Candidate extreme samples are identified in", d_type),
+      " using a two-dimensional principal component analysis (PCA) / Hotelling’s T² framework fit on non-QC samples. ",
+      "Hotelling’s T² is computed as the squared Mahalanobis distance in PC1–PC2 space derived from a PCA model trained on non-QC samples only."
+    ),
+    
+    htmltools::tags$ol(
+      htmltools::tags$li(
+        htmltools::tags$strong("Log and scale metabolites (non-QC only): "),
+        "Metabolite intensities are transformed using log2(x + 1) and standardized using pooled non-QC samples."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("PCA fit (non-QC samples): "),
+        "PCA is fit on non-QC samples with complete metabolite data, retaining PC1 and PC2."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Hotelling’s T² in PC space: "),
+        "All complete samples (QC and non-QC) are projected into PC1–PC2 space, and a squared Mahalanobis distance (Hotelling’s T²) is computed."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Ellipse cutoff: "),
+        "Samples falling outside the (1 − α) confidence ellipse are flagged using a χ² cutoff with 2 degrees of freedom (default α = 0.05, corresponding to 95%)."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Dual z-score rule for metabolite-level flags: "),
+        "For samples outside the ellipse, individual metabolite values are flagged only if they satisfy both ",
+        htmltools::tags$strong("|global z| ≥ 3"),
+        " (scaled using pooled non-QC samples) and ",
+        htmltools::tags$strong("|class z| ≥ 3"),
+        " (scaled within the corresponding non-QC class)."
+      )
+    ),
+    
+    htmltools::tags$p(
+      htmltools::tags$strong("Interpretation: "),
+      "Samples outside the ellipse represent multivariate extremes. Reported candidate extreme values are metabolite measurements that additionally satisfy the dual z-score criterion."
+    ),
+    
+    htmltools::tags$p(
+      htmltools::tags$strong("Caution: "),
+      "Candidate extreme values are provided for diagnostic purposes. ",
+      "Additional biological, technical, or experimental context should be considered before classifying a value as an outlier and removing it."
+    )
+  )
 }
