@@ -125,8 +125,7 @@ mod_export_server <- function(id, data, params) {
           basename(xlsx_path),
           basename(stats_xlsx_path),
           basename(outlier_xlsx_path),
-          "correction_report.html",
-          if (isTRUE(rr$has_pdf)) "correction_report.pdf"
+          "quality_report.html"
         )
         rel <- rel[file.exists(file.path(base_dir, rel))]
         

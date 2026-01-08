@@ -27,6 +27,7 @@ Imports:
     htmltools,
     readxl,
     openxlsx,
+    rmarkdown,
     impute
 Suggests:
     randomForest,
@@ -37,13 +38,10 @@ Suggests:
     httpuv,
     cowplot,
     jsonlite,
-    pagedown,
-    rmarkdown,
     zip,
     testthat (>= 3.0.0),
     shinytest2,
     corpcor,
-    chromote,
     pkgload,
     knitr,
 Remotes:

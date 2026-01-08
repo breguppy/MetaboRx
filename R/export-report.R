@@ -7,11 +7,10 @@ render_report <- function(p,
                           out_dir,
                           template = system.file("app", "report_templates", "report.Rmd", package = "QCcorrection")) {
   .require_pkg("rmarkdown", "render reports")
-  .require_pkg("pagedown", "print to PDF")
   if (!dir.exists(out_dir))
     dir.create(out_dir, recursive = TRUE)
   env <- new.env(parent = baseenv())
-  shiny::withProgress(message = "Creating correction_report(.pdf/.html)...", value = 0, {
+  shiny::withProgress(message = "Creating quality_report.html...", value = 0, {
     # build plots
     met_candidates <- .get_top_two(p, d)
     increased_qc <- .increased_qc_rsd(d)
@@ -20,7 +19,7 @@ render_report <- function(p,
     rsd_plot  <- make_rsd_plot(p, d)
     pca_plot  <- make_pca_plot(p, d)
     pca_loading_plot <- make_pca_loading_plot(p, d)
-    shiny::incProgress(1 / 4, detail = "Saved: plots for report")
+    shiny::incProgress(1 / 3, detail = "Saved: plots for report")
     
     # plain strings only; no shiny::tagList here
     descriptions <- list(
@@ -155,7 +154,7 @@ render_report <- function(p,
     )
     
     params <- list(
-      title = "QC Correction Report",
+      title = "Metabolomics Data Quality Report",
       notes = p$notes %||% "",
       plots = list(
         "Metabolite Scatter 1" = met1_plot,
@@ -181,53 +180,25 @@ render_report <- function(p,
         out_data           = p$out_data,
         sample_grouping    = p$sample_grouping,
         qcImputeM          = p$qcImputeM,
-        samImputeM         = p$samImputeM
+        samImputeM         = p$samImputeM,
+        remove_imputed     = p$remove_imputed
       ),
       descriptions = descriptions
     )
-    shiny::incProgress(1 / 4, detail = "Saved: report information")
+    shiny::incProgress(1 / 3, detail = "Saved: report information")
     
     html_out <- rmarkdown::render(
-      input = template,
+      input         = template,
       output_format = "html_document",
-      output_file   = file.path(out_dir, "correction_report.html"),
-      params = params,
-      envir  = env,
-      quiet  = TRUE
+      output_file   = file.path(out_dir, "quality_report.html"),
+      params        = params,
+      envir         = env,
+      quiet         = TRUE
     )
-    shiny::incProgress(1 / 4, detail = "Saved: HTML")
+    shiny::incProgress(1 / 3, detail = "Saved: HTML")
     
-    pdf_out  <- file.path(out_dir, "correction_report.pdf")
-    has_pdf  <- FALSE
-    
-    chrome <- tryCatch(
-      {
-        if (requireNamespace("pagedown", quietly = TRUE)) {
-          pagedown::find_chrome()
-        }
-      },
-      error = function(e) {
-        message("An error occurred: ", e$message)
-        return(NA)
-      }
+    list(
+      html = normalizePath(html_out, winslash = "/")
     )
-    if (requireNamespace("pagedown", quietly = TRUE)) {
-      if (!is.null(chrome)) {
-        has_pdf <- isTRUE(tryCatch({
-          pagedown::chrome_print(input = html_out, output = pdf_out); TRUE
-        }, error = function(e) FALSE))
-      }
-    }
-    if (has_pdf) {
-      shiny::incProgress(1/4, detail = "Saved: PDF")
-    } else {
-      if (file.exists(pdf_out)) unlink(pdf_out)
-      warning("Chrome/Chromium not found or PDF render failed. HTML only.")
-    }
-    
-    # return both paths and a flag
-    list(html = normalizePath(html_out, winslash = "/"),
-         pdf  = if (has_pdf) normalizePath(pdf_out, winslash = "/") else NULL,
-         has_pdf = has_pdf)
   })
 }

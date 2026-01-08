@@ -8,7 +8,7 @@ output:
     toc_float: true
 params:
   title:
-    value: "QC Correction Report"
+    value: "Metabolomics Data Quality Report"
   notes:
     value: ""
   plots:
@@ -36,7 +36,7 @@ library(QCcorrection)
 **Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and biological classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
 
 ```{r}
-QCcorrection:::ui_basic_info(params$choices$raw_df, params$choices$replacement_counts, params$choices$non_numerics_cols, params$choices$duplicate_mets, params$choices$high_corr_mets)
+QCcorrection:::ui_basic_info(params$choices$raw_df, params$choices$replacement_counts, params$choices$non_numeric_cols, params$choices$duplicate_mets, params$choices$high_corr_mets)
 statement("Withheld Columns")
 ```
 
