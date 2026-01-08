@@ -368,7 +368,7 @@ ui_corr_range_info <- function(all_cor, range) {
 # Post-correction filtering info for section 2.2 Post-Correction Filtering
 ui_postcor_filter_info <- function(filtered_corrected_result,
                                    remove_imputed,
-                                   rsd_filter,
+                                   rsd_cutoff,
                                    post_cor_filter) {
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
@@ -388,7 +388,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     warning_ui <- tags$div(
       class = "alert alert-danger",
       style = "margin-bottom: 10px;",
-      tags$strong(paste0(n_istd, " internal standard(s) with QC RSD above ", rsd_filter, "%: ")),
+      tags$strong(paste0(n_istd, " internal standard(s) with QC RSD above ", rsd_cutoff, "%: ")),
       tags$ul(
         lapply(istd_names, tags$li)
       )
@@ -403,7 +403,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
         paste0(
           n_removed,
           " metabolite(s) removed based on QC RSD above ",
-          rsd_filter,
+          rsd_cutoff,
           "%"
         )
       ),

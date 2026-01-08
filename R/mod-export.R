@@ -51,9 +51,9 @@ mod_export_ui <- function(id) {
                tags$li(icon("folder"), " RSD figures"),
                tags$li(icon("folder"), "PCA plots")
              )),
-      column(4, tags$h5(icon("file-pdf"), " correction_report(.pdf/.html)"),
+      column(4, tags$h5(icon("file-circle-check"), " quality_report.html"),
              tags$ul(style = "list-style-type: none;",
-               tags$li("Report describing the correction steps and figures for evaluating the correction process.")
+               tags$li("Report describing all summaries, preprocessing steps, and figures generated from the app.")
              ))
     ),
     uiOutput(ns("download_all_ui"))

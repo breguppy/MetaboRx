@@ -13,8 +13,10 @@ params:
     value: ""
   plots:
     value: !r character(0)
-  choices:
-    value: !r character(0)
+  p:
+    value: !r NULL
+  d:
+    value: !r NULL
   descriptions:
     value: !r character(0)
 ---
@@ -33,16 +35,16 @@ library(QCcorrection)
 
 ### Raw Data Summary and Structural Checks
 
-**Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and biological classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
+**Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and sample classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
 
 ```{r}
-QCcorrection:::ui_basic_info(params$choices$raw_df, params$choices$replacement_counts, params$choices$non_numeric_cols, params$choices$duplicate_mets, params$choices$high_corr_mets)
+QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
 statement("Withheld Columns")
 ```
 
 ### Missing Value Filter
 ```{r}
-QCcorrection:::ui_filter_info(params$choices$filtered$mv_removed_cols, params$choices$mv_cutoff, params$choices$filtered$qc_missing_mets)
+QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets)
 ```
 
 ### Missing Value Imputation
@@ -57,7 +59,7 @@ statement("Correction Description")
 
 ### Post-correction Filter
 ```{r}
-QCcorrection:::ui_postcor_filter_info(params$choices$filtered_corrected, params$choices$remove_imputed, params$choices$rsd_cutoff, params$choices$post_cor_filter)
+QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
 ```
 
 ### Transformation Description
@@ -71,7 +73,7 @@ statement("Candidate Extreme Values")
 ```
 
 ```{r}
-QCcorrection:::ui_outliers(list(out_data = params$choices$out_data, qcImputeM = params$choices$qcImputeM, samImputeM = params$choices$samImputeM), list(filtered_corrected = params$choices$filtered_corrected, transformed = params$choices$transformed))
+QCcorrection:::ui_outliers(params$p, params$d) # need to add hotelling's plot
 ```
 
 # Correction Evaluation
@@ -99,7 +101,7 @@ statement("RSD Comparison")
 ```
 
 ```{r}
-QCcorrection:::ui_rsd_stats(list(rsd_compare = params$choices$rsd_compare, rsd_cal = params$choices$rsd_cal), list(filtered = params$choices$filtered, filtered_corrected = params$choices$filtered_corrected, transformed = params$choices$transformed))
+QCcorrection:::ui_rsd_stats(params$p, params$d)
 ```
 
 ### PCA Comparison

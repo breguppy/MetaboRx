@@ -163,26 +163,8 @@ render_report <- function(p,
         "PCA Comparison" = pca_plot,
         "PCA Loading" = pca_loading_plot
       ),
-      choices = list(
-        raw_df             = d$cleaned$df,
-        replacement_counts = d$cleaned$replacement_counts,
-        non_numeric_cols   = d$cleaned$non_numeric_cols,
-        duplicate_mets     = d$cleaned$duplicate_mets,
-        high_corr_mets    = d$cleaned$high_corr_mets,
-        filtered           = d$filtered,
-        filtered_corrected = d$filtered_corrected,
-        transformed        = d$transformed,
-        mv_cutoff          = p$mv_cutoff,
-        post_cor_filter    = p$post_cor_filter,
-        rsd_cutoff         = p$rsd_cutoff,
-        rsd_compare        = p$rsd_compare,
-        rsd_cal            = p$rsd_cal,
-        out_data           = p$out_data,
-        sample_grouping    = p$sample_grouping,
-        qcImputeM          = p$qcImputeM,
-        samImputeM         = p$samImputeM,
-        remove_imputed     = p$remove_imputed
-      ),
+      p = p,
+      d = d,
       descriptions = descriptions
     )
     shiny::incProgress(1 / 3, detail = "Saved: report information")
