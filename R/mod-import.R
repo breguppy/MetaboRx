@@ -69,7 +69,7 @@ mod_import_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        ui_filter_slider(ns), 
+        uiOutput(ns("mv_filter_slider")), 
         width = 400
         ),
       layout_sidebar(
@@ -104,7 +104,7 @@ mod_import_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        ui_corr_slider(ns),
+        uiOutput(ns("raw_corr_slider")),
         width = 400
       ),
       layout_sidebar(
@@ -121,11 +121,7 @@ mod_import_ui <- function(id) {
         )
     )),
     card(
-      actionButton(
-        ns("next_correction"),
-        "Next: Choose Correction Settings",
-        class = "btn-primary btn-lg"
-      )
+      uiOutput(ns("next_correction_ui"))
     )
   )
 }
@@ -134,12 +130,15 @@ mod_import_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
+    #---------- 1.1 Upload Raw Data server
     data_raw <- reactive({
       req(input$file1)
       read_raw_data(input$file1$datapath)
     })
     output$contents <- renderTable(data_raw())
     
+    #---------- 1.2 Select Non-metabolite Columns server
+    # requires raw data to display selection choices
     selections_r <- reactive({
       list(
         sample = input$sample_col %||% "",
@@ -153,12 +152,14 @@ mod_import_server <- function(id) {
       req(data_raw())
       ui_nonmet_cols(names(data_raw()), ns = session$ns)
     })
+    
     output$column_warning <- renderUI({
       req(data_raw())
       sel <- selections_r()
       ui_column_warning(data_raw(),
                         c(sel$sample, sel$batch, sel$class, sel$order))
     })
+    
     output$withhold_toggle <- renderUI({
       req(data_raw())
       ui_withhold_toggle(ns = session$ns)
@@ -172,6 +173,7 @@ mod_import_server <- function(id) {
         return(character(0))
       paste0("withhold_col_", seq_len(n))
     })
+    
     withheld_r <- reactive({
       ids <- withheld_ids_r()
       if (!length(ids))
@@ -242,10 +244,18 @@ mod_import_server <- function(id) {
       ui_basic_info(cd$df, cd$replacement_counts, cd$non_numeric_cols, cd$duplicate_mets, cd$blank_df, cd$below_blank_threshold)
     })
     
+    #---------- 1.3 Filter Missing Values server
+    # requires cleaned data 
+    output$mv_filter_slider <- renderUI({
+      req(cleaned_r())
+      ui_filter_slider(ns = session$ns)
+    })
+    
     filtered_r <- reactive({
       cd <- req(cleaned_r())
       filter_by_missing(cd$df, setdiff(names(cd$df), c("sample", "batch", "class", "order")), input$mv_cutoff)
     })
+    
     output$filter_info <- renderUI({
       fd <- filtered_r()
       req(fd)
@@ -254,7 +264,6 @@ mod_import_server <- function(id) {
                      fd$qc_missing_mets)
     })
     
-    # button for downloading missing value report.
     output$download_mv_btn <- renderUI({
       req(cleaned_r())
       
@@ -286,15 +295,21 @@ mod_import_server <- function(id) {
       }
     )
     
-    # Increment whenever filtered df changes
     filtered_version_r <- reactiveVal(0L)
     
     observeEvent(filtered_r()$df, {
       filtered_version_r(filtered_version_r() + 1L)
     }, ignoreInit = TRUE)
     
-    # Store the version we last computed correlations for
     computed_version_r <- reactiveVal(NA_integer_)
+    
+    #---------- 1.4 Raw Data Metabolite Correlations server
+    # requires missing value filtered data 
+    output$raw_corr_slider <- renderUI({
+      req(filtered_r())
+      ui_raw_corr_slider(ns = session$ns)
+    })
+    
     output$compute_raw_corr_ui <- renderUI({
       req(filtered_r())
       v <- filtered_version_r()
@@ -322,6 +337,7 @@ mod_import_server <- function(id) {
       metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
       compute_pairwise_metabolite_correlations(df, metab)
     })
+    
     observeEvent(input$compute_raw_corr, ignoreInit = TRUE, {
       shinyjs::disable("compute_raw_corr")
       output$corr_spinner <- renderUI({
@@ -329,6 +345,7 @@ mod_import_server <- function(id) {
         raw_correlations_r(); computed_version_r(filtered_version_r()); NULL
       })
     })
+    
     output$corr_spinner <- renderUI(NULL)
     
     observeEvent(raw_correlations_r(), {
@@ -339,6 +356,7 @@ mod_import_server <- function(id) {
       all_corr <- req(raw_correlations_r())
       ui_corr_range_info(all_corr, input$corr_threshold)
     })
+    
     output$download_raw_corr_btn <- renderUI({
       req(raw_correlations_r())
       
@@ -354,6 +372,7 @@ mod_import_server <- function(id) {
         )
       )
     })
+    
     output$download_raw_corr_data <- downloadHandler(
       filename = function() {
         paste0("raw_metabolite_correlations_", Sys.Date(), ".xlsx")
@@ -364,6 +383,29 @@ mod_import_server <- function(id) {
       }
     )
     
+    #---------- Next: Choose Correction Settings server
+    # requires raw correlations
+    output$next_correction_ui <- renderUI({
+      req(raw_correlations_r()) 
+      actionButton(
+        ns("next_correction"),
+        "Next: Choose Correction Settings",
+        class = "btn-primary btn-lg",
+        width = "100%"
+      )
+    })
+    
+    observeEvent(input$next_correction, {
+      req(raw_correlations_r())
+      validate(
+        need(!is.null(cleaned_r()), "Missing cleaned data"),
+        need(!is.null(filtered_r()), "Missing filtered data")
+      )
+      updateTabsetPanel(session$rootScope(), "main_steps", "tab_correct")
+    })
+    
+    #---------- module output
+    # Collect all input parameters from this module.
     params_r <- reactive({
       sel <- selections_r()
       list(
@@ -378,15 +420,6 @@ mod_import_server <- function(id) {
       )
     })
     
-    observeEvent(input$next_correction, {
-      validate(
-        need(!is.null(cleaned_r()), "Missing cleaned data"),
-        need(!is.null(filtered_r()), "Missing filtered data")
-      )
-      updateTabsetPanel(session$rootScope(), "main_steps", "tab_correct")
-    })
-    
-    # module output
     list(cleaned  = cleaned_r,
          filtered = filtered_r,
          raw_corr = raw_correlations_r,

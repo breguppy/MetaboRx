@@ -1,16 +1,4 @@
-#' File upload
-#' @keywords internal
-#' @noRd
-ui_file_upload <- function(ns) {
-    fileInput(
-      ns("file1"),
-      "Choose Raw Data File (.csv, .xls, or .xlsx)",
-      accept = c(".csv", ".xls", ".xlsx"),
-      buttonLabel = "Browse...",
-      placeholder = "No file selected"
-    )
-}
-
+#----------- Reusable functions
 #' Reusable titled sidebar
 #' @keywords internal
 #' @noRd
@@ -34,6 +22,21 @@ ui_table_scroll <- function(outputId, ns, height = "400px") {
   )
 }
 
+#--------- 1.1 Upload Raw Data inputs
+#' File upload
+#' @keywords internal
+#' @noRd
+ui_file_upload <- function(ns) {
+    fileInput(
+      ns("file1"),
+      "Choose Raw Data File (.csv, .xls, or .xlsx)",
+      accept = c(".csv", ".xls", ".xlsx"),
+      buttonLabel = "Browse...",
+      placeholder = "No file selected"
+    )
+}
+
+#---------- 1.2 Select Non-metabolite Columns Inputs
 #' Column selection for meta data
 #' @keywords internal
 #' @noRd
@@ -101,52 +104,6 @@ ui_withhold_count <- function(ns, max_withhold) {
                step  = 1)
 }
 
-#' metabolite correlation slider
-#' @keywords internal
-#' @noRd
-ui_corr_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
-    placement = "right"
-  )
-}
-#' metabolite correlation slider in corrected or transformed data
-#' @keywords internal
-#' @noRd
-ui_tc_corr_slider <- function(ns) {
-  tagList(tooltip(
-    radioButtons(
-      ns("tc_corr_data"),
-      "Compute metabolite correlations for",
-      list(
-        "Corrected data" = "filtered_cor_data",
-        "Transformed and corrected data" = "transformed_cor_data"
-      ),
-      "filtered_cor_data"
-    ),
-    "all pairwise metabolite correlations will be computed in the data set you select.",
-    placement = "right"
-  ),
-  tooltip(
-    sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
-    placement = "right"
-  )
-  )
-}
-
-#' missing value filter slider
-#' @keywords internal
-#' @noRd
-ui_filter_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites with missing % above this threshold are removed.", 
-    placement = "right"
-  )
-}
-
 #' Repeated selectors for which columns to withhold
 #' @param ids character vector of input ids to render (e.g., "withhold_col_1")
 #' @param cols candidate column names
@@ -170,7 +127,32 @@ ui_withhold_selectors <- function(ids, cols, prev, ns) {
   })
 }
 
-#' Impute missing QC value options for section 2.1 Choose Correction settings
+#----------- 1.3 Filter Missing Values
+#' missing value filter slider
+#' @keywords internal
+#' @noRd
+ui_filter_slider <- function(ns) {
+  tooltip(
+    sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
+    "Metabolites with missing % above this threshold are removed.", 
+    placement = "right"
+  )
+}
+
+#--------- Raw Data Metabolite Correlations input
+#' metabolite correlation slider
+#' @keywords internal
+#' @noRd
+ui_raw_corr_slider <- function(ns) {
+  tooltip(
+    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
+    placement = "right"
+  )
+}
+
+#---------- 2.1 Choose Correction Settings inputs
+#' Impute missing QC value options
 #' @keywords internal
 #' @noRd
 ui_qc_impute <- function(df, metab_cols, ns = identity) {
@@ -241,8 +223,7 @@ ui_qc_impute <- function(df, metab_cols, ns = identity) {
   }
 }
 
-
-#' Impute missing sample value options for section 2.1 Choose Correction settings
+#' Impute missing sample value options
 #' @keywords internal
 #' @noRd
 ui_sample_impute <- function(df, metab_cols, ns = identity) {
@@ -325,7 +306,7 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
   }
 }
 
-#' Correction method selection options for section 2.1 Choose Correction settings
+#' Correction method selection options
 #' @keywords internal
 #' @noRd
 ui_correction_method <- function(df, ns = identity) {
@@ -412,7 +393,7 @@ ui_correction_method <- function(df, ns = identity) {
   )
 }
 
-
+#---------- 2.2 Post-Correction Filtering inputs
 #' Post-correction filtering
 #' @keywords internal
 #' @noRd
@@ -434,7 +415,7 @@ ui_post_cor_filter <- function(ns) {
           shiny::icon("circle-info")
         ),
         shiny::tags$p(shiny::strong("Relative Standard Deviation = RSD: "), 
-                                    "Computed for each metabolite by dividing standard deviation by mean and expressed as a percentage. Describes standard deviation as a percentage of the mean."),
+                      "Computed for each metabolite by dividing standard deviation by mean and expressed as a percentage. Describes standard deviation as a percentage of the mean."),
         title = "RSD% calculation",
         placement = "auto",
         options = list(container = "body",
@@ -449,15 +430,15 @@ ui_post_cor_filter <- function(ns) {
     conditionalPanel(
       condition = sprintf("!input['%s']", ns("post_cor_filter")),
       tooltip(
-       sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 20),
+        sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 20),
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
-       placement = "right"
+        placement = "right"
       )
     ),
     
   )
 }
-
+#---------- Post-Correction Transformation
 #' Post-correction transformation
 #' @keywords internal
 #' @noRd
@@ -548,7 +529,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   )
 }
 
-
+#----------- 2.4 Candidate Extreme Values inputs
 #' Options for outlier detection
 #' @keywords internal
 #' @noRd
@@ -568,6 +549,35 @@ ui_detect_outliers_options <- function(ns) {
   )
 }
 
+#----------- 2.5 Post-Correction/Transformation Correlations inputs
+#' metabolite correlation slider in corrected or transformed data
+#' @keywords internal
+#' @noRd
+ui_tc_corr_slider <- function(ns) {
+  tagList(tooltip(
+    radioButtons(
+      ns("tc_corr_data"),
+      "Compute metabolite correlations for",
+      list(
+        "Corrected data" = "filtered_cor_data",
+        "Transformed and corrected data" = "transformed_cor_data"
+      ),
+      "filtered_cor_data"
+    ),
+    "all pairwise metabolite correlations will be computed in the data set you select.",
+    placement = "right"
+  ),
+  tooltip(
+    sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
+    placement = "right"
+  )
+  )
+}
+
+#---------- 3.1 Scatter Plot Evaluation input
+
+#---------- 3.2 RSD Evaluation input
 #' visualization rsd evaluation
 #' @keywords internal
 #' @noRd
@@ -590,6 +600,7 @@ ui_rsd_eval <- function(ns) {
   )
 }
 
+#---------- 3.3 PCA Evaluation input
 #' visualization pca evaluation
 #' @keywords internal
 #' @noRd
@@ -607,6 +618,7 @@ ui_pca_eval <- function(ns){
   )
 }
 
+#----------- 3.4 Select Figure Format input
 #' Visualization downloading figure format
 #' @keywords internal
 #' @noRd
