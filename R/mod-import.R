@@ -19,26 +19,12 @@ mod_import_ui <- function(id) {
                 style = "text-decoration:none;",
                 shiny::icon("circle-info")
               ),
-              shiny::tags$p(shiny::strong("Note: "), "Raw data must be on the first sheet of .xls or .xlsx file."),
-              shiny::tags$p(shiny::strong("Your upload data must have:")),
-              shiny::tags$ul(
-                shiny::tags$li(shiny::strong("Rows = samples"), " (can be in any order)"),
-                shiny::tags$li(shiny::strong("Columns = non-metabolite columns and metabolites"), " (can be in any order)"),
-                shiny::tags$li(shiny::strong("Non-metabolite columns:")),
-                shiny::tags$ul(
-                  shiny::tags$li(shiny::tags$p(shiny::strong("sample column (required): "), "Column that contains unique sample names.")),
-                  shiny::tags$li(shiny::tags$p(shiny::strong("batch column (optional): "), "Column that contains batch information if samples were run in batches.")),
-                  shiny::tags$li(shiny::tags$p(shiny::strong("class column (required): "), "Column that indicated the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blank samples, label them as 'blank'.")),
-                  shiny::tags$li(shiny::tags$p(shiny::strong("injection order column (required): "), "Column that indicates injection order.")),
-                  shiny::tags$li(shiny::tags$p(shiny::strong("additional meta-information columns (optional): "), "Any remaining non-metabolite columns need to be specified."))
-                ),
-                shiny::tags$li(shiny::strong("Note: "), "Data (excluding blank samples) must begin and end with QC samples when sorted by injection order.")
-              ),
+              report_text_data_req(),
               shiny::tags$img(
                 src = image_src <- knitr::image_uri(system.file("www/example_data_structure.png", package = "QCcorrection")),  
                 style = "width: 100%; height: auto; display: block;"
               ),
-              title = "Required data structure",
+              title = "Required data structure and information",
               placement = "auto",
               options = list(container = "body",
                              customClass = "popover-responsive") 
@@ -55,7 +41,7 @@ mod_import_ui <- function(id) {
         title = "1.2 Select Non-metabolite Columns",
         uiOutput(ns("column_selectors")),
         uiOutput(ns("column_warning")),
-        ui_withhold_toggle(ns),
+        uiOutput(ns("withhold_toggle")),
         uiOutput(ns("n_withhold_ui")),
         uiOutput(ns("withhold_selectors_ui")),
         width = 400
@@ -172,6 +158,10 @@ mod_import_server <- function(id) {
       sel <- selections_r()
       ui_column_warning(data_raw(),
                         c(sel$sample, sel$batch, sel$class, sel$order))
+    })
+    output$withhold_toggle <- renderUI({
+      req(data_raw())
+      ui_withhold_toggle(ns = session$ns)
     })
     
     withheld_ids_r <- reactive({

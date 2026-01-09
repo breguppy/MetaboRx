@@ -56,6 +56,74 @@
 #'
 #' @keywords internal
 #' @noRd
+report_text_data_req <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(
+      htmltools::strong("1. Acceptable file formats: "),
+      ".csv, .xls, or .xlsx"
+    ),
+    htmltools::tags$p(
+      htmltools::tags$u("Note:"),
+      " Raw data must be on the ",
+      htmltools::tags$u("first sheet"),
+      " of a .xls or .xlsx file."
+    ),
+    htmltools::tags$p(htmltools::strong("2. Required data formatting:")),
+    htmltools::tags$ol(
+      type = "a",
+      htmltools::tags$li(htmltools::strong("Rows = samples"), " (can be in any order)"),
+      htmltools::tags$li(
+        htmltools::strong("Columns = non-metabolite columns and metabolites"),
+        " (can be in any order)"
+      ),
+      htmltools::tags$li(htmltools::strong("Non-metabolite columns:")),
+      htmltools::tags$ul(
+        htmltools::tags$li(
+          htmltools::tags$p(
+            htmltools::strong("sample column (required): "),
+            "Column that contains unique sample names."
+          )
+        ),
+        htmltools::tags$li(
+          htmltools::tags$p(
+            htmltools::strong("batch column (optional): "),
+            "Column that contains batch information if samples were run in batches."
+          )
+        ),
+        htmltools::tags$li(
+          htmltools::tags$p(
+            htmltools::strong("class column (required): "),
+            "Column that indicated the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blank samples, label them as 'blank'."
+          )
+        ),
+        htmltools::tags$li(
+          htmltools::tags$p(
+            htmltools::strong("injection order column (required): "),
+            "Column that indicates injection order."
+          )
+        ),
+        htmltools::tags$li(
+          htmltools::tags$p(
+            htmltools::strong("additional meta-information columns (optional): "),
+            "Any remaining non-metabolite columns need to be specified."
+          )
+        )
+      )
+    ),
+    htmltools::tags$p(
+      htmltools::strong("3. Injection order must begin and end with QC samples: "),
+      "Data (excluding blank samples) must begin and end with QC samples when sorted by injection order."
+    ),
+    htmltools::tags$p(
+      htmltools::strong("4. Internal Standard Metabolites Must be Labeled: "),
+      "internal standard metabolites must have a column name that begins with 'ISTD', or 'ITSD'."
+    )
+  )
+}
+
+
+#' @keywords internal
+#' @noRd
 report_text_withheld_columns <- function(p, d) {
   x <- htmltools::tagList(
     htmltools::tags$span(
