@@ -27,7 +27,7 @@ mod_correct_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "2.2 Post-Correction Filtering",
-          ui_post_cor_filter(ns),
+          uiOutput(ns("post_cor_filter_block")),
           width = 400
         ),
         layout_sidebar(
@@ -46,9 +46,7 @@ mod_correct_ui <- function(id) {
       layout_sidebar(
         sidebar = ui_sidebar_block(
           title = "2.3 Post-Correction Transformation",
-          uiOutput(ns("transform_selection_ui")),
-          uiOutput(ns("trn_withhold_ui")),
-          uiOutput(ns("trn_withhold_selectors_ui")),
+          uiOutput(ns("transform_block")),
           width = 400
         ),
         layout_sidebar(
@@ -307,35 +305,47 @@ mod_correct_server <- function(id, data, params) {
     
     #--------- 2.2 Post-correction filtering server
     # requires corrected data
+    output$post_cor_filter_block <- renderUI({
+      req(corrected_r())
+      tagList(
+        ui_post_cor_filter(ns = session$ns),
+        NULL
+      )
+    })
+    
+    
     filtered_corrected_r <- reactive({
       req(filtered_r(), corrected_r())
-      df_filtered <- filtered_r()$df
+      
+      df_filtered  <- filtered_r()$df
       df_corrected <- corrected_r()$df
       
-      if (isTRUE(input$post_cor_filter)) {
-        fil_cor <- filter_by_qc_rsd(df_filtered, 
-                                    df_corrected, 
-                                    Inf, 
-                                    input$remove_imputed, 
-                                    c("sample","batch","class","order"))
-      } else {
-        fil_cor <- filter_by_qc_rsd(df_filtered, 
-                                    df_corrected, 
-                                    input$rsd_filter, 
-                                    input$remove_imputed, 
-                                    c("sample","batch","class","order"))
-      }
+      post_all       <- isTRUE(input$post_cor_filter)          
+      remove_imputed <- isTRUE(input$remove_imputed)           
+      rsd_cutoff     <- input$rsd_filter %||% Inf              
       
-      fil_cor 
+      cutoff_to_use <- if (post_all) Inf else rsd_cutoff
+      
+      filter_by_qc_rsd(
+        df_filtered,
+        df_corrected,
+        cutoff_to_use,
+        remove_imputed,
+        c("sample", "batch", "class", "order")
+      )
     })
     
     output$post_cor_filter_info <- renderUI({
-      req(filtered_corrected_r())
-      ui_postcor_filter_info(filtered_corrected_r(), 
-                             input$remove_imputed, 
-                             input$rsd_filter, 
-                             input$post_cor_filter)
+      req(corrected_r())                # ensures step 2.1 done
+      res <- req(filtered_corrected_r())
+      
+      remove_imputed <- isTRUE(input$remove_imputed)
+      rsd_filter     <- input$rsd_filter %||% Inf
+      post_cor_all   <- isTRUE(input$post_cor_filter)
+      
+      ui_postcor_filter_info(res, remove_imputed, rsd_filter, post_cor_all)
     })
+    
     
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())
@@ -375,6 +385,15 @@ mod_correct_server <- function(id, data, params) {
     
     #---------- 2.3 Post-correction Transformation server
     # Requires filtered and corrected data
+    output$transform_block <- renderUI({
+      req(filtered_corrected_r())
+      tagList(
+        uiOutput(ns("transform_selection_ui")),
+        uiOutput(ns("trn_withhold_ui")),
+        uiOutput(ns("trn_withhold_selectors_ui"))
+      )
+    })
+    
     output$transform_selection_ui <- renderUI({
       req(filtered_corrected_r())
       
@@ -388,20 +407,22 @@ mod_correct_server <- function(id, data, params) {
       req(filtered_corrected_r())
       
       transform_method <- input$transform %||% "none"
-      ex_istd          <- input$ex_ISTD %||% TRUE
+      ex_istd          <- isTRUE(input$ex_ISTD)
       withhold_on      <- isTRUE(input$trn_withhold_checkbox)
       
-      if (isTRUE(input$remove_imputed)) {
-        df_filtered <- filtered_corrected_r()$df_mv
+      df_filtered <- if (isTRUE(input$remove_imputed)) {
+        filtered_corrected_r()$df_mv
       } else {
-        df_filtered <- filtered_corrected_r()$df_no_mv
+        filtered_corrected_r()$df_no_mv
       }
       
       withheld <- character(0)
-      if (withhold_on && !is.null(input$trn_withhold_n)) {
-        for (i in seq_len(input$trn_withhold_n)) {
-          col <- input[[paste0("trn_withhold_col_", i)]]
-          if (!is.null(col) && nzchar(col) && col %in% names(df_filtered)) {
+      n_withhold <- input$trn_withhold_n %||% 0L
+      
+      if (withhold_on && n_withhold > 0L) {
+        for (i in seq_len(n_withhold)) {
+          col <- input[[paste0("trn_withhold_col_", i)]] %||% ""
+          if (nzchar(col) && col %in% names(df_filtered)) {
             withheld <- c(withheld, col)
           }
         }
@@ -410,8 +431,9 @@ mod_correct_server <- function(id, data, params) {
       transform_data(filtered_corrected_r(), transform_method, withheld, ex_istd)
     })
     
+    
     observe({
-      req(corrected_r(), input$trn_withhold_checkbox)
+      req(filtered_corrected_r(), input$trn_withhold_checkbox)
       
       max_withhold <- max(ncol(corrected_r()$df) - 4, 0)
       
@@ -427,27 +449,31 @@ mod_correct_server <- function(id, data, params) {
         }
       })
     })
+    
     output$trn_withhold_selectors_ui <- renderUI({
-      req(corrected_r(), input$trn_withhold_n, input$ex_ISTD)
-      cols <- names(corrected_r()$df)
-      cols <- setdiff(cols, c("sample", "batch", "class", "order"))
-      if (input$ex_ISTD) {
-        istd <- grep("ISTD", cols, value = TRUE)
-        itsd <- grep("ITSD", cols, value = TRUE)
-        cols <- setdiff(cols, c(istd, itsd))
+      req(filtered_corrected_r())
+      n_withhold <- input$trn_withhold_n %||% 0L
+      if (n_withhold <= 0L || !identical(input$transform %||% "none", "TRN")) return(NULL)
+      
+      ex_istd <- isTRUE(input$ex_ISTD)
+      
+      cols <- setdiff(names(corrected_r()$df), c("sample","batch","class","order"))
+      if (ex_istd) {
+        cols <- setdiff(cols, c(grep("ISTD", cols, value = TRUE), grep("ITSD", cols, value = TRUE)))
       }
+      
       dropdown_choices <- c("Select a column..." = "", cols)
       
-      # Generate list of columns to withhold
-      lapply(seq_len(input$trn_withhold_n), function(i) {
+      lapply(seq_len(n_withhold), function(i) {
         selectInput(
-          inputId = ns(paste0("trn_withhold_col_", i)),
-          label = paste("Select column to withhold #", i),
-          choices = dropdown_choices,
+          inputId  = ns(paste0("trn_withhold_col_", i)),
+          label    = paste("Select column to withhold #", i),
+          choices  = dropdown_choices,
           selected = ""
         )
       })
     })
+    
     
     output$cor_data <- renderTable({
       req(transformed_r())
@@ -678,7 +704,7 @@ mod_correct_server <- function(id, data, params) {
     #---------- 2.6 Identify Control Group server
     # require filtered and corrected data ********* This needs updating
     output$control_class_selector <- renderUI({
-      req(cleaned_r())
+      req(transformed_r())
       df <- cleaned_r()$df
       classes <- unique(df$class[df$class != "QC"])
       dropdown_choices <- c("Select a class..." = "", classes)
