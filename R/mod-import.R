@@ -61,8 +61,7 @@ mod_import_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            shiny::tags$p("Metabolites with low detection rates may not be reliable or insightful. The missing value percentage threshold can be adjusted to the user's desired threshold. Metabolites with missing value percentage above the threshold will be removed from the dataset."),
-            shiny::tags$p("Metabolites that remain in the dataset after filtering and have at least 1 missing value for QC samples are also shown on the right. Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
+            report_test_mv_filter(),
             title = "Why filter metabolites bases on missing values?",
             placement = "auto",
             options = list(container = "body",

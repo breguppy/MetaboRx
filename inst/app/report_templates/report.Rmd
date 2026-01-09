@@ -28,6 +28,7 @@ library(QCcorrection)
 # Raw Data
 ```{r}
 QCcorrection:::report_text_data_req()
+QCcorrection:::report_text_withheld_columns(p,d)
 ```
 
 ### Raw Data Summary and Structural Checks

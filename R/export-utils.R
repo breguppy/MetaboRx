@@ -52,7 +52,9 @@
     pull(Metabolite)
 }
 
-#' Report text helpers for the HTML report
+#--------- Report text helper for popovers and HTML report
+
+#' text for data structure and information requirements
 #'
 #' @keywords internal
 #' @noRd
@@ -121,34 +123,30 @@ report_text_data_req <- function() {
   )
 }
 
-
 #' @keywords internal
 #' @noRd
 report_text_withheld_columns <- function(p, d) {
-  x <- htmltools::tagList(
-    htmltools::tags$span(
-      style = "font-weight:bold;",
-      "Raw data uploaded to the app requires specific non-metabolite columns that provide additional information about the dataset."
-    ),
-    htmltools::tags$ul(lapply(c(
-      "sample column (required): Column that contains unique sample names.", 
-      "batch column (optional): Column that contains batch information if samples were run in batches.",
-      "class column (required): Column that indicated the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blank samples, label them as 'blank'.",
-      "injection order column (required): Column that indicates injection order.",
-      "additional meta-information columns (optional): Any remaining non-metabolite columns need to be specified."
-    ), htmltools::tags$li))
-  )
-  
   if (isTRUE(p$withhold_cols) && !is.null(p$n_withhold) && length(d$cleaned$withheld_cols) > 0) {
-    x <- htmltools::tagList(
-      x,
+    htmltools::tagList(
       htmltools::tags$br(),
-      htmltools::tags$span(style = "font-weight:bold;", "The following columns were withheld from correction:"),
+      htmltools::tags$span(style = "font-weight:bold;", 
+                           "The following metabolite columns were withheld from correction:"),
       htmltools::tags$ul(lapply(d$cleaned$withheld_cols, htmltools::tags$li))
     )
+  } else {
+    htmltools::tags$span(style = "font-weight:bold;", 
+                         "All metabolite columns in the raw data were included in the correction.")
   }
-  
-  x
+}
+#' @keywords internal
+#' @noRd
+report_test_mv_filter <- function() {
+  htmltools::tagList(
+    htmltools::tags$p("Metabolites with missing value percentage above the selected threshold are removed from the dataset.",
+                "Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing sample, metabolite, batch, and class missing value counts."),
+    htmltools::tags$p("Metabolites that remain in the dataset after filtering and have at least 1 missing value for QC samples are provided for diagnostic purposes.",
+                "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected.")
+  )
 }
 
 #' @keywords internal
@@ -192,13 +190,8 @@ report_text_imputation <- function(p, d) {
   }
   
   htmltools::tagList(
-    # main paragraph
     htmltools::tags$p(paste(paragraphs, collapse = " ")),
-    
-    # bold header
     htmltools::tags$strong("Imputation method descriptions:"),
-    
-    # bullet list
     htmltools::tags$ul(lapply(
       c(
         "Metabolite median / mean: Across all samples.",
