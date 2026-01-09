@@ -349,16 +349,6 @@ ui_corr_range_info <- function(all_cor, range) {
         range[2]
       ),
       body_tags = cor_badges,
-      info_title = "Why flag metabolites with strong positive linear correlations?",
-      info_content =
-        shiny::tagList(
-          shiny::tags$p("Two metababolites might have a strong positive linear correlation without a biological explanation if "),
-          shiny::tags$ul(
-            shiny::tags$li("they are from the same chromotography peak, but viewed under different filters."),
-            shiny::tags$li("They have similar signal drift patterns that confounds biological signal.")
-          ),
-          shiny::tags$p("If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound.")
-        )
     )
   
   } 

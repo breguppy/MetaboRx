@@ -61,7 +61,7 @@ mod_import_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            report_test_mv_filter(),
+            report_text_mv_filter(),
             title = "Why filter metabolites bases on missing values?",
             placement = "auto",
             options = list(container = "body",
@@ -94,9 +94,7 @@ mod_import_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            shiny::tags$p("To investigate linear relationships between metabolites, Pearson's r is computed for each pair. A strong positive linear correlation (Pearson's r near 1) means that as one metabolite increases, the other metabolite consistently increases proportionally."),
-            shiny::tags$p("All pairwise correlations are computed, but we only allow pairs with a strong positive linear correlations to be displayed here."),
-            shiny::tags$p("To view all pairwise correlations, download the Excel displayed on the right."),
+            report_text_correlations(),
             title = "Pearson's r correlations",
             placement = "auto",
             options = list(container = "body",

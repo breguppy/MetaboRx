@@ -138,14 +138,46 @@ report_text_withheld_columns <- function(p, d) {
                          "All metabolite columns in the raw data were included in the correction.")
   }
 }
+
 #' @keywords internal
 #' @noRd
-report_test_mv_filter <- function() {
+report_text_mv_filter <- function() {
   htmltools::tagList(
-    htmltools::tags$p("Metabolites with missing value percentage above the selected threshold are removed from the dataset.",
-                "Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing sample, metabolite, batch, and class missing value counts."),
-    htmltools::tags$p("Metabolites that remain in the dataset after filtering and have at least 1 missing value for QC samples are provided for diagnostic purposes.",
-                "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected.")
+    htmltools::tags$p("Metabolites with missing value percentage above the selected threshold are removed from the dataset."),
+    htmltools::tags$p("After filtering by missing value percentage, metabolites that have at least 1 missing value for QC samples are displayed.",
+                "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
+    htmltools::tags$p("Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, and class.")
+  )
+}
+
+#' @keywords internal
+#' @noRd
+report_text_correlations <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(
+      "To investigate linear relationships between metabolites, Pearson's r is computed for all pairs in the dataset. ",
+      "A strong positive linear correlation (Pearson's r near 1) means that as one metabolite increases, the other metabolite consistently increases proportionally."
+    ),
+    htmltools::tags$p(
+      "All pairwise correlations are computed, but only pairs with a strong positive linear correlations are displayed here. ",
+      "To further investigate metabolite correlations view the Excel file '*_metabolite_correlations.xlsx'. ",
+      "Take special note of any pair of metabolites what have strong correlation, but no biological explanation."
+    ),
+    htmltools::tags$p(
+      "Two metababolites might have a strong positive linear correlation without a biological explanation if "
+    ),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        "they are from the same chromotography peak, but viewed under different filters during the peak-picking process."
+      ),
+      htmltools::tags$li(
+        "They have similar signal drift patterns that confounds biological signal."
+      )
+    ),
+    htmltools::tags$p(
+      "If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound."
+    )
+    
   )
 }
 
