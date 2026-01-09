@@ -236,30 +236,34 @@ mod_correct_server <- function(id, data, params) {
       d()$cleaned
     })
     
-    ########## Part 2.1: choose correction settings:
+    #---------- 2.1: Choose Correction Settings server
+    # requires filtered data
     output$qc_missing_value_warning <- renderUI({
       df <- filtered_r()$df
       ui_qc_missing_warning(df)
     })
+    
     output$qcImpute <- renderUI({
       df <- filtered_r()$df
       mc <- setdiff(names(df), c('sample','batch','class','order'))
       ui_qc_impute(df, mc, ns = session$ns)
     })
+    
     output$sampleImpute <- renderUI({
       df <- filtered_r()$df
       mc <- setdiff(names(df), c('sample','batch','class','order'))
       ui_sample_impute(df, mc, ns = session$ns)
     })
+    
     output$correctionMethod <- renderUI({
       ui_correction_method(filtered_r()$df, ns = session$ns)
     })
+    
     output$unavailable_options <- renderUI({
       df <- filtered_r()$df
       mc <- setdiff(names(df), c('sample','batch','class','order'))
       ui_unavailable_options(df, mc)
     })
-    
     
     metab_cols_r <- reactive({
       setdiff(names(filtered_r()$df), c("sample","batch","class","order"))
@@ -269,6 +273,7 @@ mod_correct_server <- function(id, data, params) {
       df <- filtered_r()$df; mc <- metab_cols_r()
       any(is.na(dplyr::filter(df, .data$class == "QC")[, mc, drop = FALSE]))
     })
+    
     has_sam_na_r <- reactive({
       df <- filtered_r()$df; mc <- metab_cols_r()
       any(is.na(dplyr::filter(df, .data$class != "QC")[, mc, drop = FALSE]))
@@ -300,8 +305,8 @@ mod_correct_server <- function(id, data, params) {
     })
     output$cor_spinner <- renderUI(NULL)
     
-    
-    ########## Part 2.2 Post correction filtering:
+    #--------- 2.2 Post-correction filtering server
+    # requires corrected data
     filtered_corrected_r <- reactive({
       req(filtered_r(), corrected_r())
       df_filtered <- filtered_r()$df
@@ -347,6 +352,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
+    
     output$download_cor_rsd_data <- downloadHandler(
       filename = function() {
         sprintf("corrected_rsd_stats_%s.xlsx", Sys.Date())
@@ -367,7 +373,8 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    ########### Part 2.3 Post-correction Transformation:
+    #---------- 2.3 Post-correction Transformation server
+    # Requires filtered and corrected data
     output$transform_selection_ui <- renderUI({
       req(filtered_corrected_r())
       
@@ -376,7 +383,6 @@ mod_correct_server <- function(id, data, params) {
       
       ui_post_cor_transform(df, mc, ns = session$ns)
     })
-    
     
     transformed_r <- reactive({
       req(filtered_corrected_r())
@@ -468,6 +474,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
+    
     output$download_tc_rsd_data <- downloadHandler(
       filename = function() {
         sprintf("transformed_rsd_stats_%s.xlsx", Sys.Date())
@@ -489,7 +496,7 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    ######### Part 2.4 Candidate Extreme Values
+    #--------- 2.4 Candidate Extreme Values server
     # PCA plot and table with candidate extreme values
     output$outliers_table <- renderUI({
       req(filtered_corrected_r(), transformed_r())
@@ -505,6 +512,7 @@ mod_correct_server <- function(id, data, params) {
         ns = ns
       )
     })
+    
     output$hotelling_pca <- shiny::renderPlot({
       req(filtered_corrected_r(), transformed_r())
       p <- list(out_data = input$out_data, 
@@ -522,6 +530,7 @@ mod_correct_server <- function(id, data, params) {
         res$pca_plot
       }
     })
+    
     output$download_ev_btn <- renderUI({
       req(transformed_r())
       
@@ -537,6 +546,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
+    
     output$download_ev_data <- downloadHandler(
       filename = function() {
         sprintf("extreme_values_%s.xlsx", Sys.Date())
@@ -553,7 +563,7 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    # ---------- Part 2.5: TC correlations button show/hide  ----------
+    #---------- 2.5 Post-Correction/Transformation Correlations
     tc_corr_input_df_r <- reactive({
       req(filtered_corrected_r(), transformed_r())
       
@@ -567,10 +577,8 @@ mod_correct_server <- function(id, data, params) {
       }
     })
     
-    # Store which selection we last computed for
     computed_tc_key_r <- reactiveVal(NA_character_)
     
-    # Current selection key (changes when user switches tc_corr_data)
     tc_corr_key_r <- reactive({
       paste(
         input$tc_corr_data %||% "filtered_cor_data",
@@ -579,12 +587,10 @@ mod_correct_server <- function(id, data, params) {
       )
     })
     
-    # Force button to reappear whenever tc_corr_data (or remove_imputed) changes
     observeEvent(input$tc_corr_data, {
       computed_tc_key_r(NA_character_)
     }, ignoreInit = TRUE)
     
-    # Also reset when upstream invalidates (helps when data genuinely updates)
     observeEvent(list(filtered_corrected_r(), transformed_r()), {
       computed_tc_key_r(NA_character_)
     }, ignoreInit = TRUE)
@@ -613,7 +619,6 @@ mod_correct_server <- function(id, data, params) {
       )
     })
     
-    
     tc_correlations_r <- eventReactive(input$compute_tc_corr, {
       df <- req(tc_corr_input_df_r())
       metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
@@ -631,13 +636,14 @@ mod_correct_server <- function(id, data, params) {
         NULL
       })
     })
-    output$tc_corr_spinner <- renderUI(NULL)
     
+    output$tc_corr_spinner <- renderUI(NULL)
     
     output$tc_corr_range_info <- renderUI({
       all_corr <- req(tc_correlations_r())
       ui_corr_range_info(all_corr, input$tc_corr_threshold)                
     })
+    
     output$download_tc_corr_btn <- renderUI({
       req(tc_correlations_r())
       
@@ -653,6 +659,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
+    
     output$download_tc_corr_data <- downloadHandler(
       filename = function() {
         paste0("corrected_metabolite_correlations_", Sys.Date(), ".xlsx")
@@ -668,7 +675,8 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    ############ Part 2.6 Identify Control Group
+    #---------- 2.6 Identify Control Group server
+    # require filtered and corrected data ********* This needs updating
     output$control_class_selector <- renderUI({
       req(cleaned_r())
       df <- cleaned_r()$df
@@ -685,7 +693,6 @@ mod_correct_server <- function(id, data, params) {
         placement = "right"
       )
     })
-    
     
     # button for downloading corrected data.
     output$download_corr_btn <- renderUI({
@@ -744,10 +751,12 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
+    #---------- Next: Visualize Data
     observeEvent(input$next_visualization, {
       updateTabsetPanel(session$rootScope(), "main_steps", "tab_visualize")
     })
     
+    #--------- Module outputs
     correct_params <- reactive(list(
       qcImputeM          = input$qcImputeM %||% "nothing_to_impute",
       samImputeM         = input$samImputeM %||% "nothing_to_impute",
