@@ -423,12 +423,8 @@ ui_outliers <- function(p, d,
                         digits_T2    = 2L,
                         pca_output_id = "hotelling_pca",
                         ns           = identity) {
-  df <- if (p$out_data == "filtered_cor_data") {
-      d$filtered_corrected$df_no_mv
-  } else {
-    d$transformed$df_no_mv
-  }
-  
+  df <- d$filtered_corrected$df_no_mv
+ 
   detect_result <- detect_hotelling_nonqc_dual_z(df, p)
   
   # Extract extreme values and full data

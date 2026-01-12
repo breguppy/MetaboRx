@@ -30,15 +30,19 @@ mod_correct_ui <- function(id) {
           uiOutput(ns("post_cor_filter_block")),
           width = 400
         ),
-        layout_sidebar(
-          sidebar = ui_sidebar_block(
-            title = "Download Corrected RSD Summary",
-            uiOutput(ns("download_cor_rsd_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("Creates Excel file with RSD summary before and after correction for samples and QCs. "),
-            width = 400,
-            position = "right"
-          ),
-        uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040") 
+        fluidRow(
+          column(4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")),
+          column(8, uiOutput(ns("outliers_table")))
+        ),
+        fluidRow(
+          column(4, uiOutput(ns("download_cor_rsd_btn"), 
+                            container = div, 
+                            style = "position: absolute; bottom: 15px; right: 15px;")
+                ),
+          column(8, uiOutput(ns("download_ev_btn"), 
+                             container = div, 
+                             style = "position: absolute; bottom: 15px; right: 15px;"),
+                )
         )
       )
     ),
@@ -57,82 +61,23 @@ mod_correct_ui <- function(id) {
           width = 400,
           position = "right"
           ),
-         ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040")
-        )
-      )
-    ),
-    card(
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "2.4 Candidate Extreme Values",
-          shiny::tags$div(
-            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-            shiny::tags$strong("How detection works"),
-            bslib::popover(
-              shiny::tags$button(
-                type = "button",
-                class = "btn btn-link p-0",
-                style = "text-decoration:none;",
-                shiny::icon("circle-info")
-              ),
-              shiny::tagList(
-                shiny::tags$p(
-                  "This screen flags potential extreme values using a 2D PCA / Hotelling T² approach fit on non-QC samples.",
-                  "Hotelling’s T² here is computed as the squared Mahalanobis distance in PC1–PC2 space using a PCA model fit on non-QC samples:"
-                ),
-                shiny::tags$ol(
-                  shiny::tags$li(
-                    shiny::strong("Log and Scale Metabolites for non-QC samples: "),
-                    "Applies log2(x + 1), then standardizes using pooled non-QC samples only."
-                  ),
-                  shiny::tags$li(
-                    shiny::strong("PCA fit (non-QC only): "),
-                    "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
-                  ),
-                  shiny::tags$li(
-                    shiny::strong("T² in PC space for all samples: "),
-                    "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance (Hotelling T²)."
-                  ),
-                  shiny::tags$li(
-                    shiny::strong("Ellipse cutoff: "),
-                    "Flags samples outside the (1 − α) ellipse using a χ² cutoff with df = 2 (default α = 0.05 → 95%)."
-                  ),
-                  shiny::tags$li(
-                    shiny::strong("Dual z-score rule (only for outlier samples): "),
-                    "Within samples outside the ellipse, flags metabolite values only when BOTH ",
-                    shiny::strong("|global z| ≥ 3"),
-                    " (pooled non-QC scaling) AND ",
-                    shiny::strong("|class z| ≥ 3"),
-                    " (within that non-QC class)."
-                  )
-                ),
-                shiny::tags$hr(),
-                shiny::tags$p(
-                  shiny::strong("Interpretation: "),
-                  "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
-                ),
-                shiny::tags$p(shiny::strong("Caution: "),
-                              "Candidate extreme values are displayed for the user's benefit. ",
-                              "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it.")
-              ),
-              title = "Candidate extreme value detection",
-              placement = "auto",
-              options = list(container = "body", customClass = "popover-responsive")
-            )
-          ),
-          
-          ui_detect_outliers_options(ns),
-          width = 400
-      ),
-        layout_sidebar(
-          sidebar = ui_sidebar_block(
-            title = "Download Extreme Value Summary",
-            uiOutput(ns("download_ev_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("Creates Excel file with summary of extreme value detection."),
-            width = 400,
-            position = "right"
-          ),
-          uiOutput(ns("outliers_table"))
+         ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040"),
+         htmltools::tags$h5("Download Corrected and Transformed Data"),
+         tooltip(
+           checkboxInput(
+             ns("keep_corrected_qcs"),
+             "Include QCs in corrected data file",
+             FALSE
+           ),
+           "Check the box if you want corrected QC values in the downloaded corrected data file.",
+           placement = "right"
+         ),
+         uiOutput(
+           ns("download_corr_btn"),
+           container = div,
+           style = "position: absolute; bottom: 15px; right: 15px;"
+         ),
+         htmltools::tags$p("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
         )
       )
     ),
@@ -176,37 +121,6 @@ mod_correct_ui <- function(id) {
         )
         )
       ),
-    card(layout_sidebar(
-      sidebar = ui_sidebar_block(
-        title = "2.6 Identify Control Group",
-        help = c(
-          "This was moved to the previous section."
-        )
-      ),
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "Download Corrected and Transformed Data",
-          tooltip(
-            checkboxInput(
-              ns("keep_corrected_qcs"),
-              "Include QCs in corrected data file",
-              FALSE
-            ),
-            "Check the box if you want corrected QC values in the downloaded corrected data file.",
-            placement = "right"
-          ),
-          uiOutput(
-            ns("download_corr_btn"),
-            container = div,
-            style = "position: absolute; bottom: 15px; right: 15px;"
-          ),
-          help = c("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
-          width = 400,
-          position = "right"
-        )
-         
-      )
-    )), 
     card(actionButton(ns("next_visualization"), "Next: Evaluate and Visualize Correction",
                       class="btn-primary btn-lg"))
   )}
@@ -341,7 +255,9 @@ mod_correct_server <- function(id, data, params) {
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())
       
-      div(
+      htmltools::tagList(
+        htmltools::tags$h5("Download RSD Summary"),
+        div(
         style = "width: 100%; text-align: center;",
         div(
           style = "max-width: 250px; display: inline-block;",
@@ -351,7 +267,10 @@ mod_correct_server <- function(id, data, params) {
             class    = "btn btn-secondary"
           )
         )
+      ),
+      htmltools::tags$p("Creates Excel file with RSDs of both raw and corrected data for both samples and QCs.")
       )
+      
     })
     
     output$download_cor_rsd_data <- downloadHandler(
@@ -371,6 +290,63 @@ mod_correct_server <- function(id, data, params) {
         
         stats_wb <- export_stats_xlsx(p, d)
         openxlsx::saveWorkbook(stats_wb, file, overwrite = TRUE)
+      }
+    )
+    output$outliers_table <- renderUI({
+      req(filtered_corrected_r())
+      d <- list(filtered_corrected = filtered_corrected_r())
+      p <- list(qcImputeM = input$qcImputeM, 
+                samImputeM = input$samImputeM)
+      ui_outliers(
+        p = p,
+        d = d,
+        pca_output_id = "hotelling_pca",
+        ns = ns
+      )
+    })
+    
+    output$hotelling_pca <- shiny::renderPlot({
+      req(filtered_corrected_r())
+      p <- list(qcImputeM = input$qcImputeM, 
+                samImputeM = input$samImputeM)
+      df <- filtered_corrected_r()$df_no_mv
+      
+      res <- detect_hotelling_nonqc_dual_z(df, p)
+      if (!is.null(res$pca_plot)) {
+        res$pca_plot
+      }
+    })
+    
+    output$download_ev_btn <- renderUI({
+      req(filtered_corrected_r())
+      htmltools::tagList(
+        htmltools::tags$h5("Download Extreme Value Summary"),
+        div(
+            style = "width: 100%; text-align: center;",
+            div(
+              style = "max-width: 250px; display: inline-block;",
+              downloadButton(
+                outputId = ns("download_ev_data"),
+                label    = "Download Extreme Value Summary",
+                class    = "btn btn-secondary"
+              )
+            )
+        ),
+        htmltools::tags$p("Creates Excel file with summary of extreme value detection.")
+      )
+    })
+    
+    output$download_ev_data <- downloadHandler(
+      filename = function() {
+        sprintf("extreme_values_%s.xlsx", Sys.Date())
+      },
+      content = function(file) {
+        d <- list(filtered_corrected = filtered_corrected_r())
+        p <- list(qcImputeM = input$qcImputeM, 
+                  samImputeM = input$samImputeM)
+        
+        outlier_wb <- export_outliers_xlsx(p, d)        
+        openxlsx::saveWorkbook(outlier_wb, file, overwrite = TRUE)
       }
     )
     
@@ -515,70 +491,6 @@ mod_correct_server <- function(id, data, params) {
     
     #--------- 2.4 Candidate Extreme Values server
     # PCA plot and table with candidate extreme values
-    output$outliers_table <- renderUI({
-      req(filtered_corrected_r(), transformed_r())
-      d <- list(filtered_corrected = filtered_corrected_r(), 
-                transformed = transformed_r())
-      p <- list(out_data = input$out_data, 
-                qcImputeM = input$qcImputeM, 
-                samImputeM = input$samImputeM)
-      ui_outliers(
-        p = p,
-        d = d,
-        pca_output_id = "hotelling_pca",
-        ns = ns
-      )
-    })
-    
-    output$hotelling_pca <- shiny::renderPlot({
-      req(filtered_corrected_r(), transformed_r())
-      p <- list(out_data = input$out_data, 
-                qcImputeM = input$qcImputeM, 
-                samImputeM = input$samImputeM)
-      # Use the same df logic as ui_outliers()
-      df <- if (p$out_data == "filtered_cor_data") {
-        filtered_corrected_r()$df_no_mv
-      } else {
-        transformed_r()$df_no_mv
-      }
-      
-      res <- detect_hotelling_nonqc_dual_z(df, p)
-      if (!is.null(res$pca_plot)) {
-        res$pca_plot
-      }
-    })
-    
-    output$download_ev_btn <- renderUI({
-      req(transformed_r())
-      
-      div(
-        style = "width: 100%; text-align: center;",
-        div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_ev_data"),
-            label    = "Download Extreme Value Summary",
-            class    = "btn btn-secondary"
-          )
-        )
-      )
-    })
-    
-    output$download_ev_data <- downloadHandler(
-      filename = function() {
-        sprintf("extreme_values_%s.xlsx", Sys.Date())
-      },
-      content = function(file) {
-        d <- list(filtered_corrected = filtered_corrected_r(), 
-                  transformed = transformed_r())
-        p <- list(out_data = input$out_data, 
-                  qcImputeM = input$qcImputeM, 
-                  samImputeM = input$samImputeM)
-        
-        outlier_wb <- export_outliers_xlsx(p, d)        
-        openxlsx::saveWorkbook(outlier_wb, file, overwrite = TRUE)
-      }
-    )
     
     #---------- 2.5 Post-Correction/Transformation Correlations
     tc_corr_input_df_r <- reactive({
@@ -766,7 +678,6 @@ mod_correct_server <- function(id, data, params) {
       rsd_cutoff         = filtered_corrected_r()$rsd_cutoff,
       transform          = input$transform,
       ex_ISTD            = isTRUE(input$ex_ISTD),
-      out_data           = input$out_data,
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),
       tc_corr_threshold = input$tc_corr_threshold
     ))

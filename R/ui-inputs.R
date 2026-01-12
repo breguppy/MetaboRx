@@ -480,6 +480,7 @@ ui_post_cor_filter <- function(ns) {
       "Check this box if you want to the corrected data to have the same missing values as the raw data.", 
       placement = "right"
     ),
+    htmltools::tags$h5("QC RSD Filtering"),
     shiny::tags$div(
       style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
       shiny::tags$strong("RSD calculation"),
@@ -490,8 +491,7 @@ ui_post_cor_filter <- function(ns) {
           style = "text-decoration:none;",
           shiny::icon("circle-info")
         ),
-        shiny::tags$p(shiny::strong("Relative Standard Deviation = RSD: "), 
-                      "Computed for each metabolite by dividing standard deviation by mean and expressed as a percentage. Describes standard deviation as a percentage of the mean."),
+        report_text_rsd_cal(),
         title = "RSD% calculation",
         placement = "auto",
         options = list(container = "body",
@@ -511,9 +511,26 @@ ui_post_cor_filter <- function(ns) {
         placement = "right"
       )
     ),
-    
+    htmltools::tags$h5("Candidate Extreme Values"),
+    shiny::tags$div(
+      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+      shiny::tags$strong("How detection works"),
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        report_text_ev_detection(),
+        title = "Candidate extreme value detection",
+        placement = "auto",
+        options = list(container = "body", customClass = "popover-responsive")
+      )
+    )
   )
 }
+
 #---------- Post-Correction Transformation
 #' Post-correction transformation
 #' @keywords internal
@@ -605,25 +622,25 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   )
 }
 
-#----------- 2.4 Candidate Extreme Values inputs
-#' Options for outlier detection
-#' @keywords internal
-#' @noRd
-ui_detect_outliers_options <- function(ns) {
-  tooltip(
-    radioButtons(
-      ns("out_data"),
-      "Detect extreme values in",
-      list(
-        "Corrected data" = "filtered_cor_data",
-        "Transformed and corrected data" = "transformed_cor_data"
-      ),
-      "filtered_cor_data"
-    ),
-    "Potential extreme values will be detected in the data set you select.",
-    placement = "right"
-  )
-}
+#' #----------- 2.4 Candidate Extreme Values inputs
+#' #' Options for outlier detection
+#' #' @keywords internal
+#' #' @noRd
+#' ui_detect_outliers_options <- function(ns) {
+#'   tooltip(
+#'     radioButtons(
+#'       ns("out_data"),
+#'       "Detect extreme values in",
+#'       list(
+#'         "Corrected data" = "filtered_cor_data",
+#'         "Transformed and corrected data" = "transformed_cor_data"
+#'       ),
+#'       "filtered_cor_data"
+#'     ),
+#'     "Potential extreme values will be detected in the data set you select.",
+#'     placement = "right"
+#'   )
+#' }
 
 #----------- 2.5 Post-Correction/Transformation Correlations inputs
 #' metabolite correlation slider in corrected or transformed data

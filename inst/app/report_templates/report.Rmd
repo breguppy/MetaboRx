@@ -75,9 +75,11 @@ QCcorrection:::report_text_imputation(params$p, params$d)
 QCcorrection:::report_text_correction(params$p, params$d)
 ```
 
-### Post-correction Filter Based on QC RSD
-Relative Standard Deviation (RSD) is computed for each metabolite by dividing standard deviation by mean and is expressed as a percentage. RSD describes standard deviation as a percentage of the mean. Metabolites with QC RSD above the set threshold are removed from the dataset and are listed here.
+### Post-correction Filtering
+#### QC RSD Fitlering
+
 ```{r}
+QCcorrection:::report_text_rsd_cal()
 QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
 ```
 
@@ -89,7 +91,7 @@ QCcorrection:::report_text_transformation(params$p, params$d)
 ### Candidate Extreme Values
 
 ```{r}
-QCcorrection:::report_text_hotelling_detection(params$p, params$d)
+QCcorrection:::report_text_ev_detection()
 QCcorrection:::ui_outliers(params$p, params$d) 
 ```
 
