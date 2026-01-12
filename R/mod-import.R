@@ -38,7 +38,7 @@ mod_import_ui <- function(id) {
     ),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "1.2 Select Non-metabolite Columns",
+        title = "1.2 Raw Data Inspection",
         uiOutput(ns("column_selectors")),
         uiOutput(ns("column_warning")),
         uiOutput(ns("withhold_toggle")),
@@ -135,7 +135,7 @@ mod_import_server <- function(id) {
     })
     output$contents <- renderTable(data_raw())
     
-    #---------- 1.2 Select Non-metabolite Columns server
+    #---------- 1.2 Raw Data Inspection server
     # requires raw data to display selection choices
     selections_r <- reactive({
       list(

@@ -36,7 +36,7 @@ ui_file_upload <- function(ns) {
     )
 }
 
-#---------- 1.2 Select Non-metabolite Columns Inputs
+#---------- 1.2 Raw Data Inspection Inputs
 #' Column selection for meta data
 #' @keywords internal
 #' @noRd
@@ -44,6 +44,7 @@ ui_nonmet_cols <- function(cols, ns = identity) {
   dropdown_choices <- c("Select a column..." = "", cols)
   
   tagList(
+    htmltools::tags$h5("Select Non-Metabolite Columns"),
     tooltip(
       selectInput(ns("sample_col"), "sample column", dropdown_choices, ""),
       "Column that contains unique sample names.",
