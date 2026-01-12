@@ -338,6 +338,63 @@ report_text_correction <- function(p, d) {
 
 #' @keywords internal
 #' @noRd
+report_text_rsd_cal <- function() {
+  htmltools::tags$p(
+    htmltools::strong("Relative Standard Deviation (RSD): "),
+    "Computed for each metabolite by dividing standard deviation by mean and ",
+    "expressed as a percentage. Describes standard deviation as a percentage ",
+    "of the mean. Metabolites with QC RSD above the set threshold are removed ",
+    "from the dataset and are listed here."
+  )
+}
+
+#' @keywords internal
+#' @noRd
+report_text_ev_detection <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(
+      "This screen flags potential extreme values using a 2D PCA / Hotelling T² approach fit on non-QC samples.",
+      "Hotelling’s T² here is computed as the squared Mahalanobis distance in PC1–PC2 space using a PCA model fit on non-QC samples:"
+    ),
+    htmltools::tags$ol(
+      htmltools::tags$li(
+        htmltools::strong("Log and Scale Metabolites for non-QC samples: "),
+        "Applies log2(x + 1), then standardizes using pooled non-QC samples only."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("PCA fit (non-QC only): "),
+        "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("T² in PC space for all samples: "),
+        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance (Hotelling T²)."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Ellipse cutoff: "),
+        "Flags samples outside the (1 − α) ellipse using a χ² cutoff with df = 2 (default α = 0.05 → 95%)."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Dual z-score rule (only for outlier samples): "),
+        "Within samples outside the ellipse, flags metabolite values only when BOTH ",
+        htmltools::strong("|global z| ≥ 3"),
+        " (pooled non-QC scaling) AND ",
+        htmltools::strong("|class z| ≥ 3"),
+        " (within that non-QC class)."
+      )
+    ),
+    htmltools::tags$hr(),
+    htmltools::tags$p(
+      htmltools::strong("Interpretation: "),
+      "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
+    ),
+    htmltools::tags$p(htmltools::strong("Caution: "),
+                  "Candidate extreme values are displayed for the user's benefit. ",
+                  "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it.")
+  )
+}
+
+#' @keywords internal
+#' @noRd
 report_text_transformation <- function(p, d) {
   base <- htmltools::tags$p(d$transformed$str)
   
@@ -427,59 +484,3 @@ report_text_pca_intro <- function(p, d) {
   ))
 }
 
-
-#' @keywords internal
-#' @noRd
-report_text_hotelling_detection <- function(p, d) {
-  if (identical(p$out_data, "filtered_cor_data")) {
-    d_type <- "corrected data"
-  } else {
-    d_type <- "transformed and corrected data"
-  }
-  htmltools::tagList(
-    
-    htmltools::tags$p(
-      paste("Candidate extreme samples are identified in", d_type),
-      " using a two-dimensional principal component analysis (PCA) / Hotelling’s T² framework fit on non-QC samples. ",
-      "Hotelling’s T² is computed as the squared Mahalanobis distance in PC1–PC2 space derived from a PCA model trained on non-QC samples only."
-    ),
-    
-    htmltools::tags$ol(
-      htmltools::tags$li(
-        htmltools::tags$strong("Log and scale metabolites (non-QC only): "),
-        "Metabolite intensities are transformed using log2(x + 1) and standardized using pooled non-QC samples."
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("PCA fit (non-QC samples): "),
-        "PCA is fit on non-QC samples with complete metabolite data, retaining PC1 and PC2."
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Hotelling’s T² in PC space: "),
-        "All complete samples (QC and non-QC) are projected into PC1–PC2 space, and a squared Mahalanobis distance (Hotelling’s T²) is computed."
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Ellipse cutoff: "),
-        "Samples falling outside the (1 − α) confidence ellipse are flagged using a χ² cutoff with 2 degrees of freedom (default α = 0.05, corresponding to 95%)."
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Dual z-score rule for metabolite-level flags: "),
-        "For samples outside the ellipse, individual metabolite values are flagged only if they satisfy both ",
-        htmltools::tags$strong("|global z| ≥ 3"),
-        " (scaled using pooled non-QC samples) and ",
-        htmltools::tags$strong("|class z| ≥ 3"),
-        " (scaled within the corresponding non-QC class)."
-      )
-    ),
-    
-    htmltools::tags$p(
-      htmltools::tags$strong("Interpretation: "),
-      "Samples outside the ellipse represent multivariate extremes. Reported candidate extreme values are metabolite measurements that additionally satisfy the dual z-score criterion."
-    ),
-    
-    htmltools::tags$p(
-      htmltools::tags$strong("Caution: "),
-      "Candidate extreme values are provided for diagnostic purposes. ",
-      "Additional biological, technical, or experimental context should be considered before classifying a value as an outlier and removing it."
-    )
-  )
-}
