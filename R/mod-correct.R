@@ -180,8 +180,7 @@ mod_correct_ui <- function(id) {
       sidebar = ui_sidebar_block(
         title = "2.6 Identify Control Group",
         help = c(
-          "If your data contains a control group please select the name of the control group in the dropdown menu on the right. Fold changes will be computed and added to a separate tab in the corrected data Excel file.",
-          "If you data does NOT contain a control group check the 'No control group' box."
+          "This was moved to the previous section."
         )
       ),
       layout_sidebar(
@@ -204,15 +203,7 @@ mod_correct_ui <- function(id) {
           help = c("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
           width = 400,
           position = "right"
-        ),
-            tooltip(
-              checkboxInput(ns("no_control"), "No control group", FALSE),
-              "Check the box if The data does not have a control group.",
-              placement = "right"
-            ),
-            conditionalPanel(condition = sprintf("!input['%s']", ns("no_control")), uiOutput(ns(
-              "control_class_selector"
-            )))
+        )
          
       )
     )), 
@@ -703,22 +694,6 @@ mod_correct_server <- function(id, data, params) {
     
     #---------- 2.6 Identify Control Group server
     # require filtered and corrected data ********* This needs updating
-    output$control_class_selector <- renderUI({
-      req(transformed_r())
-      df <- cleaned_r()$df
-      classes <- unique(df$class[df$class != "QC"])
-      dropdown_choices <- c("Select a class..." = "", classes)
-      tooltip(
-        selectInput(
-          ns("control_class"),
-          "Control Group",
-          choices = dropdown_choices,
-          selected = ""
-        ),
-        "Name of control samples in class column. This class's average will be used to compute fold changes in the corrected data file.",
-        placement = "right"
-      )
-    })
     
     # button for downloading corrected data.
     output$download_corr_btn <- renderUI({
@@ -759,8 +734,8 @@ mod_correct_server <- function(id, data, params) {
           ex_ISTD           = isTRUE(input$ex_ISTD),
           keep_corrected_qcs= isTRUE(input$keep_corrected_qcs),
           tc_corr_threshold = input$tc_corr_threshold,
-          no_control        = isTRUE(input$no_control),
-          control_class     = input$control_class %||% ""
+          no_control        = isTRUE(p_in$no_control),
+          control_class     = p_in$control_class
         )
         
         rv <- list(
@@ -793,9 +768,7 @@ mod_correct_server <- function(id, data, params) {
       ex_ISTD            = isTRUE(input$ex_ISTD),
       out_data           = input$out_data,
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),
-      tc_corr_threshold = input$tc_corr_threshold,
-      no_control         = isTRUE(input$no_control),
-      control_class      = input$control_class %||% ""
+      tc_corr_threshold = input$tc_corr_threshold
     ))
     
     list(

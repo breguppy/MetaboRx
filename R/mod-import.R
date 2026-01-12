@@ -46,7 +46,8 @@ mod_import_ui <- function(id) {
         uiOutput(ns("withhold_selectors_ui")),
         width = 400
       ),
-      uiOutput(ns("basic_info"))
+      uiOutput(ns("basic_info")),
+      uiOutput(ns("ui_control_class_selector"))
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -240,6 +241,11 @@ mod_import_server <- function(id) {
       req(cd)
       ui_basic_info(cd$df, cd$replacement_counts, cd$non_numeric_cols, cd$duplicate_mets, cd$blank_df, cd$below_blank_threshold)
     })
+    output$ui_control_class_selector <- renderUI({
+      cd <- cleaned_r()
+      req(cd)
+      ui_control_class_selector(cd$df, ns = session$ns)
+    })
     
     #---------- 1.3 Filter Missing Values server
     # requires cleaned data 
@@ -406,13 +412,15 @@ mod_import_server <- function(id) {
     params_r <- reactive({
       sel <- selections_r()
       list(
-        sample_col = sel$sample,
-        batch_col = sel$batch,
-        class_col  = sel$class,
-        order_col = sel$order,
-        withheld_cols = withheld_r(),
-        n_withhold = input$n_withhold %||% 0,
-        mv_cutoff = input$mv_cutoff,
+        sample_col         = sel$sample,
+        batch_col          = sel$batch,
+        class_col          = sel$class,
+        order_col          = sel$order,
+        withheld_cols      = withheld_r(),
+        n_withhold         = input$n_withhold %||% 0,
+        no_control         = isTRUE(input$no_control),
+        control_class      = input$control_class %||% "",
+        mv_cutoff          = input$mv_cutoff,
         raw_corr_threshold = input$corr_threshold
       )
     })

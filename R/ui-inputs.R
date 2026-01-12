@@ -127,6 +127,81 @@ ui_withhold_selectors <- function(ids, cols, prev, ns) {
   })
 }
 
+ui_control_class_selector <- function(df, ns) {
+  classes <- unique(df$class[df$class != "QC"])
+  dropdown_choices <- c("Select a class..." = "", classes)
+  
+  shiny::tagList(
+    
+    # Purple info card (inline, warn_card-like)
+    shiny::tags$div(
+      class = "card border mb-3",
+      style = "margin-top: 10px; border-color: #6f42c1;",
+      
+      # Header with info popover
+      shiny::tags$div(
+        class = "card-header",
+        style = "border-bottom-color: #6f42c1;",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+          shiny::tags$span("Control group (optional)"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            shiny::tagList(
+              shiny::tags$p(
+                "If a control group is selected, fold changes are computed for each metabolite ",
+                "relative to the control-group average."
+              ),
+              shiny::tags$p(
+                "Fold-change values are written to a separate tab in the corrected-data Excel file."
+              )
+            ),
+            title = "The control group is only used to compute fold changes in Excel",
+            placement = "auto",
+            options = list(container = "body", customClass = "popover-responsive")
+          )
+        )
+      ),
+      
+      # Body
+      shiny::tags$div(
+        class = "card-body",
+        shiny::tags$p(
+          class = "card-text",
+          "If your data includes a control group, select it below. ",
+          "If not, check “No control group”."
+        ),
+        
+        bslib::tooltip(
+          shiny::checkboxInput(ns("no_control"), "No control group", FALSE),
+          "Check this if the dataset does not contain a control group.",
+          placement = "right"
+        ),
+        
+        shiny::conditionalPanel(
+          condition = sprintf("!input['%s']", ns("no_control")),
+          bslib::tooltip(
+            shiny::selectInput(
+              ns("control_class"),
+              "Control Group",
+              choices = dropdown_choices,
+              selected = ""
+            ),
+            "Name of control samples in the class column. This class’s average is used to compute fold changes.",
+            placement = "right"
+          )
+        )
+      )
+    )
+  )
+}
+
+
 #----------- 1.3 Filter Missing Values
 #' missing value filter slider
 #' @keywords internal
