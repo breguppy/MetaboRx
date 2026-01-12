@@ -122,6 +122,93 @@ report_text_data_req <- function() {
     )
   )
 }
+#' @keywords internal
+#' @noRd
+report_text_data_inspection <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(
+      "Before correction, the app performs a lightweight cleaning step and runs a set of checks ",
+      "so you can confirm the dataset is formatted correctly and identify common quality issues."
+    ),
+    
+    htmltools::tags$h4("Cleaning performed"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        htmltools::tags$strong("Standardizes metadata columns: "),
+        "the selected columns are renamed to ",
+        htmltools::tags$code("sample"), ", ",
+        htmltools::tags$code("batch"), ", ",
+        htmltools::tags$code("class"), ", and ",
+        htmltools::tags$code("order"), "."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Removes non-metabolite columns withheld from correction: "),
+        "if you chose to withhold additional columns."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Drops fully non-numeric metabolite columns: "),
+        "columns that contain no numeric values."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Sorts rows by injection order: "),
+        "all downstream checks reflect run order."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Standardizes QC labels: "),
+        "QC samples are consistently recognized."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Detects and removes blank samples: "),
+        "if present, blanks are excluded from correction."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Converts invalid metabolite entries to missing values (NA): "),
+        htmltools::tags$ul(
+          htmltools::tags$li("non-numeric entries (text, symbols, etc.) \u2192 NA"),
+          htmltools::tags$li("exact zeros \u2192 NA")
+        )
+      )
+    ),
+    
+    htmltools::tags$h4("Checks and summaries reported"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        htmltools::tags$strong("Dataset structure: "),
+        "number of metabolite columns, number of samples and QC injections, number of batches, ",
+        "and the list of non-QC classes."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Missingness: "),
+        "total missing values (including values converted to NA during cleaning)."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("QC coverage by batch: "),
+        "counts of QC injections in each batch (useful for interpreting which correction options are available)."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Potential duplicate metabolites (informational): "),
+        "flags metabolite column pairs that are equal or nearly equal across the same non-missing rows."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Blank-related flags (informational): "),
+        "when blank samples are present, flags metabolites whose QC signal is low relative to blanks for review."
+      )
+    ),
+    
+    htmltools::tags$h4("How to use this section"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        "Use the structure counts to verify the correct columns were selected and parsed."
+      ),
+      htmltools::tags$li(
+        "Use the warnings to spot issues that may affect correction (missingness, low QC coverage, or blank-related concerns)."
+      ),
+      htmltools::tags$li(
+        "Flags in this section are primarily for transparency; features are not automatically removed unless explicitly stated."
+      )
+    )
+  )
+}
 
 #' @keywords internal
 #' @noRd

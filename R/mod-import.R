@@ -39,6 +39,23 @@ mod_import_ui <- function(id) {
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "1.2 Raw Data Inspection",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Data Inspection"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_data_inspection(),
+            title = "What is cleaned and checked in this section",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
         uiOutput(ns("column_selectors")),
         uiOutput(ns("column_warning")),
         uiOutput(ns("withhold_toggle")),

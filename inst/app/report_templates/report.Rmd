@@ -33,9 +33,9 @@ QCcorrection:::report_text_withheld_columns(p,d)
 
 ### Raw Data Summary and Structural Checks
 
-**Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and sample classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
-
+**Raw data summary and structural checks.** 
 ```{r}
+QCcorrection:::report_text_data_inspection()
 QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
 ```
 

@@ -99,8 +99,8 @@ ui_basic_info <- function(df,
         total_replaced,
         " values were converted to missing (NA) prior to processing."
       ),
-      info_title = "What values are marked as missing?",
-      info_content = shiny::tags$p("0, NA, NaN, or any other non-numeric value is counted as a missing value. You can choose an imputation method in the next tab.")
+      #info_title = "What values are marked as missing?",
+      #info_content = shiny::tags$p("0, NA, NaN, or any other non-numeric value is counted as a missing value. You can choose an imputation method in the next tab.")
     )
   }
   
@@ -114,8 +114,8 @@ ui_basic_info <- function(df,
         style = "font-weight: 600; margin-top: 8px;",
         paste(sort(unique(non_numeric_cols)), collapse = ", ")
       ),
-      info_title = "What makes a column non-numeric?",
-      info_content = shiny::tags$p("If every value in a 'metabolite' column is not a number, then the column is removed from the dataset.")
+      #info_title = "What makes a column non-numeric?",
+      #info_content = shiny::tags$p("If every value in a 'metabolite' column is not a number, then the column is removed from the dataset.")
     )
   }
   
@@ -147,11 +147,11 @@ ui_basic_info <- function(df,
         nrow(duplicate_mets)
       ),
       body_tags = dup_badges,
-      info_title = "What does it mean for 2 metabolites to be equal or nearly equal?",
-      info_content = shiny::tagList(
-        shiny::tags$p("For every sample, the values for the two meatbolite are equal to each other or within 1e-3 of each other."),
-        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-      )
+      #info_title = "What does it mean for 2 metabolites to be equal or nearly equal?",
+      #info_content = shiny::tagList(
+      #  shiny::tags$p("For every sample, the values for the two meatbolite are equal to each other or within 1e-3 of each other."),
+      #  shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
+      #)
     )
   }
   
@@ -190,17 +190,17 @@ ui_basic_info <- function(df,
     blank_card <- warn_card(
       title = "Blank samples detected",
       body  = blank_body,
-      body_tags = blank_tags,
-      info_title = "Why do we flag metabolites with QC average less than 3x the blank average?",
-      info_content = shiny::tagList(
-        shiny::tags$p("Metabolites with QC average less than 3x the blank average may indicate the metabolite is:"),
-        shiny::tags$ul(
-          shiny::tags$li("low abunance/near the limit of detection in QC samples"),
-          shiny::tags$li("carried over to blank samples from previous samples"), 
-          shiny::tags$li("a potential contaminate")
-        ),
-        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-    )
+      body_tags = blank_tags
+      #info_title = "Why do we flag metabolites with QC average less than 3x the blank average?",
+      #info_content = shiny::tagList(
+      #  shiny::tags$p("Metabolites with QC average less than 3x the blank average may indicate the metabolite is:"),
+      #  shiny::tags$ul(
+      #    shiny::tags$li("low abunance/near the limit of detection in QC samples"),
+      #    shiny::tags$li("carried over to blank samples from previous samples"), 
+      #    shiny::tags$li("a potential contaminate")
+      #  ),
+      #  shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
+    #)
     )
   }
   

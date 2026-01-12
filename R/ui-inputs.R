@@ -136,7 +136,7 @@ ui_control_class_selector <- function(df, ns) {
     
     # Purple info card (inline, warn_card-like)
     shiny::tags$div(
-      class = "card border mb-3",
+      class = "card border-info mb-3",
       style = "margin-top: 10px; border-color: #6f42c1;",
       
       # Header with info popover
