@@ -531,7 +531,7 @@ ui_post_cor_filter <- function(ns) {
   )
 }
 
-#---------- Post-Correction Transformation
+#---------- 2.3 Post-Correction Transformation
 #' Post-correction transformation
 #' @keywords internal
 #' @noRd
@@ -622,27 +622,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   )
 }
 
-#' #----------- 2.4 Candidate Extreme Values inputs
-#' #' Options for outlier detection
-#' #' @keywords internal
-#' #' @noRd
-#' ui_detect_outliers_options <- function(ns) {
-#'   tooltip(
-#'     radioButtons(
-#'       ns("out_data"),
-#'       "Detect extreme values in",
-#'       list(
-#'         "Corrected data" = "filtered_cor_data",
-#'         "Transformed and corrected data" = "transformed_cor_data"
-#'       ),
-#'       "filtered_cor_data"
-#'     ),
-#'     "Potential extreme values will be detected in the data set you select.",
-#'     placement = "right"
-#'   )
-#' }
-
-#----------- 2.5 Post-Correction/Transformation Correlations inputs
+#----------- 2.4 Post-Correction/Transformation Correlations inputs
 #' metabolite correlation slider in corrected or transformed data
 #' @keywords internal
 #' @noRd

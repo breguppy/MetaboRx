@@ -106,12 +106,13 @@ if (!is.null(params$d$tc_corr)) {
 # Visualization
 
 ### Visualize the Correction with Metabolite Scatter Plots
-
+```{r}
+QCcorrection:::report_text_met_scatter()
+```
 ```{r, echo=FALSE, fig.show='hold', out.width='49%', fig.width=5, fig.height=5}
 print(params$plots[["Metabolite Scatter 1"]])
 print(params$plots[["Metabolite Scatter 2"]])
 ```
-
 ```{r}
 QCcorrection:::report_text_scatter_intro(params$p, params$d)
 ```
