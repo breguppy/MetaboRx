@@ -3,8 +3,9 @@
 #' @keywords internal
 #' @noRd
 
-mod_correct_ui <- function(id) { 
-  ns <- NS(id); 
+mod_correct_ui <- function(id) {
+  ns <- NS(id)
+  
   nav_panel(
     title = "2. Correction Settings",
     value = "tab_correct",
@@ -15,100 +16,98 @@ mod_correct_ui <- function(id) {
       fluidRow(
         column(3, tags$h5("Impute Missing QC Values"), uiOutput(ns("qcImpute"))),
         column(3, tags$h5("Impute Missing Sample Values"), uiOutput(ns("sampleImpute"))),
-        column(3, tags$h5("Choose Correction Method"), uiOutput(ns("correctionMethod"))),
-        column(3, tags$h5("Unavailable Options"), uiOutput(ns("unavailable_options"))),
-        actionButton(ns("correct"), "Correct Data with Selected Settings",
-                     class="btn-primary btn-lg", width="100%"),
-        div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("cor_spinner")),
-                                                    color="#404040", size=0.6, proxy.height="22px"))
-      )
-    ),
-    card(
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "2.2 Post-Correction Filtering",
-          uiOutput(ns("post_cor_filter_block")),
-          width = 400
+        column(3, tags$h5("Choose Correction Method"), uiOutput(ns(
+          "correctionMethod"
+        ))),
+        column(3, tags$h5("Unavailable Options"), uiOutput(ns(
+          "unavailable_options"
+        ))),
+        actionButton(
+          ns("correct"),
+          "Correct Data with Selected Settings",
+          class = "btn-primary btn-lg",
+          width = "100%"
         ),
-        fluidRow(
-          column(4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")),
-          column(8, uiOutput(ns("outliers_table")))
-        ),
-        fluidRow(
-          column(4, uiOutput(ns("download_cor_rsd_btn"), 
-                            container = div, 
-                            style = "position: absolute; bottom: 15px; right: 15px;")
-                ),
-          column(8, uiOutput(ns("download_ev_btn"), 
-                             container = div, 
-                             style = "position: absolute; bottom: 15px; right: 15px;"),
-                )
+        div(
+          style = "margin:12px 0 0 0;",
+          withSpinner(
+            uiOutput(ns("cor_spinner")),
+            color = "#404040",
+            size = 0.6,
+            proxy.height = "22px"
+          )
         )
       )
     ),
     card(
       layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "2.3 Post-Correction Transformation",
-          uiOutput(ns("transform_block")),
-          width = 400
-        ),
-        layout_sidebar(
-          sidebar = ui_sidebar_block(
-             title = "Download Transformed RSD Summary",
-          uiOutput(ns("download_tc_rsd_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("Creates Excel file with RSD summary before and after correction and transformation for samples and QCs."),
-          width = 400,
-          position = "right"
-          ),
-         ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040"),
-         uiOutput(
-           ns("download_corr_btn"),
-           container = div,
-           style = "position: absolute; bottom: 15px; right: 15px;"
-         ),
-        )
+        sidebar = ui_sidebar_block(title = "2.2 Post-Correction Filtering", uiOutput(ns(
+          "post_cor_filter_block"
+        )), width = 400),
+        fluidRow(column(
+          4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
+        ), column(8, uiOutput(
+          ns("outliers_table")
+        ))),
+        fluidRow(column(4, uiOutput(
+          ns("download_cor_rsd_btn")
+        )), column(8, uiOutput(
+          ns("download_ev_btn")
+        )))
       )
     ),
-    card(
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "2.4 Post-Correction/Transformation Metabolite Correlation",
-          shiny::tags$div(
-            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-            shiny::tags$strong("Pearson's r correlations"),
-            bslib::popover(
-              shiny::tags$button(
-                type = "button",
-                class = "btn btn-link p-0",
-                style = "text-decoration:none;",
-                shiny::icon("circle-info")
-              ),
-              report_text_correlations(),
-              title = "Pearson's r correlations",
-              placement = "auto",
-              options = list(container = "body",
-                             customClass = "popover-responsive") 
-            )
-          ),
-          uiOutput(ns("tc_corr_slider")),
-          width = 400
-        ),
-        layout_sidebar(
-          sidebar = ui_sidebar_block(
-            title = "Download Corrected/Transformed Data Metabolite Correlations",
-            uiOutput(ns("download_tc_corr_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-            help = c("Creates Excel file with all pairwise metabolite correlations in the raw data and corrected/transformed data."),
-            width = 400,
-            position = "right"),
-          uiOutput(ns("compute_tc_corr_ui")),
-          div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("tc_corr_spinner")),
-                                                      color="#404040")),
-          uiOutput(ns("tc_corr_range_info"))
-        )
-        )
+    card(layout_sidebar(
+      sidebar = ui_sidebar_block(title = "2.3 Post-Correction Transformation", uiOutput(ns(
+        "transform_block"
+      )), width = 400),
+      fluidRow(column(
+        8,
+        ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040"),
       ),
-    card(uiOutput(ns("next_visualization_ui")))
+      column(4, uiOutput(ns(
+        "download_tc_rsd_btn"
+      )), uiOutput(ns(
+        "download_corr_btn"
+      ))))
+    )),
+    card(layout_sidebar(
+      sidebar = ui_sidebar_block(
+        title = "2.4 Post-Correction/Transformation Metabolite Correlation",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Pearson's r correlations"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_correlations(),
+            title = "Pearson's r correlations",
+            placement = "auto",
+            options = list(container = "body", customClass = "popover-responsive")
+          )
+        ),
+        uiOutput(ns("tc_corr_slider")),
+        width = 400
+      ),
+      fluidRow(column(
+        8,
+        uiOutput(ns("compute_tc_corr_ui")),
+        div(style = "margin:12px 0 0 0;", withSpinner(uiOutput(
+          ns("tc_corr_spinner")
+        ), color = "#404040")),
+        uiOutput(ns("tc_corr_range_info"))
+      ), column(4, uiOutput(
+        ns("download_tc_corr_btn")
+      )))
+      
+    )),
+    card(uiOutput(ns(
+      "next_visualization_ui"
+    ))
+    )
   )}
 
 mod_correct_server <- function(id, data, params) {
@@ -240,23 +239,21 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())
-      
-      htmltools::tagList(
-        htmltools::tags$h5("Download RSD Summary"),
+      download_card(
+        "Download RSD Summary",
+        "Creates Excel file with RSDs of both raw and corrected data for both samples and QCs.",
         div(
-        style = "width: 100%; text-align: center;",
-        div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_cor_rsd_data"),
-            label    = "Download Corrected RSD Summary",
-            class    = "btn btn-secondary"
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_cor_rsd_data"),
+              label    = "Download Corrected RSD Summary",
+              class    = "btn btn-secondary btn-lg"
+            )
           )
         )
-      ),
-      htmltools::tags$p("Creates Excel file with RSDs of both raw and corrected data for both samples and QCs.")
       )
-      
     })
     
     output$download_cor_rsd_data <- downloadHandler(
@@ -305,20 +302,20 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_ev_btn <- renderUI({
       req(filtered_corrected_r())
-      htmltools::tagList(
-        htmltools::tags$h5("Download Extreme Value Summary"),
+      download_card(
+        "Download Extreme Value Summary",
+        "Creates Excel file with summary of extreme value detection.",
         div(
-            style = "width: 100%; text-align: center;",
-            div(
-              style = "max-width: 250px; display: inline-block;",
-              downloadButton(
-                outputId = ns("download_ev_data"),
-                label    = "Download Extreme Value Summary",
-                class    = "btn btn-secondary"
-              )
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_ev_data"),
+              label    = "Download Extreme Value Summary",
+              class    = "btn btn-secondary btn-lg"
             )
-        ),
-        htmltools::tags$p("Creates Excel file with summary of extreme value detection.")
+          )
+        )
       )
     })
     
@@ -440,15 +437,18 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_tc_rsd_btn <- renderUI({
       req(transformed_r())
-      
-      div(
-        style = "width: 100%; text-align: center;",
+      download_card(
+        "Download Transformed RSD Summary",
+        "Creates Excel file with RSD summary before and after correction and transformation for samples and QCs.",
         div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_tc_rsd_data"),
-            label    = "Download Transformed RSD Summary",
-            class    = "btn btn-secondary"
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_tc_rsd_data"),
+              label    = "Download Transformed RSD Summary",
+              class    = "btn btn-secondary btn-lg"
+            )
           )
         )
       )
@@ -477,9 +477,10 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_corr_btn <- renderUI({
       req(transformed_r())
-      htmltools::tagList(
-        htmltools::tags$h5("Download Corrected and Transformed Data"),
-        tooltip(
+      download_card(
+        "Download Corrected and Transformed Data",
+        htmltools::tagList(
+          tooltip(
           checkboxInput(
             ns("keep_corrected_qcs"),
             "Include QCs in corrected data file",
@@ -488,19 +489,20 @@ mod_correct_server <- function(id, data, params) {
           "Check the box if you want corrected QC values in the downloaded corrected data file.",
           placement = "right"
         ),
+        htmltools::tags$p("Creates Excel file with correction settings, corrected data, ",
+                          "transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs.")
+        ),
         div(
           style = "width: 100%; text-align: center;",
           div(
-            style = "max-width: 250px; display: inline-block;",
+            style = "display: inline-block;",
             downloadButton(
               outputId = ns("download_corr_data"),
               label    = "Download Corrected and Transformed Data",
-              class    = "btn btn-secondary"
+              class    = "btn btn-secondary btn-lg"
             )
           )
-        ), 
-        htmltools::tags$p("Creates Excel file with correction settings, corrected data, ",
-        "transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
+        )
       )
     })
     
@@ -587,20 +589,28 @@ mod_correct_server <- function(id, data, params) {
       req(nzchar(key))
       
       # If we've computed for this key, hide
-      if (!is.na(computed_tc_key_r()) && identical(computed_tc_key_r(), key)) {
+      if (!is.na(computed_tc_key_r()) &&
+          identical(computed_tc_key_r(), key)) {
         return(NULL)
       }
       
       tagList(
+        div(
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "max-width: 350px; display: inline-block;",
+            actionButton(
+              ns("compute_tc_corr"),
+              "Compute Metabolite Correlations",
+              class = "btn btn-primary btn-lg",
+              width = "100%"
+            )
+          )
+        ),
+        
         tags$div(
           style = "margin-bottom: 8px; color: #555;",
           "Computing correlations may take a while if the data has many metabolites."
-        ),
-        actionButton(
-          ns("compute_tc_corr"),
-          "Compute Metabolite Correlations",
-          class = "btn btn-primary btn-lg",
-          width = "100%"
         )
       )
     })
@@ -632,15 +642,18 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_tc_corr_btn <- renderUI({
       req(tc_correlations_r())
-      
-      div(
-        style = "width: 100%; text-align: center;",
+      download_card(
+        "Download Corrected/Transformed Data Metabolite Correlations",
+        "Creates Excel file with all pairwise metabolite correlations in the raw data and corrected/transformed data.",
         div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_tc_corr_data"),
-            label    = "Download Metabolite Correlations",
-            class    = "btn btn-secondary"
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_tc_corr_data"),
+              label    = "Download Metabolite Correlations",
+              class    = "btn btn-secondary btn-lg"
+            )
           )
         )
       )
