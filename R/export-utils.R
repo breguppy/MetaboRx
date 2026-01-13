@@ -487,6 +487,47 @@ report_text_scatter_intro <- function(p, d) {
   
   htmltools::tags$p(paste(parts, collapse = " "))
 }
+#' RSD comparison plot explanation.
+#' @keywords internal
+#' @noRd
+report_text_rsd_plots <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(htmltools::strong("How to read this plot")),
+    htmltools::tags$p("This section compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
+                  "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
+                  "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
+                  "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
+                  "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."),
+    htmltools::tags$hr(),
+    htmltools::strong("Visualize changes in RSD by: Distrbution"),
+    htmltools::tags$p(
+      "The distributions of RSDs in non-QC samples is displayed in the left panel and the distribution of RSDs in ",
+      "QC samples is displayed in the right panel. ",
+      "The blue distribution is RSD in the raw data before any correction or transformations is applied. ",
+      "The orange distrubution is RSD in the corrected or transformed and corrected data. "
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "after correction/transformation and correction, the orange distributions should be shifted to the left compared to the blue distributions. ",
+      "The orange distribution for QC samples should be tall and skinny with the highest density near zero."
+    ),
+    htmltools::tags$hr(),
+    htmltools::strong("Visualize changes in RSD by: Scatter Plot"),
+    htmltools::tags$p(
+      "In the scatter plot comparison the x-axis is RSD before correction/transformation and correction and the y-axis is RSD after. ",
+      "RSDs for non-QC samples are displayed in the left panel and QC samples in the right panel. ",
+      "Red dots indicate that RSD increased after correction/transformation and correction. ", 
+      "Gray dot indicate no change in RSD after correction/transformation and correction. ",
+      "Green dots indicate a decrease in RSD after correction/transformation. ",
+      "The percentages of increased, no change, and decreased RSDs are shown at the top of each panel."
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "after correction/transofrmation and correction, the majority of RSDs should decrease for QC samples. ",
+      "Non-QC sample RSDs may or may not decrease dramatically after correction/transformation and correction."
+    ),
+  )
+}
 
 #' @keywords internal
 #' @noRd
@@ -494,16 +535,12 @@ report_text_rsd_intro <- function(p, d) {
   increased_qc <- .increased_qc_rsd(d)
   
   main <- sprintf(
-    "In these plots, green indicates RSD decreased after %s, red indicates RSD increased after %s, and gray indicates no change in RSD.",
+    "In these plots, RSD is computed per s% after %s and compared to the raw data.",
+    if (identical(p$rsd_cal, "class_met")) "sample class and metabolite" else "metabolite",
     if (p$rsd_compare == "filtered_cor_data") "correction" else "correction and transformation",
-    if (p$rsd_compare == "filtered_cor_data") "correction" else "correction and transformation"
   )
   
   extra <- character(0)
-  if (identical(p$rsd_cal, "class_met")) {
-    extra <- c(extra, "For these figures RSD is calculated for each metabolite grouping by sample class.")
-  }
-  
   if (isTRUE(!p$post_cor_filter)) {
     extra <- c(extra, sprintf(
       "Some metabolites may have been filtered out of the post-corrected dataset if the QC RSD is above %s%%.",
@@ -527,6 +564,21 @@ report_text_rsd_intro <- function(p, d) {
   
   x
 }
+#' Change in RSD table description.
+#' @keywords internal
+#' @noRd
+report_text_rsd_table <- function() {
+  htmltools::tagList(
+    htmltools::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                      "We include median as a more robust measure of \u0394 RSD."),
+    htmltools::tags$p("\u0394 RSD = After RSD - Before RSD. "),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
+      " In this situation, a more negative number is disirable for all four \u0394 metrics."
+    ),
+  )
+}
 
 #' @keywords internal
 #' @noRd
@@ -536,5 +588,43 @@ report_text_pca_intro <- function(p, d) {
     if (p$pca_compare == "filtered_cor_data") "corrected" else "corrected and transformed",
     p$color_col
   ))
+}
+
+#' PCA plot description
+#' @keywords internal
+#' @noRd
+report_text_pca_plots <- function() {
+  htmltools::tagList(
+    htmltools::tags$p(htmltools::strong("What is principal component analysis (PCA)?")),
+    htmltools::tags$p("PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
+                  "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
+                  "data."),
+    htmltools::tags$hr(),
+    htmltools::strong("PCA score plots"),
+    htmltools::tags$p(
+      "The left panel is the 2D PC plot for the raw data and the right panel is the 2D PC plot for the corrected/transformed and corrected data. ",
+      "The x-axis is PC1 and y-axis is PC2. The percentage in the parentheses on the axis labels is the variance explained for each conponent. ",
+      "Dots in this figure represent samples."
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "after correction/transformation and correction, biological variation should dominate technical variation and signal drift should ",
+      "not be visible in right panel. "
+    ),
+    htmltools::tags$ul(
+      htmltools::tags$li(htmltools::strong("When coloring the plot by class: "), "QC samples should cluster together in the right panel."),
+      htmltools::tags$li(htmltools::strong("When coloring the plot by batch or order: "), "there should be no distinct color patterns in the right panel if samples were run using a random injection ordering")
+    ),
+    htmltools::tags$hr(),
+    htmltools::strong("PCA loading plots"),
+    htmltools::tags$p(
+      "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
+      "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
+      "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
+      "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",
+      "A positive loading (green) means that a high value in that metabolite corresponds to a high value in that PC. ",
+      "A negative loading (red) means a high value in that metabolite corresponds to a low value in that PC."
+    ),
+  )
 }
 

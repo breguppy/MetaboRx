@@ -46,40 +46,7 @@ mod_visualize_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            shiny::tags$p(shiny::strong("How to read this plot")),
-            shiny::tags$p("This page compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
-            "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
-            "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
-            "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
-            "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."),
-            shiny::tags$hr(),
-            shiny::strong("Visualize changes in RSD by: Distrbution"),
-            shiny::tags$p(
-              "The distributions of RSDs in non-QC samples is displayed in the left panel and the distribution of RSDs in ",
-              "QC samples is displayed in the right panel. ",
-              "The blue distribution is RSD in the raw data before any correction or transformations is applied. ",
-              "The orange distrubution is RSD in the corrected or transformed and corrected data. "
-            ),
-            shiny::tags$p(
-              shiny::strong("Goal: "),
-              "after correction/transformation and correction, the orange distributions should be shifted to the left compared to the blue distributions. ",
-              "The orange distribution for QC samples should be tall and skinny with the highest density near zero."
-            ),
-            shiny::tags$hr(),
-            shiny::strong("Visualize changes in RSD by: Scatter Plot"),
-            shiny::tags$p(
-              "In the scatter plot comparison the x-axis is RSD before correction/transformation and correction and the y-axis is RSD after. ",
-              "RSDs for non-QC samples are displayed in the left panel and QC samples in the right panel. ",
-              "Red dots indicate that RSD increased after correction/transformation and correction. ", 
-              "Gray dot indicate no change in RSD after correction/transformation and correction. ",
-              "Green dots indicate a decrease in RSD after correction/transformation. ",
-              "The percentages of increased, no change, and decreased RSDs are shown at the top of each panel."
-            ),
-            shiny::tags$p(
-              shiny::strong("Goal: "),
-              "after correction/transofrmation and correction, the majority of RSDs should decrease for QC samples. ",
-              "Non-QC sample RSDs may or may not decrease dramatically after correction/transformation and correction."
-            ),
+            report_text_rsd_plots(),
             title = "What information does the RSD comparison plots show?",
             placement = "auto",
             options = list(container = "body",
@@ -97,15 +64,7 @@ mod_visualize_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            shiny::tags$p(shiny::strong("")),
-            shiny::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
-                          "We include median as a more robust measure of \u0394 RSD."),
-            shiny::tags$p("\u0394 RSD = After RSD - Before RSD. "),
-            shiny::tags$p(
-              shiny::strong("Goal: "),
-              "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
-              " In this situation, a more negative number is disirable for all four \u0394 metrics."
-            ),
+            report_text_rsd_table(),
             title = "What metrics are used to evaluate RSD?",
             placement = "auto",
             options = list(container = "body",
@@ -132,36 +91,7 @@ mod_visualize_ui <- function(id) {
               style = "text-decoration:none;",
               shiny::icon("circle-info")
             ),
-            shiny::tags$p(shiny::strong("What is principal component analysis (PCA)?")),
-            shiny::tags$p("PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
-                          "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
-                          "data."),
-            shiny::tags$hr(),
-            shiny::strong("PCA score plots"),
-            shiny::tags$p(
-              "The left panel is the 2D PC plot for the raw data and the right panel is the 2D PC plot for the corrected/transformed and corrected data. ",
-              "The x-axis is PC1 and y-axis is PC2. The percentage in the parentheses on the axis labels is the variance explained for each conponent. ",
-              "Dots in this figure represent samples."
-            ),
-            shiny::tags$p(
-              shiny::strong("Goal: "),
-              "after correction/transformation and correction, biological variation should dominate technical variation and signal drift should ",
-              "not be visible in right panel. "
-              ),
-            shiny::tags$ul(
-              shiny::tags$li(shiny::strong("When coloring the plot by class: "), "QC samples should cluster together in the right panel."),
-              shiny::tags$li(shiny::strong("When coloring the plot by batch or order: "), "there should be no distinct color patterns in the right panel if samples were run using a random injection ordering")
-            ),
-            shiny::tags$hr(),
-            shiny::strong("PCA loading plots"),
-            shiny::tags$p(
-              "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
-              "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
-              "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
-              "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",
-              "A positive loading (green) means that a high value in that metabolite corresponds to a high value in that PC. ",
-              "A negative loading (red) means a high value in that metabolite corresponds to a low value in that PC."
-            ),
+            report_text_pca_plots(),
             title = "What information does the PCA plots and loading plots show?",
             placement = "auto",
             options = list(container = "body",

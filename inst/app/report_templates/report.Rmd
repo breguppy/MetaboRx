@@ -118,6 +118,9 @@ QCcorrection:::report_text_scatter_intro(params$p, params$d)
 ```
 
 ### RSD Comparison
+```{r}
+QCcorrection:::report_test_rsd_plots()
+```
 
 ```{r, echo=FALSE, fig.width=7.5, fig.height=4.5}
 print(params$plots[["RSD Comparison"]])
@@ -129,11 +132,14 @@ QCcorrection:::report_text_rsd_intro(params$p, params$d)
 ```
 
 ```{r}
+QCcorrection:::report_text_rsd_table()
 QCcorrection:::ui_rsd_stats(params$p, params$d)
 ```
 
 ### PCA Comparison
-
+```{r}
+QCcorrection:::report_text_pca_plots()
+```
 ```{r, echo=FALSE, fig.width=8.333, fig.height=4.417}
 print(params$plots[["PCA Comparison"]])
 ```
