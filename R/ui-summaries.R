@@ -9,6 +9,27 @@ metric_card <- function(label, value) {
     h5(style = "margin:0;", label)
   )
 }
+
+download_card <- function(title,
+                      body,
+                      btn) {
+  
+  header <- shiny::tags$div(
+    style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+    shiny::tags$span(title),
+  )
+  
+  shiny::tags$div(
+    class = "card bg-light mb-3",
+    style = "margin-top: 10px;",
+    shiny::tags$div(class = "card-header", header),
+    shiny::tags$div(
+      class = "card-body",
+      shiny::tags$p(class = "card-text", body),
+      btn
+    )
+  )
+}
 # Reusable warning card generator
 warn_card <- function(title,
                       body,
@@ -163,7 +184,7 @@ ui_basic_info <- function(df,
     below_blank_threshold <- unique(stats::na.omit(as.character(below_blank_threshold)))
     
     blank_body <- sprintf(
-      "%d blank sample(s) were detected and excluded from processing.",
+      "%d blank sample(s) detected and excluded from processing.",
       n_blanks
     )
     

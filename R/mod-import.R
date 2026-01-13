@@ -86,18 +86,13 @@ mod_import_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        uiOutput(ns("mv_filter_slider")), 
+        uiOutput(ns("mv_filter_slider")),
         width = 400
-        ),
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "Download Missing Value Summary", 
-          uiOutput(ns("download_mv_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("Missing value summary by metabolite, sample, class, and batch."),
-          width = 400,
-          position = "right"),
-        uiOutput(ns("filter_info"))
-      )
+      ),
+        fluidRow(
+          column(8, uiOutput(ns("filter_info"))),
+          column(4, uiOutput(ns("download_mv_btn")))
+        )
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -122,18 +117,16 @@ mod_import_ui <- function(id) {
         uiOutput(ns("raw_corr_slider")),
         width = 400
       ),
-      layout_sidebar(
-        sidebar = ui_sidebar_block(
-          title = "Download Raw Data Metabolite Correlations",
-          uiOutput(ns("download_raw_corr_btn"), container = div, style = "position: absolute; bottom: 15px; right: 15px;"),
-          help = c("Creates Excel file with all pairwise metabolite correlations in the raw data."),
-          width = 400,
-          position = "right"),
-        uiOutput(ns("compute_raw_corr_ui")),
-        div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("corr_spinner")),
-                                                    color="#404040")),
-        uiOutput(ns("corr_range_info"))
-        )
+      fluidRow(
+        column(8, 
+               uiOutput(ns("compute_raw_corr_ui")),
+               div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("corr_spinner")),
+                                                  color="#404040")),
+               uiOutput(ns("corr_range_info"))
+        ),
+        column(4, 
+               uiOutput(ns("download_raw_corr_btn")))
+      )
     )),
     card(
       uiOutput(ns("next_correction_ui"))
@@ -285,20 +278,23 @@ mod_import_server <- function(id) {
     })
     
     output$download_mv_btn <- renderUI({
-      req(cleaned_r())
-      
-      div(
-        style = "width: 100%; text-align: center;",
-        div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_mv_data"),
-            label    = "Download Missing Value Info",
-            class    = "btn btn-secondary"
-          )
-        )
+      req(filtered_r())
+      download_card("Download Missing Value Summary",
+                    "Creates Excel file with missing value summarized by metabolite, sample, class, and batch.",
+                    div(
+                      style = "width: 100%; text-align: center;",
+                      div(
+                        style = "display: inline-block;",
+                        downloadButton(
+                          outputId = ns("download_mv_data"),
+                          label    = "Download Missing Value Summary",
+                          class    = "btn btn-secondary btn-lg"
+                        )
+                      )
+                    )
       )
     })
+    
     output$download_mv_data <- downloadHandler(
       filename = function() {
         paste0("missing_value_counts_", Sys.Date(), ".xlsx")
@@ -340,15 +336,21 @@ mod_import_server <- function(id) {
       
       tagList(
         tags$div(
+          style = "width: 100%; text-align: center;",
+          tags$div(
+            style = "max-width: 350px; display: inline-block;",
+            actionButton(
+              ns("compute_raw_corr"),
+              "Compute Metabolite Correlations",
+              class = "btn-primary btn-lg",
+              width = "100%"
+            )
+          )
+        ),
+        tags$div(
           style = "margin-bottom: 8px; color: #555;",
           "Computing correlations may take a while if the data has many metabolites."
         ),
-        actionButton(
-          ns("compute_raw_corr"),
-          "Compute Metabolite Correlations",
-          class = "btn-primary btn-lg",
-          width = "100%"
-        )
       )
     })
     
@@ -379,15 +381,18 @@ mod_import_server <- function(id) {
     
     output$download_raw_corr_btn <- renderUI({
       req(raw_correlations_r())
-      
-      div(
-        style = "width: 100%; text-align: center;",
+      download_card(
+        "Download Raw Data Metabolite Correlations",
+        "Creates Excel file with all pairwise metabolite correlations in the raw data.",
         div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_raw_corr_data"),
-            label    = "Download Metabolite Correlations",
-            class    = "btn btn-secondary"
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_raw_corr_data"),
+              label    = "Download Metabolite Correlations",
+              class    = "btn btn-secondary btn-lg"
+            )
           )
         )
       )

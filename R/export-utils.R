@@ -397,7 +397,10 @@ report_text_ev_detection <- function() {
     ),
     htmltools::tags$p(htmltools::strong("Caution: "),
                   "Candidate extreme values are displayed for the user's benefit. ",
-                  "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it.")
+                  "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."),
+    htmltools::tags$p(htmltools::strong("Note:" ),
+                      "This is not an exhaustive outlier search. This extreme value detection sections aims to help identify unreasonable ",
+                      "metabolite values thats make a sample stand out from the others.")
   )
 }
 
