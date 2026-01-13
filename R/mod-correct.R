@@ -93,7 +93,7 @@ mod_correct_ui <- function(id) {
                              customClass = "popover-responsive") 
             )
           ),
-          ui_tc_corr_slider(ns),
+          uiOutput(ns("tc_corr_slider")),
           width = 400
         ),
         layout_sidebar(
@@ -110,8 +110,7 @@ mod_correct_ui <- function(id) {
         )
         )
       ),
-    card(actionButton(ns("next_visualization"), "Next: Evaluate and Visualize Correction",
-                      class="btn-primary btn-lg"))
+    card(uiOutput(ns("next_visualization_ui")))
   )}
 
 mod_correct_server <- function(id, data, params) {
@@ -502,7 +501,8 @@ mod_correct_server <- function(id, data, params) {
             )
           )
         ), 
-        htmltools::tags$p("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
+        htmltools::tags$p("Creates Excel file with correction settings, corrected data, ",
+        "transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
       )
     })
     
@@ -546,7 +546,11 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    #---------- 2.5 Post-Correction/Transformation Correlations
+    #---------- 2.4 Post-Correction/Transformation Correlations
+    output$tc_corr_slider <- renderUI({
+      req(transformed_r())
+      ui_tc_corr_slider(ns = session$ns)
+    })
     tc_corr_input_df_r <- reactive({
       req(filtered_corrected_r(), transformed_r())
       
@@ -579,6 +583,7 @@ mod_correct_server <- function(id, data, params) {
     }, ignoreInit = TRUE)
     
     output$compute_tc_corr_ui <- renderUI({
+      req(transformed_r())
       # Always read the key so the UI invalidates when tc_corr_data changes
       key <- tc_corr_key_r()
       req(nzchar(key))
@@ -658,76 +663,21 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    output$download_corr_btn <- renderUI({
-      req(transformed_r())
-      htmltools::tagList(
-        htmltools::tags$h5("Download Corrected and Transformed Data"),
-        tooltip(
-          checkboxInput(
-            ns("keep_corrected_qcs"),
-            "Include QCs in corrected data file",
-            FALSE
-          ),
-          "Check the box if you want corrected QC values in the downloaded corrected data file.",
-          placement = "right"
-        ),
-       div(
-        style = "width: 100%; text-align: center;",
-        div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_corr_data"),
-            label    = "Download Corrected and Transformed Data",
-            class    = "btn btn-secondary"
-          )
-        )
-      ), 
-        htmltools::tags$p("Creates Excel file with correction settings, corrected data, transformed data, group statistics, fold changes, and MetaboAnalyst Ready tabs."),
-      )
-    })
-    
-    output$download_corr_data <- downloadHandler(
-      filename = function() {
-        paste0("corrected_data_", Sys.Date(), ".xlsx")
-      },
-      content = function(file) {
-        fc <- isolate(filtered_corrected_r())
-        tr <- isolate(transformed_r())
-        cr <- isolate(corrected_r())
-        p_in <- params()  
-        
-        p <- list(
-          sample_col        = p_in$sample_col,
-          batch_col         = p_in$batch_col,
-          class_col         = p_in$class_col,
-          order_col         = p_in$order_col,
-          Frule             = p_in$Frule,
-          remove_imputed    = isTRUE(input$remove_imputed),
-          rsd_cutoff        = fc$rsd_cutoff,
-          transform         = input$transform,
-          ex_ISTD           = isTRUE(input$ex_ISTD),
-          keep_corrected_qcs= isTRUE(input$keep_corrected_qcs),
-          tc_corr_threshold = input$tc_corr_threshold,
-          no_control        = isTRUE(p_in$no_control),
-          control_class     = p_in$control_class
-        )
-        
-        rv <- list(
-          cleaned            = cleaned_r(),
-          filtered           = filtered_r(),
-          imputed            = imputed_r(),
-          corrected          = cr,
-          filtered_corrected = fc,
-          transformed        = tr
-        )
-        
-        wb <- export_xlsx(p, rv)                      
-        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      }
-    )
-    
     #---------- Next: Visualize Data
+    output$next_visualization_ui <- renderUI({
+      req(tc_correlations_r()) 
+      actionButton(
+        ns("next_visualization"), 
+        "Next: Evaluate and Visualize Correction",
+        class="btn-primary btn-lg"
+        )
+    })
     observeEvent(input$next_visualization, {
+      req(tc_correlations_r())
+      validate(
+        need(!is.null(filtered_corrected_r()), "Missing corrected data"),
+        need(!is.null(transformed_r()), "Missing transformed data data")
+      )
       updateTabsetPanel(session$rootScope(), "main_steps", "tab_visualize")
     })
     

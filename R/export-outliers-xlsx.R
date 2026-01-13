@@ -17,13 +17,8 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
     nm
   }
   
-  if (p$out_data == "filtered_cor_data") {
-    df <- d$filtered_corrected$df_no_mv
-    d_type <- "corrected data"
-  } else {
-    df <- d$transformed$df_no_mv
-    d_type <- "transformed and corrected data"
-  }
+  df <- d$filtered_corrected$df_no_mv
+
   res <- detect_hotelling_nonqc_dual_z(df, p)
   
   outlier_samples <- unique(res$data$sample[res$data$is_outlier_sample])
@@ -98,8 +93,9 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
   shiny::withProgress(message = "Creating extreme_values_*today's_date*.xlsx...", value = 0, {
     s1 <- .add_sheet("Samples Outside Ellipse")
     txt1 <- paste(
-      "Tab 1. This tab shows samples outside the Hotelling's T^2 95% ellipse. The ellipse is computed in the PC1-PC2 space using the non-QC samples in the",
-      d_type, "."
+      "Tab 1. This tab shows samples outside the Hotelling's T^2 95% ellipse.",
+      "The ellipse is computed in the PC1-PC2 space using the non-QC samples in",
+      "the signal drift corrected data."
     )
     openxlsx::writeData(wb,
                         s1,
@@ -128,7 +124,8 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
     
     s2 <- .add_sheet("PC Loadings")
     txt2 <- paste(
-      "Tab 2. This tab shows the loadings for PC1 and PC2 computed using the non-QC samples in the", d_type, "."
+      "Tab 2. This tab shows the loadings for PC1 and PC2 computed using the",
+      "non-QC samples in the corrected data."
     )
     openxlsx::writeData(wb,
                         s2,
@@ -157,8 +154,9 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
     
     s3 <- .add_sheet("Potential Extreme Values")
     txt3 <- paste(
-       "Tab 3. This tab shows samples outside the Hotelling's T^2 95% Ellipse with AND have at least 1 potential extreme metabolite value meaning global AND class |z| is greater than 3 in the", 
-       d_type, "."
+       "Tab 3. This tab shows samples outside the Hotelling's T^2 95% ellipse",
+       "with AND have at least 1 potential extreme metabolite value meaning",
+       "global AND class |z| is greater than 3 in the corrected data."
     )
     openxlsx::writeData(wb,
                         s3,
