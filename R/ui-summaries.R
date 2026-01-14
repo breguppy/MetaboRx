@@ -9,7 +9,7 @@ metric_card <- function(label, value) {
     h5(style = "margin:0;", label)
   )
 }
-
+# Download card used for all download buttons on the first 3 tabs
 download_card <- function(title,
                       body,
                       btn) {
@@ -27,6 +27,47 @@ download_card <- function(title,
       class = "card-body",
       shiny::tags$p(class = "card-text", body),
       btn
+    )
+  )
+}
+
+info_card <- function(title,
+                      body,
+                      body_tags = NULL,
+                      info_title = NULL,
+                      info_content = NULL,
+                      info_placement = "auto",
+                      info_class = "popover-responsive") {
+  has_info <- !is.null(info_title) || !is.null(info_content)
+  
+  header <- shiny::tags$div(
+    style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+    shiny::tags$span(title),
+    if (has_info) {
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        info_content %||% shiny::tags$p(""),
+        title = info_title %||% "",
+        placement = info_placement,
+        options = list(container = "body", customClass = info_class)
+      )
+    }
+  )
+  
+  shiny::tags$div(
+    class = "card border-info mb-3",
+    style = "margin-top: 10px;",
+    shiny::tags$div(class = "card-header", 
+                    header),
+    shiny::tags$div(
+      class = "card-body",
+      shiny::tags$p(class = "card-text", body),
+      body_tags
     )
   )
 }
@@ -65,7 +106,8 @@ warn_card <- function(title,
   shiny::tags$div(
     class = "card border-warning mb-3",
     style = "margin-top: 10px;",
-    shiny::tags$div(class = "card-header", header),
+    shiny::tags$div(class = "card-header",
+                    header),
     shiny::tags$div(
       class = "card-body",
       shiny::tags$p(class = "card-text", body),
@@ -114,14 +156,12 @@ ui_basic_info <- function(df,
   # ---------- Warning box 1: replaced values ----------
   replaced_card <- NULL
   if (total_replaced > 0) {
-    replaced_card <- warn_card(
+    replaced_card <- info_card(
       title = "Replaced non-numeric or zeros values in metabolite columns",
       body  = paste0(
         total_replaced,
         " values were converted to missing (NA) prior to processing."
       ),
-      #info_title = "What values are marked as missing?",
-      #info_content = shiny::tags$p("0, NA, NaN, or any other non-numeric value is counted as a missing value. You can choose an imputation method in the next tab.")
     )
   }
   
@@ -130,13 +170,11 @@ ui_basic_info <- function(df,
   if (length(non_numeric_cols) > 0) {
     nonnum_card <- warn_card(
       title = "Non-numerical columns detected",
-      body  = "These columns contain all non-numeric values and will be removed prior to processing.", #If you do not want these columns removed, check the box 'withhold additional columns from correction' on the left and add them to list below the box.",
+      body  = "These columns contain all non-numeric values and will be removed prior to processing.",
       body_tags = tags$p(
         style = "font-weight: 600; margin-top: 8px;",
         paste(sort(unique(non_numeric_cols)), collapse = ", ")
       ),
-      #info_title = "What makes a column non-numeric?",
-      #info_content = shiny::tags$p("If every value in a 'metabolite' column is not a number, then the column is removed from the dataset.")
     )
   }
   
@@ -168,11 +206,6 @@ ui_basic_info <- function(df,
         nrow(duplicate_mets)
       ),
       body_tags = dup_badges,
-      #info_title = "What does it mean for 2 metabolites to be equal or nearly equal?",
-      #info_content = shiny::tagList(
-      #  shiny::tags$p("For every sample, the values for the two meatbolite are equal to each other or within 1e-3 of each other."),
-      #  shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-      #)
     )
   }
   
@@ -212,16 +245,6 @@ ui_basic_info <- function(df,
       title = "Blank samples detected",
       body  = blank_body,
       body_tags = blank_tags
-      #info_title = "Why do we flag metabolites with QC average less than 3x the blank average?",
-      #info_content = shiny::tagList(
-      #  shiny::tags$p("Metabolites with QC average less than 3x the blank average may indicate the metabolite is:"),
-      #  shiny::tags$ul(
-      #    shiny::tags$li("low abunance/near the limit of detection in QC samples"),
-      #    shiny::tags$li("carried over to blank samples from previous samples"), 
-      #    shiny::tags$li("a potential contaminate")
-      #  ),
-      #  shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-    #)
     )
   }
   
@@ -287,13 +310,13 @@ ui_basic_info <- function(df,
 
 
 # Filter info for section 1.4 Filter Raw Data
-ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets) {
+ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_all_missing) {
   left_col <- if (length(mv_removed) == 0) {
     tags$div(style = "flex: 1; padding-right: 10px;",
              tags$span(
                style = "color:darkgreen;font-weight:bold;",
                paste0(
-                 "No metabolites removed for missing value percentage above ",
+                 "No metabolites with missing value percentage above ",
                  mv_cutoff,
                  "%."
                )
@@ -328,11 +351,40 @@ ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets) {
       tags$ul(lapply(qc_missing_mets, tags$li)))
   }
   
-  tags$div(
+  summary_row <- tags$div(
     style = "display:flex; gap:16px; align-items:flex-start;",
     left_col, right_col
   )
+  
+  has_all_missing <- !is.null(class_metab_all_missing) &&
+    is.data.frame(class_metab_all_missing) &&
+    nrow(class_metab_all_missing) > 0L
+  
+  all_missing_card <- NULL
+  if (has_all_missing) {
+    # Create bullet list like: "QC — MetaboliteA"
+    pair_items <- apply(
+      class_metab_all_missing[, c("class", "metabolite"), drop = FALSE],
+      1,
+      function(r) paste0(r[[1]], " — ", r[[2]])
+    )
+    
+    all_missing_card <- warn_card(
+      title = "All-missing class/metabolite combinations detected",
+      body  = paste0(
+        "The following class–metabolite pairs have all values missing. ",
+        "These values will remain missing if you choose a class-metabolite imputation method."
+      ),
+      body_tags = shiny::tags$ul(lapply(pair_items, shiny::tags$li))
+    )
+  }
+  
+  shiny::tagList(
+    summary_row,
+    all_missing_card
+  )
 }
+
 
 
 ui_corr_range_info <- function(all_cor, range) {

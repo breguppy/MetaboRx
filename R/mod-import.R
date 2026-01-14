@@ -61,10 +61,10 @@ mod_import_ui <- function(id) {
         uiOutput(ns("withhold_toggle")),
         uiOutput(ns("n_withhold_ui")),
         uiOutput(ns("withhold_selectors_ui")),
+        uiOutput(ns("ui_control_class_selector")),
         width = 400
       ),
-      uiOutput(ns("basic_info")),
-      uiOutput(ns("ui_control_class_selector"))
+      uiOutput(ns("basic_info"))
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -274,7 +274,8 @@ mod_import_server <- function(id) {
       req(fd)
       ui_filter_info(fd$mv_removed_cols,
                      input$mv_cutoff,
-                     fd$qc_missing_mets)
+                     fd$qc_missing_mets,
+                     fd$class_metab_all_missing)
     })
     
     output$download_mv_btn <- renderUI({
