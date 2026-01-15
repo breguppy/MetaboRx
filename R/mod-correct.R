@@ -72,6 +72,40 @@ mod_correct_ui <- function(id) {
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
+        title = "1.4 Raw Data Metabolite Correlations",
+        shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Pearson's r correlations"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_correlations(),
+            title = "Pearson's r correlations",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
+        uiOutput(ns("raw_corr_slider")),
+        width = 400
+      ),
+      fluidRow(
+        column(8, 
+               uiOutput(ns("compute_raw_corr_ui")),
+               div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("corr_spinner")),
+                                                           color="#404040")),
+               uiOutput(ns("corr_range_info"))
+        ),
+        column(4, 
+               uiOutput(ns("download_raw_corr_btn")))
+      )
+    )),
+    card(layout_sidebar(
+      sidebar = ui_sidebar_block(
         title = "2.4 Post-Correction/Transformation Metabolite Correlation",
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
@@ -547,6 +581,96 @@ mod_correct_server <- function(id, data, params) {
     )
     
     #---------- 2.4 Post-Correction/Transformation Correlations
+    #---------- 1.4 Raw Data Metabolite Correlations server
+    # requires missing value filtered data
+    
+    # move this to mod_correct so all correlations can be exported together
+    output$raw_corr_slider <- renderUI({
+      req(filtered_r())
+      ui_raw_corr_slider(ns = session$ns)
+    })
+    
+    output$compute_raw_corr_ui <- renderUI({
+      req(filtered_r())
+      v <- filtered_version_r()
+      
+      if (isTRUE(!is.na(computed_version_r())) && identical(computed_version_r(), v)) {
+        return(NULL) # hide after computed, until df changes
+      }
+      
+      tagList(
+        tags$div(
+          style = "width: 100%; text-align: center;",
+          tags$div(
+            style = "max-width: 350px; display: inline-block;",
+            actionButton(
+              ns("compute_raw_corr"),
+              "Compute Metabolite Correlations",
+              class = "btn-primary btn-lg",
+              width = "100%"
+            )
+          )
+        ),
+        tags$div(
+          style = "margin-bottom: 8px; color: #555;",
+          "Computing correlations may take a while if the data has many metabolites."
+        ),
+      )
+    })
+    
+    raw_correlations_r <- eventReactive(input$compute_raw_corr, {
+      df <- isolate(filtered_r()$df)
+      metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
+      compute_pairwise_metabolite_correlations(df, metab)
+    })
+    
+    observeEvent(input$compute_raw_corr, ignoreInit = TRUE, {
+      shinyjs::disable("compute_raw_corr")
+      output$corr_spinner <- renderUI({
+        on.exit(shinyjs::enable("compute_raw_corr"), add = TRUE)
+        raw_correlations_r(); computed_version_r(filtered_version_r()); NULL
+      })
+    })
+    
+    output$corr_spinner <- renderUI(NULL)
+    
+    observeEvent(raw_correlations_r(), {
+      computed_version_r(filtered_version_r())
+    }, ignoreInit = TRUE)
+    
+    output$corr_range_info <- renderUI({
+      all_corr <- req(raw_correlations_r())
+      ui_corr_range_info(all_corr, input$corr_threshold)
+    })
+    
+    output$download_raw_corr_btn <- renderUI({
+      req(raw_correlations_r())
+      download_card(
+        "Download Raw Data Metabolite Correlations",
+        "Creates Excel file with all pairwise metabolite correlations in the raw data.",
+        div(
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "display: inline-block;",
+            downloadButton(
+              outputId = ns("download_raw_corr_data"),
+              label    = "Download Metabolite Correlations",
+              class    = "btn btn-secondary btn-lg"
+            )
+          )
+        )
+      )
+    })
+    
+    output$download_raw_corr_data <- downloadHandler(
+      filename = function() {
+        paste0("raw_metabolite_correlations_", Sys.Date(), ".xlsx")
+      },
+      content = function(file) {
+        wb <- export_corr_xlsx(raw_correlations_r()) 
+        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+      }
+    )
     output$tc_corr_slider <- renderUI({
       req(transformed_r())
       ui_tc_corr_slider(ns = session$ns)

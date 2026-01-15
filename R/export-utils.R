@@ -237,7 +237,7 @@ report_text_mv_filter <- function() {
     htmltools::tags$p("Metabolites with missing value percentage above the selected threshold are removed from the dataset."),
     htmltools::tags$p("After filtering by missing value percentage, metabolites that have at least 1 missing value for QC samples are displayed.",
                 "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
-    htmltools::tags$p("If a metabolite is missing for all samples in a particular class, a warning will appear stating the class and metabolite with all missing values."),
+    htmltools::tags$p("If a metabolite is missing for all samples in a single class, a warning will appear stating the class and metabolite with all missing values."),
     htmltools::tags$p("Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, and class.")
   )
 }
