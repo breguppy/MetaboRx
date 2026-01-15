@@ -421,6 +421,48 @@ report_text_transformation <- function(p, d) {
   base
 }
 
+#' @keywords internal
+#' @noRd
+report_text_transform_methods <- function() {
+  htmltools::tagList(
+    htmltools::tags$p("Post-correction transformations/normalizations:"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        htmltools::strong("Internal Standard Normalization: "),
+        "For each sample (row), compute the mean of internal standard columns (ISTD*/ITSD*), ",
+        "then divide each non-internal standard metabolite by that mean."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Total Ratio Normalization (TRN): "),
+        "For each sample (row), compute the total signal as the sum across included metabolite columns, ",
+        "then scale each included metabolite by its proportion of that total and multiply by the number ",
+        "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("None: "),
+        "Leaves corrected metabolite values unchanged."
+      ),
+    ),
+    htmltools::tags$hr(),
+    htmltools::tags$p(
+      htmltools::strong("Exclude internal standards checkbox: "),
+      "When checked, ISTD/ITSD columns are excluded from the TRN total-signal calculation and are not transformed."
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Withhold from TRN: "),
+      "Use this if a column should not contribute to the TRN total (e.g., TIC)."
+    ),
+    htmltools::tags$hr(),
+    htmltools::tags$p(
+      htmltools::strong("Caution: "),
+      "Internal Standard Normalization should not be used when only a single internal standard is measured.", 
+      "The single internal standard may not be representive of all metabolites measured in the samples.",
+      "Total Ratio Normalization (TRN) relies on the assuption that total intensity should be the same across as samples",
+      " and is sensitive to extreme values or dominate metabolites with high relative intensities."
+    )
+  )
+}
+
 #' How to interpret the metabolite scatter plots:
 #' @keywords internal
 #' @noRd

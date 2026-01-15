@@ -45,13 +45,13 @@ mod_correct_ui <- function(id) {
           "post_cor_filter_block"
         )), width = 400),
         fluidRow(column(
-          4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
-        ), column(8, uiOutput(
-          ns("outliers_table")
+          8, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
+        ), column(4, 
+                  uiOutput(ns("download_cor_rsd_btn")
         ))),
-        fluidRow(column(4, uiOutput(
-          ns("download_cor_rsd_btn")
-        )), column(8, uiOutput(
+        fluidRow(column(8, uiOutput(
+          ns("outliers_table")
+        )), column(4, uiOutput(
           ns("download_ev_btn")
         )))
       )
@@ -65,9 +65,9 @@ mod_correct_ui <- function(id) {
         ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040"),
       ),
       column(4, uiOutput(ns(
-        "download_tc_rsd_btn"
-      )), uiOutput(ns(
         "download_cor_btn"
+      )), uiOutput(ns(
+        "download_tc_rsd_btn"
       ))))
     )),
     card(layout_sidebar(
@@ -437,7 +437,8 @@ mod_correct_server <- function(id, data, params) {
     
     output$download_tc_rsd_btn <- renderUI({
       req(transformed_r())
-      download_card(
+      if (!identical(input$transform, "none")) {
+        download_card(
         "Download Transformed RSD Summary",
         "Creates Excel file with RSD summary before and after correction and transformation for samples and QCs.",
         div(
@@ -452,6 +453,9 @@ mod_correct_server <- function(id, data, params) {
           )
         )
       )
+      } else {
+        NULL
+      }
     })
     
     output$download_tc_rsd_data <- downloadHandler(

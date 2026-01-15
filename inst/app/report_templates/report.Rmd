@@ -82,12 +82,6 @@ QCcorrection:::report_text_correction(params$p, params$d)
 QCcorrection:::report_text_rsd_cal()
 QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
 ```
-
-### Transformation Description
-```{r}
-QCcorrection:::report_text_transformation(params$p, params$d)
-```
-
 ### Candidate Extreme Values
 
 ```{r}
@@ -95,10 +89,16 @@ QCcorrection:::report_text_ev_detection()
 QCcorrection:::ui_outliers(params$p, params$d) 
 ```
 
-### Transformed and Corrected Metabolite Correlations
+### Transformation Description
+```{r}
+QCcorrection:::report_text_transformation(params$p, params$d)
+QCcorrection:::report_text_transform_methods()
+```
+
+###  Metabolite Correlations
 ```{r}
 if (!is.null(params$d$tc_corr)) {
-  QCcorrection:::ui_corr_range_info(params$d$tc_corr, params$p$tc_corr_threshold)
+  QCcorrection:::ui_corr_range_info(params$d$all_corr, params$p$tc_corr_threshold)
 } else {
   htmltools::tags$span(style = "font-weight:bold;", "Metabolite correlations were not computed.")
 }

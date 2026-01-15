@@ -503,35 +503,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
         style = "text-decoration:none;",
         shiny::icon("circle-info")
       ),
-      shiny::tagList(
-        shiny::tags$p("Post-correction transformations/normalizations:"),
-        shiny::tags$ul(
-          if (has_istd) shiny::tags$li(
-            shiny::strong("Internal Standard Normalization: "),
-            "For each sample (row), compute the mean of internal standard columns (ISTD*/ITSD*), ",
-            "then divide each non-internal standard metabolite by that mean."
-          ),
-          shiny::tags$li(
-            shiny::strong("Total Ratio Normalization (TRN): "),
-            "For each sample (row), compute the total signal as the sum across included metabolite columns, ",
-            "then scale each included metabolite by its proportion of that total and multiply by the number ",
-            "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
-          ),
-          shiny::tags$li(
-            shiny::strong("None: "),
-            "Leaves corrected metabolite values unchanged."
-          ),
-        ),
-        shiny::tags$hr(),
-        shiny::tags$p(
-          shiny::strong("Exclude internal standards checkbox: "),
-          "When checked, ISTD/ITSD columns are excluded from the TRN total-signal calculation and are not transformed."
-        ),
-        shiny::tags$p(
-          shiny::strong("Withhold from TRN: "),
-          "Use this if a column should not contribute to the TRN total (e.g., TIC)."
-        )
-      ),
+      report_text_transform_methods(),
       title = "Transformation methods",
       placement = "right",
       options = list(container = "body", customClass = "popover-responsive")
