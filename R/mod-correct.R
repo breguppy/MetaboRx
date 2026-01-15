@@ -67,46 +67,12 @@ mod_correct_ui <- function(id) {
       column(4, uiOutput(ns(
         "download_tc_rsd_btn"
       )), uiOutput(ns(
-        "download_corr_btn"
+        "download_cor_btn"
       ))))
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "1.4 Raw Data Metabolite Correlations",
-        shiny::tags$div(
-          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-          shiny::tags$strong("Pearson's r correlations"),
-          bslib::popover(
-            shiny::tags$button(
-              type = "button",
-              class = "btn btn-link p-0",
-              style = "text-decoration:none;",
-              shiny::icon("circle-info")
-            ),
-            report_text_correlations(),
-            title = "Pearson's r correlations",
-            placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
-          )
-        ),
-        uiOutput(ns("raw_corr_slider")),
-        width = 400
-      ),
-      fluidRow(
-        column(8, 
-               uiOutput(ns("compute_raw_corr_ui")),
-               div(style="margin:12px 0 0 0;", withSpinner(uiOutput(ns("corr_spinner")),
-                                                           color="#404040")),
-               uiOutput(ns("corr_range_info"))
-        ),
-        column(4, 
-               uiOutput(ns("download_raw_corr_btn")))
-      )
-    )),
-    card(layout_sidebar(
-      sidebar = ui_sidebar_block(
-        title = "2.4 Post-Correction/Transformation Metabolite Correlation",
+        title = "2.4 Metabolite Correlation",
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Pearson's r correlations"),
@@ -123,18 +89,18 @@ mod_correct_ui <- function(id) {
             options = list(container = "body", customClass = "popover-responsive")
           )
         ),
-        uiOutput(ns("tc_corr_slider")),
+        uiOutput(ns("correlation_slider")),
         width = 400
       ),
       fluidRow(column(
         8,
-        uiOutput(ns("compute_tc_corr_ui")),
+        uiOutput(ns("compute_corr_ui")),
         div(style = "margin:12px 0 0 0;", withSpinner(uiOutput(
-          ns("tc_corr_spinner")
+          ns("corr_spinner")
         ), color = "#404040")),
-        uiOutput(ns("tc_corr_range_info"))
+        uiOutput(ns("corr_range_info"))
       ), column(4, uiOutput(
-        ns("download_tc_corr_btn")
+        ns("download_corr_btn")
       )))
       
     )),
@@ -509,7 +475,7 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    output$download_corr_btn <- renderUI({
+    output$download_cor_btn <- renderUI({
       req(transformed_r())
       download_card(
         "Download Corrected and Transformed Data",
@@ -531,7 +497,7 @@ mod_correct_server <- function(id, data, params) {
           div(
             style = "display: inline-block;",
             downloadButton(
-              outputId = ns("download_corr_data"),
+              outputId = ns("download_cor_data"),
               label    = "Download Corrected and Transformed Data",
               class    = "btn btn-secondary btn-lg"
             )
@@ -540,7 +506,7 @@ mod_correct_server <- function(id, data, params) {
       )
     })
     
-    output$download_corr_data <- downloadHandler(
+    output$download_cor_data <- downloadHandler(
       filename = function() {
         paste0("corrected_data_", Sys.Date(), ".xlsx")
       },
@@ -580,143 +546,76 @@ mod_correct_server <- function(id, data, params) {
       }
     )
     
-    #---------- 2.4 Post-Correction/Transformation Correlations
-    #---------- 1.4 Raw Data Metabolite Correlations server
-    # requires missing value filtered data
-    
-    # move this to mod_correct so all correlations can be exported together
-    output$raw_corr_slider <- renderUI({
-      req(filtered_r())
-      ui_raw_corr_slider(ns = session$ns)
+    #---------- 2.4 Metabolite Correlations
+    # Requires filtered(), filtered_corrected_r(), and transformed_r()
+    output$correlation_slider <- renderUI({
+      req(transformed_r())
+      ui_correlation_slider(ns = session$ns)
     })
     
-    output$compute_raw_corr_ui <- renderUI({
-      req(filtered_r())
-      v <- filtered_version_r()
-      
-      if (isTRUE(!is.na(computed_version_r())) && identical(computed_version_r(), v)) {
-        return(NULL) # hide after computed, until df changes
-      }
-      
-      tagList(
-        tags$div(
-          style = "width: 100%; text-align: center;",
-          tags$div(
-            style = "max-width: 350px; display: inline-block;",
-            actionButton(
-              ns("compute_raw_corr"),
-              "Compute Metabolite Correlations",
-              class = "btn-primary btn-lg",
-              width = "100%"
-            )
-          )
-        ),
-        tags$div(
-          style = "margin-bottom: 8px; color: #555;",
-          "Computing correlations may take a while if the data has many metabolites."
-        ),
-      )
-    })
+    .pick_df_version <- function(x, remove_imputed) {
+      if (isTRUE(remove_imputed)) x$df_mv else x$df_no_mv
+    }
     
-    raw_correlations_r <- eventReactive(input$compute_raw_corr, {
-      df <- isolate(filtered_r()$df)
+    .compute_corr <- function(df) {
       metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
       compute_pairwise_metabolite_correlations(df, metab)
-    })
+    }
     
-    observeEvent(input$compute_raw_corr, ignoreInit = TRUE, {
-      shinyjs::disable("compute_raw_corr")
-      output$corr_spinner <- renderUI({
-        on.exit(shinyjs::enable("compute_raw_corr"), add = TRUE)
-        raw_correlations_r(); computed_version_r(filtered_version_r()); NULL
-      })
-    })
+    all_corr_r <- reactiveVal(NULL)
+   
+    computed_key_r <- reactiveVal(NA_character_)
     
-    output$corr_spinner <- renderUI(NULL)
+    .safe_dim <- function(df) {
+      if (is.null(df)) return("NAxNA")
+      paste0(nrow(df), "x", ncol(df))
+    }
     
-    observeEvent(raw_correlations_r(), {
-      computed_version_r(filtered_version_r())
-    }, ignoreInit = TRUE)
-    
-    output$corr_range_info <- renderUI({
-      all_corr <- req(raw_correlations_r())
-      ui_corr_range_info(all_corr, input$corr_threshold)
-    })
-    
-    output$download_raw_corr_btn <- renderUI({
-      req(raw_correlations_r())
-      download_card(
-        "Download Raw Data Metabolite Correlations",
-        "Creates Excel file with all pairwise metabolite correlations in the raw data.",
-        div(
-          style = "width: 100%; text-align: center;",
-          div(
-            style = "display: inline-block;",
-            downloadButton(
-              outputId = ns("download_raw_corr_data"),
-              label    = "Download Metabolite Correlations",
-              class    = "btn btn-secondary btn-lg"
-            )
-          )
-        )
-      )
-    })
-    
-    output$download_raw_corr_data <- downloadHandler(
-      filename = function() {
-        paste0("raw_metabolite_correlations_", Sys.Date(), ".xlsx")
-      },
-      content = function(file) {
-        wb <- export_corr_xlsx(raw_correlations_r()) 
-        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      }
-    )
-    output$tc_corr_slider <- renderUI({
-      req(transformed_r())
-      ui_tc_corr_slider(ns = session$ns)
-    })
-    tc_corr_input_df_r <- reactive({
-      req(filtered_corrected_r(), transformed_r())
+    corr_key_r <- reactive({
+      req(filtered_r(), filtered_corrected_r())
       
-      use_mv <- isTRUE(input$remove_imputed)
-      use_filtered <- identical(input$tc_corr_data, "filtered_cor_data")
+      remove_imputed <- isTRUE(input$remove_imputed)
+      tr_method      <- input$transform %||% "none"
+      include_trn    <- !identical(tr_method, "none")
       
-      if (use_filtered) {
-        if (use_mv) filtered_corrected_r()$df_mv else filtered_corrected_r()$df_no_mv
+      raw_df <- filtered_r()$df
+      cor_df <- .pick_df_version(filtered_corrected_r(), remove_imputed)
+      
+      # Only touch transformed_r() when it should exist for the key
+      trn_dim <- if (include_trn) {
+        trn_df <- .pick_df_version(req(transformed_r()), remove_imputed)
+        .safe_dim(trn_df)
       } else {
-        if (use_mv) transformed_r()$df_mv else transformed_r()$df_no_mv
+        "SKIP"
       }
-    })
-    
-    computed_tc_key_r <- reactiveVal(NA_character_)
-    
-    tc_corr_key_r <- reactive({
-      paste(
-        input$tc_corr_data %||% "filtered_cor_data",
-        isTRUE(input$remove_imputed),
-        sep = "::"
+      
+      paste0(
+        "remove_imputed=", remove_imputed,
+        "|transform=", tr_method,
+        "|raw_dim=", .safe_dim(raw_df),
+        "|cor_dim=", .safe_dim(cor_df),
+        "|trn_dim=", trn_dim
       )
     })
     
-    observeEvent(input$tc_corr_data, {
-      computed_tc_key_r(NA_character_)
-    }, ignoreInit = TRUE)
+    observeEvent(
+      list(filtered_r(), filtered_corrected_r(), transformed_r(),
+           input$remove_imputed, input$transform),
+      {
+        computed_key_r(NA_character_)
+      },
+      ignoreInit = TRUE
+    )
     
-    observeEvent(list(filtered_corrected_r(), transformed_r()), {
-      computed_tc_key_r(NA_character_)
-    }, ignoreInit = TRUE)
-    
-    output$compute_tc_corr_ui <- renderUI({
-      req(transformed_r())
-      # Always read the key so the UI invalidates when tc_corr_data changes
-      key <- tc_corr_key_r()
+    output$compute_corr_ui <- renderUI({
+      req(filtered_corrected_r())
+      key <- corr_key_r()
       req(nzchar(key))
       
-      # If we've computed for this key, hide
-      if (!is.na(computed_tc_key_r()) &&
-          identical(computed_tc_key_r(), key)) {
-        return(NULL)
-      }
+      # IMPORTANT: force dependency on computed_key_r()
+      ck <- computed_key_r()
+      
+      if (!is.na(ck) && identical(ck, key)) return(NULL)
       
       tagList(
         div(
@@ -724,14 +623,13 @@ mod_correct_server <- function(id, data, params) {
           div(
             style = "max-width: 350px; display: inline-block;",
             actionButton(
-              ns("compute_tc_corr"),
+              ns("compute_corr"),
               "Compute Metabolite Correlations",
               class = "btn btn-primary btn-lg",
               width = "100%"
             )
           )
         ),
-        
         tags$div(
           style = "margin-bottom: 8px; color: #555;",
           "Computing correlations may take a while if the data has many metabolites."
@@ -739,33 +637,53 @@ mod_correct_server <- function(id, data, params) {
       )
     })
     
-    tc_correlations_r <- eventReactive(input$compute_tc_corr, {
-      df <- req(tc_corr_input_df_r())
-      metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
-      compute_pairwise_metabolite_correlations(df, metab)
+    
+    
+    compute_all_correlations_r <- eventReactive(input$compute_corr, {
+      req(filtered_r(), filtered_corrected_r(), transformed_r())
+      
+      remove_imputed <- isTRUE(input$remove_imputed)
+      transform_meth <- input$transform %||% "none"
+      
+      raw_df <- filtered_r()$df
+      cor_df <- .pick_df_version(filtered_corrected_r(), remove_imputed)
+      
+      # Only compute transformed correlations if transform != "none"
+      do_transformed <- !identical(transform_meth, "none")
+      transformed_df <- if (do_transformed) .pick_df_version(transformed_r(), remove_imputed) else NULL
+      
+      list(
+        raw = .compute_corr(raw_df),
+        corrected = .compute_corr(cor_df),
+        transformed = if (do_transformed) .compute_corr(transformed_df) else NULL,
+        transformed_included = do_transformed,
+        transform_method = transform_meth
+      )
     })
     
-    observeEvent(input$compute_tc_corr, ignoreInit = TRUE, {
-      shinyjs::disable(ns("compute_tc_corr"))
-      output$tc_corr_spinner <- renderUI({
-        on.exit(shinyjs::enable(ns("compute_tc_corr")), add = TRUE)
+    
+    observeEvent(input$compute_corr, ignoreInit = TRUE, {
+      shinyjs::disable("compute_corr")
+      output$corr_spinner <- renderUI({
+        on.exit(shinyjs::enable("compute_corr"), add = TRUE)
         
-        tc_correlations_r()
+        res <- compute_all_correlations_r()
+        all_corr_r(res)
         
-        computed_tc_key_r(tc_corr_key_r())
+        computed_key_r(corr_key_r())
         NULL
       })
     })
+    output$corr_spinner <- renderUI(NULL)
     
-    output$tc_corr_spinner <- renderUI(NULL)
     
-    output$tc_corr_range_info <- renderUI({
-      all_corr <- req(tc_correlations_r())
-      ui_corr_range_info(all_corr, input$tc_corr_threshold)                
+    output$corr_range_info <- renderUI({
+      all_corr <- req(all_corr_r())
+      ui_corr_range_info(all_corr, input$corr_threshold)                
     })
     
-    output$download_tc_corr_btn <- renderUI({
-      req(tc_correlations_r())
+    output$download_corr_btn <- renderUI({
+      req(all_corr_r())
       download_card(
         "Download Corrected/Transformed Data Metabolite Correlations",
         "Creates Excel file with all pairwise metabolite correlations in the raw data and corrected/transformed data.",
@@ -774,7 +692,7 @@ mod_correct_server <- function(id, data, params) {
           div(
             style = "display: inline-block;",
             downloadButton(
-              outputId = ns("download_tc_corr_data"),
+              outputId = ns("download_corr_data"),
               label    = "Download Metabolite Correlations",
               class    = "btn btn-secondary btn-lg"
             )
@@ -783,24 +701,19 @@ mod_correct_server <- function(id, data, params) {
       )
     })
     
-    output$download_tc_corr_data <- downloadHandler(
+    output$download_corr_data <- downloadHandler(
       filename = function() {
-        paste0("corrected_metabolite_correlations_", Sys.Date(), ".xlsx")
+        paste0("metabolite_correlations_", Sys.Date(), ".xlsx")
       },
       content = function(file) {
-        if (input$tc_corr_data == "filtered_cor_data") {
-          d_type <- "Corrected"}
-        else {
-          d_type <- "Transformed and Corrected"
-        }
-        wb <- export_corr_xlsx(d()$raw_corr, tc_correlations_r(), d_type2 = d_type) 
+        wb <- export_corr_xlsx(compute_all_correlations_r()) 
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
       }
     )
     
     #---------- Next: Visualize Data
     output$next_visualization_ui <- renderUI({
-      req(tc_correlations_r()) 
+      req(all_corr_r()) 
       actionButton(
         ns("next_visualization"), 
         "Next: Evaluate and Visualize Correction",
@@ -808,7 +721,7 @@ mod_correct_server <- function(id, data, params) {
         )
     })
     observeEvent(input$next_visualization, {
-      req(tc_correlations_r())
+      req(all_corr_r())
       validate(
         need(!is.null(filtered_corrected_r()), "Missing corrected data"),
         need(!is.null(transformed_r()), "Missing transformed data data")
@@ -826,7 +739,7 @@ mod_correct_server <- function(id, data, params) {
       transform          = input$transform,
       ex_ISTD            = isTRUE(input$ex_ISTD),
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),
-      tc_corr_threshold = input$tc_corr_threshold
+      corr_threshold = input$corr_threshold
     ))
     
     list(
@@ -834,7 +747,7 @@ mod_correct_server <- function(id, data, params) {
       corrected          = corrected_r,
       filtered_corrected = filtered_corrected_r,
       transformed        = transformed_r,
-      tc_corr            = tc_correlations_r,
+      all_corr           = all_corr_r,
       params             = correct_params
     )
   })

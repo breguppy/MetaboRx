@@ -386,46 +386,60 @@ ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_a
 }
 
 
-
-ui_corr_range_info <- function(all_cor, range) {
-  high_corr_mets <- filter_correlation_pairs_by_range(all_cor, range)
-  correlated_card <- tags$div(style = "flex: 1; padding-right: 10px;",
-                              tags$span(
-                                style = "color:darkgreen;font-weight:bold;",
-                                "No metabolite pairs within this correlation range."
-                              ))
+.make_correlation_card <- function(high_corr_mets, range, card_title) {
+  cor_badges <- NULL
+  card_body <- tags$div(
+    style = "flex: 1; padding-right: 10px;",
+    tags$span(style = "color:darkgreen;font-weight:bold;", "No metabolite pairs within this correlation range.")
+  )
   if (!is.null(high_corr_mets) && nrow(high_corr_mets) > 0) {
-    
-    cor_badges <- tags$div(
-      style = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;",
-      lapply(seq_len(nrow(high_corr_mets)), function(i) {
-        pair <- high_corr_mets[i, , drop = FALSE]
-        tags$span(
-          style = paste(
-            "background-color: #fff3cd;",
-            "border: 1px solid #ffeeba;",
-            "padding: 4px 8px;",
-            "border-radius: 12px;",
-            "font-size: 0.85rem;"
-          ),
-          sprintf("%s \u221D %s", pair$col1, pair$col2)
-        )
-      })
+    cor_badges <- tags$div(style = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;", lapply(seq_len(nrow(high_corr_mets)), function(i) {
+      pair <- high_corr_mets[i, , drop = FALSE]
+      tags$span(
+        style = paste(
+          "background-color: #fff3cd;",
+          "border: 1px solid #ffeeba;",
+          "padding: 4px 8px;",
+          "border-radius: 12px;",
+          "font-size: 0.85rem;"
+        ),
+        sprintf("%s \u221D %s", pair$col1, pair$col2)
+      )
+    }))
+    card_body <- sprintf(
+      "%d column pairs have correlation (Pearson's r) within the selected range: %.3f - %.3f.",
+      nrow(high_corr_mets),
+      range[1],
+      range[2]
     )
-    
-    correlated_card <- warn_card(
-      title = "Correlated Metabolites",
-      body  = sprintf(
-        "%d column pairs have correlation (Pearson's r) within the selected range: %.3f - %.3f.",
-        nrow(high_corr_mets),
-        range[1],
-        range[2]
-      ),
-      body_tags = cor_badges,
-    )
+  }
+  correlated_card <- info_card(title = card_title,
+                               body  = card_body,
+                               body_tags = cor_badges)
+}
+ui_corr_range_info <- function(all_corr, range) {
+  raw_high_corr_mets       <- filter_correlation_pairs_by_range(all_corr$raw, range)
+  corrected_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$corrected, range)
   
-  } 
-  correlated_card
+  raw_corr_card       <- .make_correlation_card(raw_high_corr_mets, range, "Raw Metabolite Correlations")
+  corrected_corr_card <- .make_correlation_card(corrected_high_corr_mets, range, "Corrected Metabolite Correlations")
+  
+  transformed_block <- if (isTRUE(all_corr$transformed_included)) {
+    transformed_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$transformed, range)
+    .make_correlation_card(
+      transformed_high_corr_mets,
+      range,
+      "Transformed and Corrected Metabolite Correlations"
+    )
+  } else {
+    NULL
+  }
+  
+  htmltools::tagList(
+    raw_corr_card,
+    corrected_corr_card,
+    transformed_block
+  )
 }
 
 # Post-correction filtering info for section 2.2 Post-Correction Filtering

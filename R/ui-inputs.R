@@ -170,18 +170,6 @@ ui_filter_slider <- function(ns) {
   )
 }
 
-#--------- Raw Data Metabolite Correlations input
-#' metabolite correlation slider
-#' @keywords internal
-#' @noRd
-ui_raw_corr_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
-    placement = "right"
-  )
-}
-
 #---------- 2.1 Choose Correction Settings inputs
 #' Impute missing QC value options
 #' @keywords internal
@@ -577,29 +565,15 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   )
 }
 
-#----------- 2.4 Post-Correction/Transformation Correlations inputs
-#' metabolite correlation slider in corrected or transformed data
+#----------- 2.4 Metabolite Correlations inputs
+#' metabolite correlation slider
 #' @keywords internal
 #' @noRd
-ui_tc_corr_slider <- function(ns) {
-  tagList(tooltip(
-    radioButtons(
-      ns("tc_corr_data"),
-      "Compute metabolite correlations for",
-      list(
-        "Corrected data" = "filtered_cor_data",
-        "Transformed and corrected data" = "transformed_cor_data"
-      ),
-      "filtered_cor_data"
-    ),
-    "all pairwise metabolite correlations will be computed in the data set you select.",
-    placement = "right"
-  ),
+ui_correlation_slider <- function(ns) {
   tooltip(
-    sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
+    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
     "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
-  )
   )
 }
 
