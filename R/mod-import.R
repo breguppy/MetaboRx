@@ -274,7 +274,8 @@ mod_import_server <- function(id) {
         p <- list()
         
         d <- list(
-          cleaned = cleaned_r()
+          cleaned = cleaned_r(),
+          filtered = filtered_r()
         )
         
         wb <- export_mv_xlsx(p, d)

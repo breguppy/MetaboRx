@@ -4,6 +4,10 @@
 #' @noRd
 export_mv_xlsx <- function(p, d, file = NULL) {
   cleaned_df <- d$cleaned$df
+  has_all_missing <- !is.null(d$filtered$class_metab_all_missing) &&
+    is.data.frame(d$filtered$class_metab_all_missing) &&
+    nrow(d$filtered$class_metab_all_missing) > 0L
+  
   .require_pkg("openxlsx", "write Excel workbooks")
   wb <- openxlsx::createWorkbook()
   
@@ -235,6 +239,37 @@ export_mv_xlsx <- function(p, d, file = NULL) {
       headerStyle = bold
     )
     shiny::incProgress(1 / 4, detail = "Saved: missing values by batch")
+    
+    if (has_all_missing) {
+      s5 <- .add_sheet("All Missing for Class")
+      txt5 <- paste(
+        "Tab All Missing for Class. The following class-metabolite pairs have",
+        "all values missing."
+      )
+      openxlsx::writeData(wb,
+                          s5,
+                          x = txt5,
+                          startCol = 1,
+                          startRow = 1)
+      openxlsx::mergeCells(wb, s5, cols = 1:6, rows = 1)
+      openxlsx::addStyle(
+        wb,
+        s5,
+        style = note,
+        rows = 1,
+        cols = 1, 
+        gridExpand = TRUE
+      )
+      openxlsx::writeData(
+        wb,
+        s5,
+        x = d$filtered$class_metab_all_missing[, c("class", "metabolite"), drop = FALSE],
+        startRow = 3,
+        startCol = 1,
+        headerStyle = bold
+      )
+    }
+    
   })
   return(wb)
 }
