@@ -502,19 +502,21 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   do.call(tagList, ui)
 }
 
-ui_outliers <- function(p, d, 
-                        top_n        = 10L,
-                        sample_col   = "sample",
-                        class_col    = "class",
-                        digits_z     = 2L,
-                        digits_T2    = 2L,
+#' @keywords internal
+#' @noRd
+ui_outliers <- function(p, d,
+                        top_n         = 10L,
+                        sample_col    = "sample",
+                        class_col     = "class",
+                        digits_z      = 2L,
+                        digits_T2     = 2L,
                         pca_output_id = "hotelling_pca",
-                        ns           = identity) {
+                        ns            = identity,
+                        include_plot  = TRUE) {
+  
   df <- d$filtered_corrected$df_no_mv
- 
   detect_result <- detect_hotelling_nonqc_dual_z(df, p)
   
-  # Extract extreme values and full data
   ev   <- detect_result$extreme_values
   dres <- detect_result$data
   
@@ -522,73 +524,60 @@ ui_outliers <- function(p, d,
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
   
-  # Metric values
-  n_outlier_samples  <- sum(dres$is_outlier_sample, na.rm = TRUE)
-  n_extreme_values   <- nrow(ev)
+  n_outlier_samples <- sum(dres$is_outlier_sample, na.rm = TRUE)
+  n_extreme_values  <- nrow(ev)
   
-  # Metric cards
   cards <- shiny::div(
     style = "display:flex; gap:10px; margin-bottom:10px;",
     metric_card("Samples outside the Hotelling's T^2 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
   
-  # If no extreme values, just show cards + PCA + message
+  plot_ui <- if (isTRUE(include_plot)) {
+    shiny::plotOutput(ns(pca_output_id), height = "350px")
+  } else {
+    NULL
+  }
+  
   if (nrow(ev) == 0L) {
     return(shiny::tagList(
-      shiny::plotOutput(ns(pca_output_id), height = "350px"),
+      plot_ui,
       cards,
       shiny::tags$em("No extreme metabolite values detected in outlier samples.")
     ))
   }
   
-  # Check required columns from detect_hotelling_nonqc_dual_z()
   required_cols <- c(
-    sample_col,
-    class_col,
-    "metabolite",
-    "z_global",
-    "abs_z_global",
-    "z_class",
-    "abs_z_class",
-    "T2"
+    sample_col, class_col, "metabolite",
+    "z_global", "abs_z_global", "z_class", "abs_z_class", "T2"
   )
   missing_cols <- setdiff(required_cols, names(ev))
   if (length(missing_cols) > 0L) {
-    stop(
-      "Missing columns in extreme_values: ",
-      paste(missing_cols, collapse = ", ")
-    )
+    stop("Missing columns in extreme_values: ", paste(missing_cols, collapse = ", "))
   }
   
-  # Sort by |z_global|, then |z_class|, then T2, descending
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
+  ev_top    <- head(ev_sorted, top_n)
   
-  # Take top_n rows
-  ev_top <- head(ev_sorted, top_n)
+  z_g_fmt    <- formatC(ev_top$z_global,     format = "f", digits = digits_z)
+  #absz_g_fmt <- formatC(ev_top$abs_z_global, format = "f", digits = digits_z)
+  z_c_fmt    <- formatC(ev_top$z_class,      format = "f", digits = digits_z)
+  #absz_c_fmt <- formatC(ev_top$abs_z_class,  format = "f", digits = digits_z)
+  T2_fmt     <- formatC(ev_top$T2,           format = "f", digits = digits_T2)
   
-  # Format numeric values
-  z_g_fmt    <- formatC(ev_top$z_global,      format = "f", digits = digits_z)
-  absz_g_fmt <- formatC(ev_top$abs_z_global,  format = "f", digits = digits_z)
-  z_c_fmt    <- formatC(ev_top$z_class,       format = "f", digits = digits_z)
-  absz_c_fmt <- formatC(ev_top$abs_z_class,   format = "f", digits = digits_z)
-  T2_fmt     <- formatC(ev_top$T2,            format = "f", digits = digits_T2)
-  
-  # Build table rows
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
       shiny::tags$td(ev_top[[sample_col]][i]),
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
       shiny::tags$td(z_g_fmt[i]),
-      shiny::tags$td(absz_g_fmt[i]),
+      #shiny::tags$td(absz_g_fmt[i]),
       shiny::tags$td(z_c_fmt[i]),
-      shiny::tags$td(absz_c_fmt[i]),
+      #shiny::tags$td(absz_c_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
   
-  # Build full table with header
   table_tag <- shiny::tags$table(
     class = "table table-striped table-condensed table-hover",
     shiny::tags$thead(
@@ -597,9 +586,9 @@ ui_outliers <- function(p, d,
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
         shiny::tags$th("Global z-score"),
-        shiny::tags$th("|z| (global)"),
+        #shiny::tags$th("|z| (global)"),
         shiny::tags$th("Class z-score"),
-        shiny::tags$th("|z| (class)"),
+        #shiny::tags$th("|z| (class)"),
         shiny::tags$th("Mahalanobis^2")
       )
     ),
@@ -607,8 +596,7 @@ ui_outliers <- function(p, d,
   )
   
   shiny::tagList(
-    # PCA plot placeholder – actual plot comes from renderPlot()
-    shiny::plotOutput(ns(pca_output_id), height = "350px"),
+    plot_ui,
     cards,
     shiny::tags$span(
       "Top 10 potential extreme values are listed below. ",
@@ -618,6 +606,3 @@ ui_outliers <- function(p, d,
     table_tag
   )
 }
-
-
-

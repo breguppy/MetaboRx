@@ -19,6 +19,8 @@ render_report <- function(p,
     rsd_plot  <- make_rsd_plot(p, d)
     pca_plot  <- make_pca_plot(p, d)
     pca_loading_plot <- make_pca_loading_plot(p, d)
+    hotelling_pca_plot <- make_hotelling_pca_plot(p, d)
+    
     shiny::incProgress(1 / 3, detail = "Saved: plots for report")
     
     
@@ -30,7 +32,8 @@ render_report <- function(p,
         "Metabolite Scatter 2" = met2_plot,
         "RSD Comparison" = rsd_plot,
         "PCA Comparison" = pca_plot,
-        "PCA Loading" = pca_loading_plot
+        "PCA Loading" = pca_loading_plot,
+        "Hotelling PCA" = hotelling_pca_plot
       ),
       p = p,
       d = d

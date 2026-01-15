@@ -344,27 +344,7 @@ ui_correction_method <- function(df, ns = identity) {
         style = "text-decoration:none;",
         shiny::icon("circle-info")
       ),
-      shiny::tagList(
-        shiny::tags$p("QC-based signal drift correction methods:"),
-        shiny::tags$ul(
-          shiny::tags$li(
-            shiny::strong("Random Forest (RF) = QC-RFSC: "),
-            "Fit a random forest model using QC samples (QC intensity vs injection order) to estimate drift and correct samples."
-          ),
-          shiny::tags$li(
-            shiny::strong("Local Polynomial Fit (LOESS) = QC-RLSC: "),
-            "Uses LOESS smoothing on QC samples to estimate drift and correct samples."
-          ),
-          shiny::tags$li(
-            shiny::strong("Batchwise versions (BW_RF / BW_LOESS): "),
-            "Apply the same approach within each batch and then recombine."
-          )
-        ),
-        shiny::tags$p(
-          shiny::strong("Rule of thumb: "),
-          "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
-        )
-      ),
+      report_text_correction_descriptions(),
       title = "What do these methods mean?",
       placement = "right",
       options = list(container = "body", customClass = "popover-responsive")

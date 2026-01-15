@@ -165,3 +165,37 @@ make_pca_loading_plot <- function(p, d) {
     ggplot2::ggplot() + ggplot2::labs(title = "PCA Loading failed \u2013 see notification")
   })
 }
+
+#' Make Hotelling PCA plot for report
+#'
+#' @param p List of parameters (must include qcImputeM, samImputeM, remove_imputed).
+#' @param d List of data reactives/artifacts (must include filtered_corrected).
+#'
+#' @return A ggplot object or NULL if not available.
+#'
+#' @keywords internal
+#' @noRd
+make_hotelling_pca_plot <- function(p, d) {
+  .require_pkg("ggplot2", "Hotelling PCA plot")
+  
+  if (is.null(d$filtered_corrected)) return(NULL)
+  
+  # Choose df version consistent with the app behavior
+  remove_imputed <- isTRUE(p$remove_imputed)
+  
+  # In your server you call detect_hotelling_nonqc_dual_z() on df_no_mv
+  # (even when remove_imputed is TRUE). Keep the same behavior here unless
+  # you intentionally want it to differ.
+  df <- d$filtered_corrected$df_no_mv
+  if (is.null(df) || !is.data.frame(df)) return(NULL)
+  
+  # Ensure p has the fields your detect_hotelling_nonqc_dual_z() expects
+  p_hot <- list(
+    qcImputeM  = p$qcImputeM %||% "nothing_to_impute",
+    samImputeM = p$samImputeM %||% "nothing_to_impute"
+  )
+  
+  res <- detect_hotelling_nonqc_dual_z(df, p_hot)
+  
+  if (!is.null(res$pca_plot)) res$pca_plot else NULL
+}

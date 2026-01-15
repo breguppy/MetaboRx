@@ -254,22 +254,19 @@ report_text_correlations <- function() {
     htmltools::tags$p(
       "All pairwise correlations are computed, but only pairs with a strong positive linear correlations are displayed here. ",
       "To further investigate metabolite correlations view the Excel file '*_metabolite_correlations.xlsx'. ",
-      "Take special note of any pair of metabolites what have strong correlation, but no biological explanation."
-    ),
-    htmltools::tags$p(
-      "Two metababolites might have a strong positive linear correlation without a biological explanation if "
-    ),
-    htmltools::tags$ul(
-      htmltools::tags$li(
-        "they are from the same chromotography peak, but viewed under different filters during the peak-picking process."
-      ),
-      htmltools::tags$li(
-        "They have similar signal drift patterns that confounds biological signal."
-      )
-    ),
-    htmltools::tags$p(
-      "If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound."
+      "Take special note of any pair of metabolites what have strong correlation, but no biological explanation and investigate further if needed. "
     )
+    # htmltools::tags$p(
+    #   "Two metababolites might have a strong positive linear correlation without a biological explanation if "
+    # ),
+    # htmltools::tags$ul(
+    #   htmltools::tags$li(
+    #     "they are from the same chromotography peak, but viewed under different filters during the peak-picking process."
+    #   ),
+    #   htmltools::tags$li(
+    #     "They have similar signal drift patterns that confounds biological signal."
+    #   )
+    # ),
     
   )
 }
@@ -341,6 +338,32 @@ report_text_correction <- function(p, d) {
     d$corrected$str,
     d$corrected$parameters
   ))
+}
+
+#' @keywords internal
+#' @noRd
+report_text_correction_descriptions <- function() {
+  htmltools::tagList(
+    htmltools::tags$p("QC-based signal drift correction methods:"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        htmltools::strong("Random Forest (RF) = QC-RFSC: "),
+        "Fit a random forest model using QC samples (QC intensity vs injection order) to estimate drift and correct samples."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Local Polynomial Fit (LOESS) = QC-RLSC: "),
+        "Uses LOESS smoothing on QC samples to estimate drift and correct samples."
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Batchwise versions (BW_RF / BW_LOESS): "),
+        "Apply the same approach within each batch and then recombine."
+      )
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Rule of thumb: "),
+      "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
+    )
+  )
 }
 
 #' Text explaining how RSD is computed
@@ -581,9 +604,9 @@ report_text_rsd_intro <- function(p, d) {
   increased_qc <- .increased_qc_rsd(d)
   
   main <- sprintf(
-    "In these plots, RSD is computed per s% after %s and compared to the raw data.",
+    "In these plots, RSD is computed per %s after %s and compared to the raw data.",
     if (identical(p$rsd_cal, "class_met")) "sample class and metabolite" else "metabolite",
-    if (p$rsd_compare == "filtered_cor_data") "correction" else "correction and transformation",
+    if (identical(p$rsd_compare, "filtered_cor_data")) "correction" else "transformation and correction"
   )
   
   extra <- character(0)
@@ -624,16 +647,6 @@ report_text_rsd_table <- function() {
       " In this situation, a more negative number is disirable for all four \u0394 metrics."
     ),
   )
-}
-
-#' @keywords internal
-#' @noRd
-report_text_pca_intro <- function(p, d) {
-  htmltools::tags$p(sprintf(
-    "This PCA plot shows both the raw data and %s data colored by %s.",
-    if (p$pca_compare == "filtered_cor_data") "corrected" else "corrected and transformed",
-    p$color_col
-  ))
 }
 
 #' PCA plot description

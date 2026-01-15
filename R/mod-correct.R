@@ -275,29 +275,24 @@ mod_correct_server <- function(id, data, params) {
         openxlsx::saveWorkbook(stats_wb, file, overwrite = TRUE)
       }
     )
-    output$outliers_table <- renderUI({
+    hotelling_res_r <- reactive({
       req(filtered_corrected_r())
+      df <- filtered_corrected_r()$df_no_mv
+      p  <- list(qcImputeM = input$qcImputeM, samImputeM = input$samImputeM)
+      detect_hotelling_nonqc_dual_z(df, p)
+    })
+    
+    output$hotelling_pca <- renderPlot({
+      res <- req(hotelling_res_r())
+      res$pca_plot
+    })
+    
+    output$outliers_table <- renderUI({
+      res <- req(hotelling_res_r())
       d <- list(filtered_corrected = filtered_corrected_r())
       p <- list(qcImputeM = input$qcImputeM, 
                 samImputeM = input$samImputeM)
-      ui_outliers(
-        p = p,
-        d = d,
-        pca_output_id = "hotelling_pca",
-        ns = ns
-      )
-    })
-    
-    output$hotelling_pca <- shiny::renderPlot({
-      req(filtered_corrected_r())
-      p <- list(qcImputeM = input$qcImputeM, 
-                samImputeM = input$samImputeM)
-      df <- filtered_corrected_r()$df_no_mv
-      
-      res <- detect_hotelling_nonqc_dual_z(df, p)
-      if (!is.null(res$pca_plot)) {
-        res$pca_plot
-      }
+      ui_outliers(p, d, top_n = 10L, ns = ns)
     })
     
     output$download_ev_btn <- renderUI({
@@ -750,6 +745,7 @@ mod_correct_server <- function(id, data, params) {
       imputed            = imputed_r,
       corrected          = corrected_r,
       filtered_corrected = filtered_corrected_r,
+      hotelling_res      = hotelling_res_r,
       transformed        = transformed_r,
       all_corr           = all_corr_r,
       params             = correct_params
