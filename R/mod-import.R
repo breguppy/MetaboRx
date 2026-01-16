@@ -22,7 +22,7 @@ mod_import_ui <- function(id) {
               ),
               report_text_data_req(),
               shiny::tags$img(
-                src = image_src <- knitr::image_uri(system.file("www/example_data_structure.png", package = "QCcorrection")),  
+                src = image_src <- knitr::image_uri(system.file("app/www/example_data_structure.png", package = "QCcorrection")),  
                 style = "width: 100%; height: auto; display: block;"
               ),
               title = "Required data structure and information",
