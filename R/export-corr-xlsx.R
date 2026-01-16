@@ -2,13 +2,13 @@
 #'
 #' @keywords internal
 #' @noRd
-export_corr_xlsx <- function(df1, df2 = NULL, d_type2 = "Corrected", file = NULL) {
+export_corr_xlsx <- function(all_corr, file = NULL) {
   .require_pkg("openxlsx", "write Excel workbooks")
   wb <- openxlsx::createWorkbook()
   
-  names(df1)[names(df1) == "col1"] <- "Metabolite 1"
-  names(df1)[names(df1) == "col2"] <- "Metabolite 2"
-  names(df1)[names(df1) == "cor"]  <- "Pearson's r"
+  names(all_corr$raw)[names(all_corr$raw) == "col1"] <- "Metabolite 1"
+  names(all_corr$raw)[names(all_corr$raw) == "col2"] <- "Metabolite 2"
+  names(all_corr$raw)[names(all_corr$raw) == "cor"]  <- "Pearson's r"
   # make column names bold and descriptions with orange background
   bold  <- openxlsx::createStyle(textDecoration = "Bold")
   note  <- openxlsx::createStyle(wrapText = TRUE,
@@ -23,9 +23,12 @@ export_corr_xlsx <- function(df1, df2 = NULL, d_type2 = "Corrected", file = NULL
   }
   
   shiny::withProgress(message = "Creating metabolite correlation summary...", value = 0, {
-    if (is.null(df2)) N <- 1 else N <- 2
+    if (all_corr$transformed_included)
+      N <- 3
+    else
+      N <- 2
     
-    # sheet 1 Metabolite
+    # sheet 1  Raw Data Metabolite Correlations
     s1 <- .add_sheet("Raw Data")
     txt1 <- paste(
       "Tab Raw Data Correlations. Pearson's r values for all metabolite pairs.",
@@ -52,49 +55,87 @@ export_corr_xlsx <- function(df1, df2 = NULL, d_type2 = "Corrected", file = NULL
     openxlsx::writeData(
       wb,
       s1,
-      x = df1,
+      x = all_corr$raw,
       startRow = 3,
       startCol = 1,
       headerStyle = bold
     )
     shiny::incProgress(1 / N, detail = "Saved: Raw Data Metabolite Correlations.")
     
-    if (!is.null(df2)) {
-      names(df2)[names(df2) == "col1"] <- "Metabolite 1"
-      names(df2)[names(df2) == "col2"] <- "Metabolite 2"
-      names(df2)[names(df2) == "cor"]  <- "Pearson's r"
-      s2 <- .add_sheet(paste(d_type2, "Data"))
-      txt2 <- paste(
-        "Tab", d_type2, "Data Correlations. Pearson's r values for all metabolite pairs.",
+    # Sheet 2: Corrected Data Metabolite Correlations
+    names(all_corr$corrected)[names(all_corr$corrected) == "col1"] <- "Metabolite 1"
+    names(all_corr$corrected)[names(all_corr$corrected) == "col2"] <- "Metabolite 2"
+    names(all_corr$corrected)[names(all_corr$corrected) == "cor"]  <- "Pearson's r"
+    s2 <- .add_sheet("Corrected Data")
+    txt2 <- paste(
+      "Tab Corrected Data Correlations. Pearson's r values for all metabolite pairs.",
+      "If r = -1 or near -1, the pair have a strong negative linear correlation.",
+      "If r = 0, there is no correlation and r values near 0 have weak correlations.",
+      "If r = 1 or is close to 1, the pair have a strong positive linear correlation.",
+      "n-complete is the number of samples with both metabolite values non-missing."
+    )
+    openxlsx::writeData(wb,
+                        s2,
+                        x = txt2,
+                        startCol = 1,
+                        startRow = 1)
+    openxlsx::mergeCells(wb, s2, cols = 1:10, rows = 1)
+    openxlsx::addStyle(
+      wb,
+      s2,
+      style = note,
+      rows = 1,
+      cols = 1,
+      gridExpand = TRUE
+    )
+    openxlsx::setRowHeights(wb, s2, rows = 1, heights = 60)
+    openxlsx::writeData(
+      wb,
+      s2,
+      x = all_corr$corrected,
+      startRow = 3,
+      startCol = 1,
+      headerStyle = bold
+    )
+    shiny::incProgress(1 / N, detail = "Saved: Corrected Date Correlations")
+    
+    if (all_corr$transformed_included) {
+      names(all_corr$transformed)[names(all_corr$transformed) == "col1"] <- "Metabolite 1"
+      names(all_corr$transformed)[names(all_corr$transformed) == "col2"] <- "Metabolite 2"
+      names(all_corr$transformed)[names(all_corr$transformed) == "cor"]  <- "Pearson's r"
+      s3 <- .add_sheet("Transformed Data")
+      txt3 <- paste(
+        "Tab Transformed and Corrected Data Correlations. Pearson's r values for all metabolite pairs.",
         "If r = -1 or near -1, the pair have a strong negative linear correlation.",
         "If r = 0, there is no correlation and r values near 0 have weak correlations.",
         "If r = 1 or is close to 1, the pair have a strong positive linear correlation.",
         "n-complete is the number of samples with both metabolite values non-missing."
       )
       openxlsx::writeData(wb,
-                          s2,
-                          x = txt2,
+                          s3,
+                          x = txt3,
                           startCol = 1,
                           startRow = 1)
-      openxlsx::mergeCells(wb, s2, cols = 1:10, rows = 1)
+      openxlsx::mergeCells(wb, s3, cols = 1:10, rows = 1)
       openxlsx::addStyle(
         wb,
-        s2,
+        s3,
         style = note,
         rows = 1,
         cols = 1,
         gridExpand = TRUE
       )
-      openxlsx::setRowHeights(wb, s2, rows = 1, heights = 60)
+      openxlsx::setRowHeights(wb, s3, rows = 1, heights = 60)
       openxlsx::writeData(
         wb,
-        s2,
-        x = df2,
+        s3,
+        x = all_corr$transformed,
         startRow = 3,
         startCol = 1,
         headerStyle = bold
       )
-      shiny::incProgress(1 / N, detail = paste("Saved:", d_type2, "Date Correlations"))
+      shiny::incProgress(1 / N, detail = "Saved: Transformed and Corrected Date Correlations")
+      
     }
   })
   return(wb)

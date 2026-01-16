@@ -47,7 +47,7 @@ test_that("filter_by_missing keeps <= cutoff and reports removed and QC-missing"
             
             # structure
             expect_named(out,
-                         c("df", "mv_cutoff", "mv_removed_cols", "qc_missing_mets"))
+                         c("df", "mv_cutoff", "mv_removed_cols", "qc_missing_mets", "class_metab_all_missing"))
             expect_equal(out$mv_cutoff, 50)
             
             # A (33.33) and C (0) kept. B (50) kept since <=. D removed.

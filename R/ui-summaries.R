@@ -9,6 +9,68 @@ metric_card <- function(label, value) {
     h5(style = "margin:0;", label)
   )
 }
+# Download card used for all download buttons on the first 3 tabs
+download_card <- function(title,
+                      body,
+                      btn) {
+  
+  header <- shiny::tags$div(
+    style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+    shiny::tags$span(title),
+  )
+  
+  shiny::tags$div(
+    class = "card bg-light mb-3",
+    style = "margin-top: 10px;",
+    shiny::tags$div(class = "card-header", header),
+    shiny::tags$div(
+      class = "card-body",
+      shiny::tags$p(class = "card-text", body),
+      btn
+    )
+  )
+}
+
+info_card <- function(title,
+                      body,
+                      body_tags = NULL,
+                      info_title = NULL,
+                      info_content = NULL,
+                      info_placement = "auto",
+                      info_class = "popover-responsive") {
+  has_info <- !is.null(info_title) || !is.null(info_content)
+  
+  header <- shiny::tags$div(
+    style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
+    shiny::tags$span(title),
+    if (has_info) {
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        info_content %||% shiny::tags$p(""),
+        title = info_title %||% "",
+        placement = info_placement,
+        options = list(container = "body", customClass = info_class)
+      )
+    }
+  )
+  
+  shiny::tags$div(
+    class = "card border-info mb-3",
+    style = "margin-top: 10px;",
+    shiny::tags$div(class = "card-header", 
+                    header),
+    shiny::tags$div(
+      class = "card-body",
+      shiny::tags$p(class = "card-text", body),
+      body_tags
+    )
+  )
+}
 # Reusable warning card generator
 warn_card <- function(title,
                       body,
@@ -44,7 +106,8 @@ warn_card <- function(title,
   shiny::tags$div(
     class = "card border-warning mb-3",
     style = "margin-top: 10px;",
-    shiny::tags$div(class = "card-header", header),
+    shiny::tags$div(class = "card-header",
+                    header),
     shiny::tags$div(
       class = "card-body",
       shiny::tags$p(class = "card-text", body),
@@ -93,14 +156,12 @@ ui_basic_info <- function(df,
   # ---------- Warning box 1: replaced values ----------
   replaced_card <- NULL
   if (total_replaced > 0) {
-    replaced_card <- warn_card(
+    replaced_card <- info_card(
       title = "Replaced non-numeric or zeros values in metabolite columns",
       body  = paste0(
         total_replaced,
         " values were converted to missing (NA) prior to processing."
       ),
-      info_title = "What values are marked as missing?",
-      info_content = shiny::tags$p("0, NA, NaN, or any other non-numeric value is counted as a missing value. You can choose an imputation method in the next tab.")
     )
   }
   
@@ -109,13 +170,11 @@ ui_basic_info <- function(df,
   if (length(non_numeric_cols) > 0) {
     nonnum_card <- warn_card(
       title = "Non-numerical columns detected",
-      body  = "These columns contain all non-numeric values and will be removed prior to processing.", #If you do not want these columns removed, check the box 'withhold additional columns from correction' on the left and add them to list below the box.",
+      body  = "These columns contain all non-numeric values and will be removed prior to processing.",
       body_tags = tags$p(
         style = "font-weight: 600; margin-top: 8px;",
         paste(sort(unique(non_numeric_cols)), collapse = ", ")
       ),
-      info_title = "What makes a column non-numeric?",
-      info_content = shiny::tags$p("If every value in a 'metabolite' column is not a number, then the column is removed from the dataset.")
     )
   }
   
@@ -147,11 +206,6 @@ ui_basic_info <- function(df,
         nrow(duplicate_mets)
       ),
       body_tags = dup_badges,
-      info_title = "What does it mean for 2 metabolites to be equal or nearly equal?",
-      info_content = shiny::tagList(
-        shiny::tags$p("For every sample, the values for the two meatbolite are equal to each other or within 1e-3 of each other."),
-        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-      )
     )
   }
   
@@ -163,7 +217,7 @@ ui_basic_info <- function(df,
     below_blank_threshold <- unique(stats::na.omit(as.character(below_blank_threshold)))
     
     blank_body <- sprintf(
-      "%d blank sample(s) were detected and excluded from processing.",
+      "%d blank sample(s) detected and excluded from processing.",
       n_blanks
     )
     
@@ -190,17 +244,7 @@ ui_basic_info <- function(df,
     blank_card <- warn_card(
       title = "Blank samples detected",
       body  = blank_body,
-      body_tags = blank_tags,
-      info_title = "Why do we flag metabolites with QC average less than 3x the blank average?",
-      info_content = shiny::tagList(
-        shiny::tags$p("Metabolites with QC average less than 3x the blank average may indicate the metabolite is:"),
-        shiny::tags$ul(
-          shiny::tags$li("low abunance/near the limit of detection in QC samples"),
-          shiny::tags$li("carried over to blank samples from previous samples"), 
-          shiny::tags$li("a potential contaminate")
-        ),
-        shiny::tags$p("These metabolites are NOT removed in this step. They are only displayed for the user's benefit.")
-    )
+      body_tags = blank_tags
     )
   }
   
@@ -266,13 +310,13 @@ ui_basic_info <- function(df,
 
 
 # Filter info for section 1.4 Filter Raw Data
-ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets) {
+ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_all_missing) {
   left_col <- if (length(mv_removed) == 0) {
     tags$div(style = "flex: 1; padding-right: 10px;",
              tags$span(
                style = "color:darkgreen;font-weight:bold;",
                paste0(
-                 "No metabolites removed for missing value percentage above ",
+                 "No metabolites with missing value percentage above ",
                  mv_cutoff,
                  "%."
                )
@@ -307,68 +351,101 @@ ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets) {
       tags$ul(lapply(qc_missing_mets, tags$li)))
   }
   
-  tags$div(
+  summary_row <- tags$div(
     style = "display:flex; gap:16px; align-items:flex-start;",
     left_col, right_col
+  )
+  
+  has_all_missing <- !is.null(class_metab_all_missing) &&
+    is.data.frame(class_metab_all_missing) &&
+    nrow(class_metab_all_missing) > 0L
+  
+  all_missing_card <- NULL
+  if (has_all_missing) {
+    # Create bullet list like: "QC — MetaboliteA"
+    pair_items <- apply(
+      class_metab_all_missing[, c("class", "metabolite"), drop = FALSE],
+      1,
+      function(r) paste0(r[[1]], " — ", r[[2]])
+    )
+    
+    all_missing_card <- warn_card(
+      title = "All-missing class/metabolite combinations detected",
+      body  = paste0(
+        "The following class–metabolite pairs have all values missing. ",
+        "These values will remain missing if you choose a class-metabolite imputation method."
+      ),
+      body_tags = shiny::tags$ul(lapply(pair_items, shiny::tags$li))
+    )
+  }
+  
+  shiny::tagList(
+    summary_row,
+    all_missing_card
   )
 }
 
 
-ui_corr_range_info <- function(all_cor, range) {
-  high_corr_mets <- filter_correlation_pairs_by_range(all_cor, range)
-  correlated_card <- tags$div(style = "flex: 1; padding-right: 10px;",
-                              tags$span(
-                                style = "color:darkgreen;font-weight:bold;",
-                                "No metabolite pairs within this correlation range."
-                              ))
+.make_correlation_card <- function(high_corr_mets, range, card_title) {
+  cor_badges <- NULL
+  card_body <- tags$div(
+    style = "flex: 1; padding-right: 10px;",
+    tags$span(style = "color:darkgreen;font-weight:bold;", "No metabolite pairs within this correlation range.")
+  )
   if (!is.null(high_corr_mets) && nrow(high_corr_mets) > 0) {
-    
-    cor_badges <- tags$div(
-      style = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;",
-      lapply(seq_len(nrow(high_corr_mets)), function(i) {
-        pair <- high_corr_mets[i, , drop = FALSE]
-        tags$span(
-          style = paste(
-            "background-color: #fff3cd;",
-            "border: 1px solid #ffeeba;",
-            "padding: 4px 8px;",
-            "border-radius: 12px;",
-            "font-size: 0.85rem;"
-          ),
-          sprintf("%s \u221D %s", pair$col1, pair$col2)
-        )
-      })
+    cor_badges <- tags$div(style = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;", lapply(seq_len(nrow(high_corr_mets)), function(i) {
+      pair <- high_corr_mets[i, , drop = FALSE]
+      tags$span(
+        style = paste(
+          "background-color: #fff3cd;",
+          "border: 1px solid #ffeeba;",
+          "padding: 4px 8px;",
+          "border-radius: 12px;",
+          "font-size: 0.85rem;"
+        ),
+        sprintf("%s \u221D %s", pair$col1, pair$col2)
+      )
+    }))
+    card_body <- sprintf(
+      "%d column pairs have correlation (Pearson's r) within the selected range: %.3f - %.3f.",
+      nrow(high_corr_mets),
+      range[1],
+      range[2]
     )
-    
-    correlated_card <- warn_card(
-      title = "Correlated Metabolites",
-      body  = sprintf(
-        "%d column pairs have correlation (Pearson's r) within the selected range: %.3f - %.3f.",
-        nrow(high_corr_mets),
-        range[1],
-        range[2]
-      ),
-      body_tags = cor_badges,
-      info_title = "Why flag metabolites with strong positive linear correlations?",
-      info_content =
-        shiny::tagList(
-          shiny::tags$p("Two metababolites might have a strong positive linear correlation without a biological explanation if "),
-          shiny::tags$ul(
-            shiny::tags$li("they are from the same chromotography peak, but viewed under different filters."),
-            shiny::tags$li("They have similar signal drift patterns that confounds biological signal.")
-          ),
-          shiny::tags$p("If a pair of metabolites has a strong positive linear correlation without a biological explanation, further investigation is needed to verify they are not the same compound.")
-        )
-    )
+  }
+  correlated_card <- info_card(title = card_title,
+                               body  = card_body,
+                               body_tags = cor_badges)
+}
+ui_corr_range_info <- function(all_corr, range) {
+  raw_high_corr_mets       <- filter_correlation_pairs_by_range(all_corr$raw, range)
+  corrected_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$corrected, range)
   
-  } 
-  correlated_card
+  raw_corr_card       <- .make_correlation_card(raw_high_corr_mets, range, "Raw Metabolite Correlations")
+  corrected_corr_card <- .make_correlation_card(corrected_high_corr_mets, range, "Corrected Metabolite Correlations")
+  
+  transformed_block <- if (isTRUE(all_corr$transformed_included)) {
+    transformed_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$transformed, range)
+    .make_correlation_card(
+      transformed_high_corr_mets,
+      range,
+      "Transformed and Corrected Metabolite Correlations"
+    )
+  } else {
+    NULL
+  }
+  
+  htmltools::tagList(
+    raw_corr_card,
+    corrected_corr_card,
+    transformed_block
+  )
 }
 
 # Post-correction filtering info for section 2.2 Post-Correction Filtering
 ui_postcor_filter_info <- function(filtered_corrected_result,
                                    remove_imputed,
-                                   rsd_filter,
+                                   rsd_cutoff,
                                    post_cor_filter) {
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
@@ -388,7 +465,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     warning_ui <- tags$div(
       class = "alert alert-danger",
       style = "margin-bottom: 10px;",
-      tags$strong(paste0(n_istd, " internal standard(s) with QC RSD above ", rsd_filter, "%: ")),
+      tags$strong(paste0(n_istd, " internal standard(s) with QC RSD above ", rsd_cutoff, "%: ")),
       tags$ul(
         lapply(istd_names, tags$li)
       )
@@ -403,7 +480,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
         paste0(
           n_removed,
           " metabolite(s) removed based on QC RSD above ",
-          rsd_filter,
+          rsd_cutoff,
           "%"
         )
       ),
@@ -425,23 +502,21 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   do.call(tagList, ui)
 }
 
-ui_outliers <- function(p, d, 
-                        top_n        = 10L,
-                        sample_col   = "sample",
-                        class_col    = "class",
-                        digits_z     = 2L,
-                        digits_T2    = 2L,
+#' @keywords internal
+#' @noRd
+ui_outliers <- function(p, d,
+                        top_n         = 10L,
+                        sample_col    = "sample",
+                        class_col     = "class",
+                        digits_z      = 2L,
+                        digits_T2     = 2L,
                         pca_output_id = "hotelling_pca",
-                        ns           = identity) {
-  df <- if (p$out_data == "filtered_cor_data") {
-      d$filtered_corrected$df_no_mv
-  } else {
-    d$transformed$df_no_mv
-  }
+                        ns            = identity,
+                        include_plot  = TRUE) {
   
+  df <- d$filtered_corrected$df_no_mv
   detect_result <- detect_hotelling_nonqc_dual_z(df, p)
   
-  # Extract extreme values and full data
   ev   <- detect_result$extreme_values
   dres <- detect_result$data
   
@@ -449,73 +524,60 @@ ui_outliers <- function(p, d,
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
   
-  # Metric values
-  n_outlier_samples  <- sum(dres$is_outlier_sample, na.rm = TRUE)
-  n_extreme_values   <- nrow(ev)
+  n_outlier_samples <- sum(dres$is_outlier_sample, na.rm = TRUE)
+  n_extreme_values  <- nrow(ev)
   
-  # Metric cards
   cards <- shiny::div(
     style = "display:flex; gap:10px; margin-bottom:10px;",
     metric_card("Samples outside the Hotelling's T^2 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
   
-  # If no extreme values, just show cards + PCA + message
+  plot_ui <- if (isTRUE(include_plot)) {
+    shiny::plotOutput(ns(pca_output_id), height = "350px")
+  } else {
+    NULL
+  }
+  
   if (nrow(ev) == 0L) {
     return(shiny::tagList(
-      shiny::plotOutput(ns(pca_output_id), height = "350px"),
+      plot_ui,
       cards,
       shiny::tags$em("No extreme metabolite values detected in outlier samples.")
     ))
   }
   
-  # Check required columns from detect_hotelling_nonqc_dual_z()
   required_cols <- c(
-    sample_col,
-    class_col,
-    "metabolite",
-    "z_global",
-    "abs_z_global",
-    "z_class",
-    "abs_z_class",
-    "T2"
+    sample_col, class_col, "metabolite",
+    "z_global", "abs_z_global", "z_class", "abs_z_class", "T2"
   )
   missing_cols <- setdiff(required_cols, names(ev))
   if (length(missing_cols) > 0L) {
-    stop(
-      "Missing columns in extreme_values: ",
-      paste(missing_cols, collapse = ", ")
-    )
+    stop("Missing columns in extreme_values: ", paste(missing_cols, collapse = ", "))
   }
   
-  # Sort by |z_global|, then |z_class|, then T2, descending
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
+  ev_top    <- head(ev_sorted, top_n)
   
-  # Take top_n rows
-  ev_top <- head(ev_sorted, top_n)
+  z_g_fmt    <- formatC(ev_top$z_global,     format = "f", digits = digits_z)
+  #absz_g_fmt <- formatC(ev_top$abs_z_global, format = "f", digits = digits_z)
+  z_c_fmt    <- formatC(ev_top$z_class,      format = "f", digits = digits_z)
+  #absz_c_fmt <- formatC(ev_top$abs_z_class,  format = "f", digits = digits_z)
+  T2_fmt     <- formatC(ev_top$T2,           format = "f", digits = digits_T2)
   
-  # Format numeric values
-  z_g_fmt    <- formatC(ev_top$z_global,      format = "f", digits = digits_z)
-  absz_g_fmt <- formatC(ev_top$abs_z_global,  format = "f", digits = digits_z)
-  z_c_fmt    <- formatC(ev_top$z_class,       format = "f", digits = digits_z)
-  absz_c_fmt <- formatC(ev_top$abs_z_class,   format = "f", digits = digits_z)
-  T2_fmt     <- formatC(ev_top$T2,            format = "f", digits = digits_T2)
-  
-  # Build table rows
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
       shiny::tags$td(ev_top[[sample_col]][i]),
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
       shiny::tags$td(z_g_fmt[i]),
-      shiny::tags$td(absz_g_fmt[i]),
+      #shiny::tags$td(absz_g_fmt[i]),
       shiny::tags$td(z_c_fmt[i]),
-      shiny::tags$td(absz_c_fmt[i]),
+      #shiny::tags$td(absz_c_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
   
-  # Build full table with header
   table_tag <- shiny::tags$table(
     class = "table table-striped table-condensed table-hover",
     shiny::tags$thead(
@@ -524,9 +586,9 @@ ui_outliers <- function(p, d,
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
         shiny::tags$th("Global z-score"),
-        shiny::tags$th("|z| (global)"),
+        #shiny::tags$th("|z| (global)"),
         shiny::tags$th("Class z-score"),
-        shiny::tags$th("|z| (class)"),
+        #shiny::tags$th("|z| (class)"),
         shiny::tags$th("Mahalanobis^2")
       )
     ),
@@ -534,8 +596,7 @@ ui_outliers <- function(p, d,
   )
   
   shiny::tagList(
-    # PCA plot placeholder – actual plot comes from renderPlot()
-    shiny::plotOutput(ns(pca_output_id), height = "350px"),
+    plot_ui,
     cards,
     shiny::tags$span(
       "Top 10 potential extreme values are listed below. ",
@@ -545,6 +606,3 @@ ui_outliers <- function(p, d,
     table_tag
   )
 }
-
-
-

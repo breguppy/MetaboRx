@@ -17,6 +17,44 @@ filter_by_missing <- function(df, metab_cols, mv_cutoff) {
   # list columns removed due to missing value %
   mv_removed_cols <- setdiff(metab_cols, mv_keep_cols)
   
+  # Get all class-metabolite pairs where all values are missing
+  classes_seen <- sort(unique(df$class))
+  
+  class_metab_all_missing <- if (length(classes_seen) == 0L || length(mv_keep_cols) == 0L) {
+    data.frame(class = character(0), metabolite = character(0), n_rows_in_class = integer(0))
+  } else {
+    out <- vector("list", length(classes_seen))
+    names(out) <- classes_seen
+    
+    for (cl in classes_seen) {
+      idx <- which(df$class == cl)
+      n_in_class <- length(idx)
+      
+      # If no rows for this class, treat as "all missing" for every kept metabolite
+      if (n_in_class == 0L) {
+        miss_all <- rep(TRUE, length(mv_keep_cols))
+      } else {
+        sub <- df[idx, mv_keep_cols, drop = FALSE]
+        miss_all <- vapply(sub, function(x) all(is.na(x)), logical(1L))
+      }
+      
+      mets <- mv_keep_cols[miss_all]
+      out[[cl]] <- if (length(mets) == 0L) {
+        NULL
+      } else {
+        data.frame(
+          class = rep(cl, length(mets)),
+          metabolite = mets,
+          n_rows_in_class = rep(n_in_class, length(mets)),
+          row.names = NULL
+        )
+      }
+    }
+    
+    do.call(rbind, Filter(Negate(is.null), out)) %||%
+      data.frame(class = character(0), metabolite = character(0), n_rows_in_class = integer(0))
+  }
+  
   # filter data by metabolite missing value
   df_filtered <- df[, c(meta_cols, mv_keep_cols), drop = FALSE]
   
@@ -33,7 +71,8 @@ filter_by_missing <- function(df, metab_cols, mv_cutoff) {
     df = df_filtered,
     mv_cutoff = mv_cutoff,
     mv_removed_cols = mv_removed_cols,
-    qc_missing_mets = qc_missing_mets
+    qc_missing_mets = qc_missing_mets,
+    class_metab_all_missing = class_metab_all_missing
   ))
 }
 

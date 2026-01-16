@@ -1,11 +1,11 @@
 # QCcorrection
-Shiny app for QC correction of metabolomics data
+Shiny app for vetting data quality and correction signal drift in metabolomics data
 
 ### Requirements
 
  - R >= 4.4.1
  
-### Installation
+## Installation
 
 #### Install Via GitHub
 To install via GitHub, use the remotes package:
@@ -28,10 +28,61 @@ remotes::install_github("breguppy/QCcorrection", dependencies = TRUE)
 QCcorrection::install_all_dependencies()
 ```
 
-### To run App
+## To run App
 ```r
 QCcorrection::run_app()
 ```
+## Data Input and Information Requirements
+
+### 1. Acceptable file formats
+
+- `.csv`
+- `.xls`
+- `.xlsx`
+
+**Note:**  
+Raw data must be located on the **first sheet** of `.xls` or `.xlsx` files.
+
+---
+
+### 2. Required data formatting
+
+- **Rows = samples** (can be in any order)
+- **Columns = non-metabolite columns and metabolites** (can be in any order)
+
+#### Non-metabolite columns
+
+- **Sample column (required):**  
+  Column containing unique sample identifiers.
+
+- **Batch column (optional):**  
+  Column containing batch information if samples were acquired in batches.
+
+- **Class column (required):**  
+  Column indicating sample type.  
+  Must contain QC samples labeled as `NA`, `QC`, `Qc`, or `qc`.  
+  If blank samples are present, they must be labeled as `blank`.
+
+- **Injection order column (required):**  
+  Column indicating the order in which samples were injected.
+
+- **Additional metadata columns (optional):**  
+  Any remaining non-metabolite columns must be explicitly specified.
+
+---
+
+### 3. Injection order requirements
+
+Data (excluding blank samples) must **begin and end with QC samples** when sorted by injection order.
+
+---
+
+### 4. Internal standard metabolites
+
+Internal standard metabolites must have column names beginning with:
+
+- `ISTD`
+- `ITSD`
 
 ### Example Raw Data Stucture
 <img align="center" src="https://github.com/breguppy/QCcorrection/blob/main/www/example_data_structure.png">

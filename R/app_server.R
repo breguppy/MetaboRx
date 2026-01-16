@@ -9,8 +9,7 @@ app_server <- function(input, output, session) {
   base_data <- reactive({
     .merge_lists(list(
       cleaned  = .get_or_null(import$cleaned),
-      filtered = .get_or_null(import$filtered),
-      raw_corr = .get_or_null(import$raw_corr)
+      filtered = .get_or_null(import$filtered)
     ))
   })
   
@@ -27,7 +26,7 @@ app_server <- function(input, output, session) {
          corrected          = .get_or_null(correct$corrected),
          filtered_corrected = .get_or_null(correct$filtered_corrected),
          transformed        = .get_or_null(correct$transformed),
-         tc_corr            = .get_or_null(correct$tc_corr)
+         all_corr            = .get_or_null(correct$all_corr)
        )
      )
    })

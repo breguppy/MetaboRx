@@ -1,16 +1,4 @@
-#' File upload
-#' @keywords internal
-#' @noRd
-ui_file_upload <- function(ns) {
-    fileInput(
-      ns("file1"),
-      "Choose Raw Data File (.csv, .xls, or .xlsx)",
-      accept = c(".csv", ".xls", ".xlsx"),
-      buttonLabel = "Browse...",
-      placeholder = "No file selected"
-    )
-}
-
+#----------- Reusable functions
 #' Reusable titled sidebar
 #' @keywords internal
 #' @noRd
@@ -34,6 +22,21 @@ ui_table_scroll <- function(outputId, ns, height = "400px") {
   )
 }
 
+#--------- 1.1 Upload Raw Data inputs
+#' File upload
+#' @keywords internal
+#' @noRd
+ui_file_upload <- function(ns) {
+    fileInput(
+      ns("file1"),
+      "Choose Raw Data File (.csv, .xls, or .xlsx)",
+      accept = c(".csv", ".xls", ".xlsx"),
+      buttonLabel = "Browse...",
+      placeholder = "No file selected"
+    )
+}
+
+#---------- 1.2 Raw Data Inspection Inputs
 #' Column selection for meta data
 #' @keywords internal
 #' @noRd
@@ -41,6 +44,7 @@ ui_nonmet_cols <- function(cols, ns = identity) {
   dropdown_choices <- c("Select a column..." = "", cols)
   
   tagList(
+    htmltools::tags$h5("Select Non-Metabolite Columns"),
     tooltip(
       selectInput(ns("sample_col"), "sample column", dropdown_choices, ""),
       "Column that contains unique sample names.",
@@ -101,52 +105,6 @@ ui_withhold_count <- function(ns, max_withhold) {
                step  = 1)
 }
 
-#' metabolite correlation slider
-#' @keywords internal
-#' @noRd
-ui_corr_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
-    placement = "right"
-  )
-}
-#' metabolite correlation slider in corrected or transformed data
-#' @keywords internal
-#' @noRd
-ui_tc_corr_slider <- function(ns) {
-  tagList(tooltip(
-    radioButtons(
-      ns("tc_corr_data"),
-      "Compute metabolite correlations for",
-      list(
-        "Corrected data" = "filtered_cor_data",
-        "Transformed and corrected data" = "transformed_cor_data"
-      ),
-      "filtered_cor_data"
-    ),
-    "all pairwise metabolite correlations will be computed in the data set you select.",
-    placement = "right"
-  ),
-  tooltip(
-    sliderInput(ns("tc_corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
-    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
-    placement = "right"
-  )
-  )
-}
-
-#' missing value filter slider
-#' @keywords internal
-#' @noRd
-ui_filter_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites with missing % above this threshold are removed.", 
-    placement = "right"
-  )
-}
-
 #' Repeated selectors for which columns to withhold
 #' @param ids character vector of input ids to render (e.g., "withhold_col_1")
 #' @param cols candidate column names
@@ -170,7 +128,50 @@ ui_withhold_selectors <- function(ids, cols, prev, ns) {
   })
 }
 
-#' Impute missing QC value options for section 2.1 Choose Correction settings
+ui_control_class_selector <- function(df, ns) {
+  classes <- unique(df$class[df$class != "QC"])
+  dropdown_choices <- c("Select a class..." = "", classes)
+  
+  htmltools::tagList(
+    htmltools::tags$hr(),
+    htmltools::tags$h5("Select control class (optional)"),
+    #htmltools::tags$p("If your data includes a control group, select it below. If not, check “No control group”."),
+      bslib::tooltip(
+        shiny::checkboxInput(ns("no_control"), "No control class", FALSE),
+        "Check this if the dataset does not have a control class.",
+        placement = "right"
+      ),
+      shiny::conditionalPanel(
+        condition = sprintf("!input['%s']", ns("no_control")),
+        bslib::tooltip(
+          shiny::selectInput(
+            ns("control_class"),
+            "Control class",
+            choices = dropdown_choices,
+            selected = ""
+          ),
+          "Name of control samples in the class column. This class’s average is used to compute fold changes in the Excel file exported from this app. Fold changes are exported to a separate tab in the corrected-data Excel file.",
+          placement = "right"
+        )
+      )
+    )
+}
+
+
+#----------- 1.3 Filter Missing Values
+#' missing value filter slider
+#' @keywords internal
+#' @noRd
+ui_filter_slider <- function(ns) {
+  tooltip(
+    sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
+    "Metabolites with missing % above this threshold are removed.", 
+    placement = "right"
+  )
+}
+
+#---------- 2.1 Choose Correction Settings inputs
+#' Impute missing QC value options
 #' @keywords internal
 #' @noRd
 ui_qc_impute <- function(df, metab_cols, ns = identity) {
@@ -241,8 +242,7 @@ ui_qc_impute <- function(df, metab_cols, ns = identity) {
   }
 }
 
-
-#' Impute missing sample value options for section 2.1 Choose Correction settings
+#' Impute missing sample value options
 #' @keywords internal
 #' @noRd
 ui_sample_impute <- function(df, metab_cols, ns = identity) {
@@ -325,7 +325,7 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
   }
 }
 
-#' Correction method selection options for section 2.1 Choose Correction settings
+#' Correction method selection options
 #' @keywords internal
 #' @noRd
 ui_correction_method <- function(df, ns = identity) {
@@ -344,27 +344,7 @@ ui_correction_method <- function(df, ns = identity) {
         style = "text-decoration:none;",
         shiny::icon("circle-info")
       ),
-      shiny::tagList(
-        shiny::tags$p("QC-based signal drift correction methods:"),
-        shiny::tags$ul(
-          shiny::tags$li(
-            shiny::strong("Random Forest (RF) = QC-RFSC: "),
-            "Fit a random forest model using QC samples (QC intensity vs injection order) to estimate drift and correct samples."
-          ),
-          shiny::tags$li(
-            shiny::strong("Local Polynomial Fit (LOESS) = QC-RLSC: "),
-            "Uses LOESS smoothing on QC samples to estimate drift and correct samples."
-          ),
-          shiny::tags$li(
-            shiny::strong("Batchwise versions (BW_RF / BW_LOESS): "),
-            "Apply the same approach within each batch and then recombine."
-          )
-        ),
-        shiny::tags$p(
-          shiny::strong("Rule of thumb: "),
-          "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
-        )
-      ),
+      report_text_correction_descriptions(),
       title = "What do these methods mean?",
       placement = "right",
       options = list(container = "body", customClass = "popover-responsive")
@@ -412,7 +392,7 @@ ui_correction_method <- function(df, ns = identity) {
   )
 }
 
-
+#---------- 2.2 Post-Correction Filtering inputs
 #' Post-correction filtering
 #' @keywords internal
 #' @noRd
@@ -423,6 +403,7 @@ ui_post_cor_filter <- function(ns) {
       "Check this box if you want to the corrected data to have the same missing values as the raw data.", 
       placement = "right"
     ),
+    htmltools::tags$h5("QC RSD Filtering"),
     shiny::tags$div(
       style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
       shiny::tags$strong("RSD calculation"),
@@ -433,8 +414,7 @@ ui_post_cor_filter <- function(ns) {
           style = "text-decoration:none;",
           shiny::icon("circle-info")
         ),
-        shiny::tags$p(shiny::strong("Relative Standard Deviation = RSD: "), 
-                                    "Computed for each metabolite by dividing standard deviation by mean and expressed as a percentage. Describes standard deviation as a percentage of the mean."),
+        report_text_rsd_cal(),
         title = "RSD% calculation",
         placement = "auto",
         options = list(container = "body",
@@ -449,15 +429,32 @@ ui_post_cor_filter <- function(ns) {
     conditionalPanel(
       condition = sprintf("!input['%s']", ns("post_cor_filter")),
       tooltip(
-       sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 20),
+        sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 20),
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
-       placement = "right"
+        placement = "right"
       )
     ),
-    
+    htmltools::tags$h5("Candidate Extreme Values"),
+    shiny::tags$div(
+      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+      shiny::tags$strong("How detection works"),
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        report_text_ev_detection(),
+        title = "Candidate extreme value detection",
+        placement = "auto",
+        options = list(container = "body", customClass = "popover-responsive")
+      )
+    )
   )
 }
 
+#---------- 2.3 Post-Correction Transformation
 #' Post-correction transformation
 #' @keywords internal
 #' @noRd
@@ -486,35 +483,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
         style = "text-decoration:none;",
         shiny::icon("circle-info")
       ),
-      shiny::tagList(
-        shiny::tags$p("Post-correction transformations/normalizations:"),
-        shiny::tags$ul(
-          if (has_istd) shiny::tags$li(
-            shiny::strong("Internal Standard Normalization: "),
-            "For each sample (row), compute the mean of internal standard columns (ISTD*/ITSD*), ",
-            "then divide each non-internal standard metabolite by that mean."
-          ),
-          shiny::tags$li(
-            shiny::strong("Total Ratio Normalization (TRN): "),
-            "For each sample (row), compute the total signal as the sum across included metabolite columns, ",
-            "then scale each included metabolite by its proportion of that total and multiply by the number ",
-            "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
-          ),
-          shiny::tags$li(
-            shiny::strong("None: "),
-            "Leaves corrected metabolite values unchanged."
-          ),
-        ),
-        shiny::tags$hr(),
-        shiny::tags$p(
-          shiny::strong("Exclude internal standards checkbox: "),
-          "When checked, ISTD/ITSD columns are excluded from the TRN total-signal calculation and are not transformed."
-        ),
-        shiny::tags$p(
-          shiny::strong("Withhold from TRN: "),
-          "Use this if a column should not contribute to the TRN total (e.g., TIC)."
-        )
-      ),
+      report_text_transform_methods(),
       title = "Transformation methods",
       placement = "right",
       options = list(container = "body", customClass = "popover-responsive")
@@ -548,26 +517,21 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
   )
 }
 
-
-#' Options for outlier detection
+#----------- 2.4 Metabolite Correlations inputs
+#' metabolite correlation slider
 #' @keywords internal
 #' @noRd
-ui_detect_outliers_options <- function(ns) {
+ui_correlation_slider <- function(ns) {
   tooltip(
-    radioButtons(
-      ns("out_data"),
-      "Detect extreme values in",
-      list(
-        "Corrected data" = "filtered_cor_data",
-        "Transformed and corrected data" = "transformed_cor_data"
-      ),
-      "filtered_cor_data"
-    ),
-    "Potential extreme values will be detected in the data set you select.",
+    sliderInput(ns("corr_threshold"), "Pearson's r range", 0.9, 1, value = c(0.99, 1), step = 0.005),
+    "Pairs of metabolites with Pearson's r within this range will be displayed on the rigth after clicking the 'Compute Metabolite Correlations' button.", 
     placement = "right"
   )
 }
 
+#---------- 3.1 Scatter Plot Evaluation input
+
+#---------- 3.2 RSD Evaluation input
 #' visualization rsd evaluation
 #' @keywords internal
 #' @noRd
@@ -590,6 +554,7 @@ ui_rsd_eval <- function(ns) {
   )
 }
 
+#---------- 3.3 PCA Evaluation input
 #' visualization pca evaluation
 #' @keywords internal
 #' @noRd
@@ -607,6 +572,7 @@ ui_pca_eval <- function(ns){
   )
 }
 
+#----------- 3.4 Select Figure Format input
 #' Visualization downloading figure format
 #' @keywords internal
 #' @noRd

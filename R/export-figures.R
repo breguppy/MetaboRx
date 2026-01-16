@@ -44,6 +44,7 @@ export_figures <- function(p, d, out_dir = tempdir()) {
     normalizePath(path, winslash = "/", mustWork = TRUE)
   }
   
+  # metabolite scatter plots
   raw_cols <- setdiff(names(d$filtered$df), c("sample", "batch", "class", "order"))
   if(isTRUE(p$remove_imputed)) {
     df_cor_mets <- d$filtered_corrected$df_mv
@@ -55,24 +56,29 @@ export_figures <- function(p, d, out_dir = tempdir()) {
   cols <- intersect(raw_cols, cor_cols)
   met_paths <- character(0)
   n <- length(cols)
-  N <- n + 3
+  N <- n + 16
   shiny::withProgress(message = "Creating figures...", value = 0, {
-    rsd_plot <- make_rsd_plot(p, d)
-    rsd_path <- file.path(rsd_dir, sprintf("rsd_comparison_%s.%s", p$rsd_cal, fmt))
-    rsd_path <- save_plot(rsd_path, rsd_plot, 7.5, 4.5)
-    shiny::incProgress(1 / N, detail = "Saved: rsd figure")
     
-    pca_plot <- make_pca_plot(p, d)  
-    pca_path <- file.path(pca_dir,
-                          sprintf("pca_comparison_%s.%s", p$color_col, fmt))
-    pca_path <- save_plot(pca_path, pca_plot, 8.333, 4.417)
-    shiny::incProgress(1 / N, detail = "Saved: pca figure")
+    rsd_res <- make_all_rsd_plots(p, d)
+    for (i in seq_along(rsd_res$rsd_plots)) {
+      rsd_path <- file.path(rsd_dir, sprintf(paste0(rsd_res$plot_names[i],".%s"), fmt))
+      rsd_path <- save_plot(rsd_path, rsd_res$rsd_plots[[i]], 7.5, 4.5)
+      shiny::incProgress(1 / N, detail = "Saved: rsd figures")
+    }
     
-    pca_loading <-  make_pca_loading_plot(p, d)
-    loading_path <- file.path(pca_dir,
-                              sprintf("pca_loadings.%s", fmt))
-    pca_path <- save_plot(loading_path, pca_loading, 8.75, 4.417)
-    shiny::incProgress(1 / N, detail = "Saved: pca loading figure")
+    pca_res <- make_all_pca_plots(p,d)
+    for (i in seq_along(pca_res$pca_plots)) {
+      pca_path <- file.path(pca_dir,
+                            sprintf(paste0(pca_res$plot_names[i], ".%s"), fmt))
+      pca_path <- save_plot(pca_path, pca_res$pca_plots[[i]], 8.333, 4.417)
+      shiny::incProgress(1 / N, detail = "Saved: pca figure")
+    }
+    for (i in seq_along(pca_res$pca_loading_plots)) {
+      loading_path <- file.path(pca_dir,
+                                sprintf(paste0(pca_res$loading_plot_names[i], ".%s"), fmt))
+      pca_path <- save_plot(loading_path, pca_res$pca_loading_plots[[i]], 8.75, 4.417)
+      shiny::incProgress(1 / N, detail = "Saved: pca loading figure")
+    }
     
     for (i in seq_len(n)) {
       metab <- cols[i]

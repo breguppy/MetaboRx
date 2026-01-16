@@ -82,6 +82,50 @@ make_rsd_plot <- function(p, d) {
 
 #' @keywords internal
 #' @noRd
+make_all_rsd_plots <- function(p, d) {
+  build_name <- function(plot_type, compare, cal) {
+    sprintf("rsd_%s_%s_%s", plot_type, compare, cal)
+  }
+  
+  # Base grid: plot types x calcs (always for filtered_cor_data)
+  specs <- expand.grid(
+    rsd_plot_type = c("dist", "scatter"),
+    rsd_cal       = c("class-met", "met"),
+    rsd_compare   = "filtered_cor_data",
+    stringsAsFactors = FALSE
+  )
+  
+  # Add transformed_cor_data variants only when transform is not "none"
+  if (!identical(p$transform, "none")) {
+    specs_trans <- specs
+    specs_trans$rsd_compare <- "transformed_cor_data"
+    specs <- rbind(specs, specs_trans)
+  }
+  
+  rsd_plots   <- vector("list", nrow(specs))
+  plot_names  <- character(nrow(specs))
+  
+  for (i in seq_len(nrow(specs))) {
+    temp_params <- p
+    temp_params$rsd_plot_type <- specs$rsd_plot_type[i]
+    temp_params$rsd_compare   <- specs$rsd_compare[i]
+    temp_params$rsd_cal       <- specs$rsd_cal[i]
+    
+    rsd_plots[[i]]  <- make_rsd_plot(temp_params, d)
+    plot_names[i]   <- build_name(temp_params$rsd_plot_type,
+                                  temp_params$rsd_compare,
+                                  temp_params$rsd_cal)
+  }
+  
+  list(
+    rsd_plots   = rsd_plots,
+    plot_names  = plot_names
+  )
+}
+
+
+#' @keywords internal
+#' @noRd
 # Helper for creating the PCA plot
 make_pca_plot <- function(p, d) {
   # get after based on pca_compare selected by user.
@@ -164,4 +208,91 @@ make_pca_loading_plot <- function(p, d) {
                             duration = 8)
     ggplot2::ggplot() + ggplot2::labs(title = "PCA Loading failed \u2013 see notification")
   })
+}
+
+#' @keywords internal
+#' @noRd
+make_all_pca_plots <- function(p, d) {
+  build_name <- function(compare, color) {
+    sprintf("pca_%s_%s", compare, color)
+  }
+  
+  # Base grid: plot types x calcs (always for filtered_cor_data)
+  specs <- expand.grid(
+    color_col       = c("batch", "class", "order"),
+    pca_compare   = "filtered_cor_data",
+    stringsAsFactors = FALSE
+  )
+  
+  # Add transformed_cor_data variants only when transform is not "none"
+  if (!identical(p$transform, "none")) {
+    specs_trans <- specs
+    specs_trans$pca_compare <- "transformed_cor_data"
+    specs <- rbind(specs, specs_trans)
+  }
+  
+  pca_plots   <- vector("list", nrow(specs))
+  plot_names  <- character(nrow(specs))
+  
+  for (i in seq_len(nrow(specs))) {
+    temp_params <- p
+    temp_params$color_col <- specs$color_col[i]
+    temp_params$pca_compare   <- specs$pca_compare[i]
+    
+    pca_plots[[i]]  <- make_pca_plot(temp_params, d)
+    plot_names[i]   <- build_name(temp_params$pca_compare,
+                                  temp_params$color_col)
+  }
+  pca_loading_plots <- vector("list", ifelse(!identical(p$transform, "none"), 2, 1))
+  loading_plot_names <- character(ifelse(!identical(p$transform, "none"), 2, 1))
+  temp_params$pca_compare <- "filtered_cor_data"
+  pca_loading_plots[[1]] <- make_pca_loading_plot(temp_params, d)
+  loading_plot_names[1] <- sprintf("pca_loadings_%s", temp_params$pca_compare)
+  
+  if (!identical(p$transform, "none")) {
+    temp_params$pca_compare <- "transformed_cor_data"
+    pca_loading_plots[[2]] <- make_pca_loading_plot(temp_params, d)
+    loading_plot_names[2] <- sprintf("pca_loadings_%s", temp_params$pca_compare)
+  }
+  
+  list(
+    pca_plots   = pca_plots,
+    plot_names  = plot_names,
+    pca_loading_plots = pca_loading_plots,
+    loading_plot_names = loading_plot_names
+  )
+}
+
+#' Make Hotelling PCA plot for report
+#'
+#' @param p List of parameters (must include qcImputeM, samImputeM, remove_imputed).
+#' @param d List of data reactives/artifacts (must include filtered_corrected).
+#'
+#' @return A ggplot object or NULL if not available.
+#'
+#' @keywords internal
+#' @noRd
+make_hotelling_pca_plot <- function(p, d) {
+  .require_pkg("ggplot2", "Hotelling PCA plot")
+  
+  if (is.null(d$filtered_corrected)) return(NULL)
+  
+  # Choose df version consistent with the app behavior
+  remove_imputed <- isTRUE(p$remove_imputed)
+  
+  # In your server you call detect_hotelling_nonqc_dual_z() on df_no_mv
+  # (even when remove_imputed is TRUE). Keep the same behavior here unless
+  # you intentionally want it to differ.
+  df <- d$filtered_corrected$df_no_mv
+  if (is.null(df) || !is.data.frame(df)) return(NULL)
+  
+  # Ensure p has the fields your detect_hotelling_nonqc_dual_z() expects
+  p_hot <- list(
+    qcImputeM  = p$qcImputeM %||% "nothing_to_impute",
+    samImputeM = p$samImputeM %||% "nothing_to_impute"
+  )
+  
+  res <- detect_hotelling_nonqc_dual_z(df, p_hot)
+  
+  if (!is.null(res$pca_plot)) res$pca_plot else NULL
 }

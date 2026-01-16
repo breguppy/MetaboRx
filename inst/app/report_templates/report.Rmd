@@ -8,112 +8,133 @@ output:
     toc_float: true
 params:
   title:
-    value: "QC Correction Report"
+    value: "Metabolomics Data Quality Report"
   notes:
     value: ""
   plots:
     value: !r character(0)
-  choices:
-    value: !r character(0)
-  descriptions:
-    value: !r character(0)
+  p:
+    value: !r NULL
+  d:
+    value: !r NULL
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_chunk$set(dev = "svg")
-statement <- function(name) {
-  d <- params$descriptions[[name]]
-  if (is.character(d) && nzchar(d)) knitr::asis_output(paste0(d, "\n\n"))
-}
 library(htmltools)
 library(dplyr)
 library(QCcorrection)
 ```
-# Preprocessing Steps
+# Raw Data
+```{r}
+QCcorrection:::report_text_data_req()
+QCcorrection:::report_text_withheld_columns(params$p, params$d)
+```
 
 ### Raw Data Summary and Structural Checks
 
-**Raw data summary and structural checks.** This section summarizes the uploaded dataset (counts of metabolite columns, samples, QC samples, batches, and biological classes) and reports the overall amount of missing data. Before downstream processing, values in metabolite columns that are not numeric (including text entries) or equal to zero are converted to missing values (NA). Any columns that contain no numeric values at all are flagged as non-numeric and removed from metabolite processing. The report may also flag potential duplicate metabolite columns (nearly identical values across samples) and the presence of blank samples; when blanks are present, metabolites with low signal relative to blanks (QC mean less than 3× the blank mean) are listed for review. These checks are informational unless explicitly removed later—use them to confirm the dataset structure and identify potential quality issues before correction.
-
+**Raw data summary and structural checks.** 
 ```{r}
-QCcorrection:::ui_basic_info(params$choices$raw_df, params$choices$replacement_counts, params$choices$non_numerics_cols, params$choices$duplicate_mets, params$choices$high_corr_mets)
-statement("Withheld Columns")
+QCcorrection:::report_text_data_inspection()
+QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
 ```
 
-### Missing Value Filter
+### Filter Missing Values in Raw Data
 ```{r}
-QCcorrection:::ui_filter_info(params$choices$filtered$mv_removed_cols, params$choices$mv_cutoff, params$choices$filtered$qc_missing_mets)
+QCcorrection:::report_text_mv_filter()
+QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets, params$d$filtered$class_metab_all_missing)
 ```
+
+# Imputation, Signal Drift Correction, and Transformation.
 
 ### Missing Value Imputation
 ```{r}
-statement("Imputation Description")
+QCcorrection:::report_text_imputation(params$p, params$d)
 ```
 
 ### Correction Description
 ```{r}
-statement("Correction Description")
+QCcorrection:::report_text_correction(params$p, params$d)
+QCcorrection:::report_text_correction_descriptions()
 ```
 
-### Post-correction Filter
+### Post-correction Filtering
+#### QC RSD Filtering
+
 ```{r}
-QCcorrection:::ui_postcor_filter_info(params$choices$filtered_corrected, params$choices$remove_imputed, params$choices$rsd_cutoff, params$choices$post_cor_filter)
+QCcorrection:::report_text_rsd_cal()
+QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
+```
+
+#### Candidate Extreme Values
+
+```{r}
+QCcorrection:::report_text_ev_detection()
+```
+```{r, echo=FALSE, fig.width=7.5, fig.height=5.5}
+hp <- params$plots[["Hotelling PCA"]]
+if (!is.null(hp)) {
+  print(hp)
+} else {
+  htmltools::tags$span(style = "font-weight:bold;", "Hotelling PCA plot was not available.")
+}
+```
+```{r}
+QCcorrection:::ui_outliers(params$p, params$d, include_plot = FALSE) 
 ```
 
 ### Transformation Description
 ```{r}
-statement("Transformation Description")
+QCcorrection:::report_text_transformation(params$p, params$d)
+QCcorrection:::report_text_transform_methods()
 ```
 
-### Candidate Extreme Values
+###  Metabolite Correlations
 ```{r}
-statement("Candidate Extreme Values")
+QCcorrection:::report_text_correlations()
+if (!is.null(params$d$all_corr)) {
+  QCcorrection:::ui_corr_range_info(params$d$all_corr, params$p$corr_threshold)
+} else {
+  htmltools::tags$span(style = "font-weight:bold;", "Metabolite correlations were not computed.")
+}
 ```
-
-```{r}
-QCcorrection:::ui_outliers(list(out_data = params$choices$out_data, qcImputeM = params$choices$qcImputeM, samImputeM = params$choices$samImputeM), list(filtered_corrected = params$choices$filtered_corrected, transformed = params$choices$transformed))
-```
-
-# Correction Evaluation
+# Visualization
 
 ### Visualize the Correction with Metabolite Scatter Plots
-
 ```{r, echo=FALSE, fig.show='hold', out.width='49%', fig.width=5, fig.height=5}
 print(params$plots[["Metabolite Scatter 1"]])
 print(params$plots[["Metabolite Scatter 2"]])
 ```
-
 ```{r}
-statement("Metabolite Scatter Plots")
+QCcorrection:::report_text_scatter_intro(params$p, params$d)
+QCcorrection:::report_text_met_scatter()
 ```
 
 ### RSD Comparison
-
+To judge the quality of the cleaned data, we can visualize the change in variation with the relative standard deviation (RSD) comparison plots. RSD is sometimes called coefficient of variation (CV) and is computed as RSD = (standard deviation / mean) * 100%. High RSD indicates that the values for that metabolite are more spread out around the mean, which may be an expected result in the experimental samples. For QC samples, RSD should decrease after correction.
+```{r}
+QCcorrection:::report_text_rsd_intro(params$p, params$d)
+```
 ```{r, echo=FALSE, fig.width=7.5, fig.height=4.5}
 print(params$plots[["RSD Comparison"]])
 ```
-
-To judge how well the correction method worked, we can visualize the change in variation with the relative standard deviation (RSD) comparison plots. RSD is sometimes called coefficient of variation (CV) and is computed as RSD = (standard deviation / mean) * 100%. High RSD indicates that the values for that metabolite are more spread out around the mean, which may be an expected result in the experimental samples. For QC samples, RSD should decrease after correction.
 ```{r}
-statement("RSD Comparison")
+QCcorrection:::report_text_rsd_plots()
 ```
 
 ```{r}
-QCcorrection:::ui_rsd_stats(list(rsd_compare = params$choices$rsd_compare, rsd_cal = params$choices$rsd_cal), list(filtered = params$choices$filtered, filtered_corrected = params$choices$filtered_corrected, transformed = params$choices$transformed))
+QCcorrection:::report_text_rsd_table()
+QCcorrection:::ui_rsd_stats(params$p, params$d)
 ```
 
 ### PCA Comparison
-
+```{r}
+QCcorrection:::report_text_pca_plots()
+```
 ```{r, echo=FALSE, fig.width=8.333, fig.height=4.417}
 print(params$plots[["PCA Comparison"]])
-```
-
-```{r}
-statement("PCA Comparison")
 ```
 
 ```{r, echo=FALSE, fig.width=8.75, fig.height=4.417}
 print(params$plots[["PCA Loading"]])
 ```
-
-The loading values for the top 10 metabolites for each PC are plotted above. The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. A positive loading means that a high value in that metabolite corresponds to a high value in that PC. A negative loading means a high value in that metabolite corresponds to a low value in that PC.  
