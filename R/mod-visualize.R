@@ -111,16 +111,12 @@ mod_visualize_ui <- function(id) {
           help = c("Figures will be downloaded in the format selected on the right."),
           width = 400
         ),
-        layout_sidebar(
-          sidebar = ui_sidebar_block(
-            title = "Download Figures",
-            uiOutput(ns("download_fig_zip_btn")),
-            help = c("If there are many metabolites, downloading figures may take a few minutes."),
-            position = "right"
-          ),
-          ui_fig_format(ns),
-          uiOutput(ns("progress_ui"))
-        ))
+        fluidRow(
+          column(8, ui_fig_format(ns)),
+          column(4, uiOutput(ns("download_fig_zip_btn")))
+        ),
+        uiOutput(ns("progress_ui"))
+        )
     ),
     card(
       actionButton(ns("next_export"), "Next: Export All", class = "btn-primary btn-lg"),
@@ -189,17 +185,22 @@ mod_visualize_server <- function(id, data, params) {
     output$download_fig_zip_btn <- renderUI({
       req(d()$transformed)
       
-      div(
+      download_card(
+        "Download Figures",
+        "If there are many metabolites, downloading figures may take a few minutes.",
+        div(
         style = "width: 100%; text-align: center;",
         div(
           style = "max-width: 250px; display: inline-block;",
           downloadButton(
             outputId = ns("download_fig_zip"),
             label    = "Download All Figures",
-            class    = "btn btn-secondary"
+            class    = "btn btn-secondary btn-lg"
           )
         )
       )
+      )
+      
     })
     # -- progress bar
     progress_reactive <- reactiveVal(0)
