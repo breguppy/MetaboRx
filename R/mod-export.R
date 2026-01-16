@@ -8,54 +8,30 @@ mod_export_ui <- function(id) {
     title = "4. Export All", 
     value = "tab_export",
     card(
-    card_title("Download Data, Summaries, Plots, and Report"),
-    tags$h4("Download all to get a ", icon("folder"), " zipped folder containing:"),
+    card_title(tags$h4("Download all to get a ", icon("folder"), " zipped folder containing:")),
     fluidRow(
-      column(4, tags$h5(icon("file-excel"), "corrected_data_*today's_date*.xlsx"),
+      column(4, tags$h5(icon("file-excel"), "Excel files:"),
              tags$ul(style = "list-style-type: none;",
-               tags$li(icon("table"), "0. Raw Data"),
-               tags$li(icon("table"), "1. Correction Settings"),
-               tags$li(icon("table"), "2. Drift Normalized"),
-               tags$li(icon("table"), "3. Scaled or Normalized"),
-               tags$li(icon("table"), "4. Grouped Data Organized"),
-               tags$li(icon("table"), "5. Grouped Data Fold Change (only when provided a control class)"),
-               tags$li(icon("table"), "Appendix1. Metaboanalyst Ready")
+               tags$li(icon("file-excel"),"Corrected and Transformed Data"),
+               tags$li(icon("file-excel"),"Missing Value Summary "),
+               tags$li(icon("file-excel"),"RSD Summaries"),
+               tags$ul(style = "list-style-type:none;",
+                       tags$li("Corrected Data RSD Summary"),
+                       tags$li("Transformed Data RSD Summary")),
+               tags$li(icon("file-excel"),"Extreme Value Summary"),
+               tags$li(icon("file-excel"),"Metabolite Correlations")
              )),
-      column(4, tags$h5(icon("file-excel"), "rsd_stats_*today's_date*.xlsx"),
-             tags$ul(style = "list-style-type: none;",
-               tags$li(icon("table"), "Raw Metabolite RSD"),
-               tags$li(icon("table"), "Corrected Metabolite RSD or Transformed Corrected Metabolite RSD"),
-               tags$li(icon("table"), "Metabolite RSD Comparison"),
-               tags$li(icon("table"), "Raw Class RSD"),
-               tags$li(icon("table"), "Corrected Class RSD or Transformed Corrected Class RSD"),
-               tags$li(icon("table"), "Class RSD Comparison"),
-               )),
-      column(4, tags$h5(icon("file-excel"), "missing_value_counts_*today's_date*.xlsx"),
-             tags$ul(style = "list-style-type: none;",
-               tags$li(icon("table"), "Metabolite"),
-               tags$li(icon("table"), "Sample"),
-               tags$li(icon("table"), "Class"),
-               tags$li(icon("table"), "Batch")
-             ))
-      ),
-      fluidRow(
-        column(4, tags$h5(icon("file-excel"), "extreme_values_*today's_date*.xlsx"),
-             tags$ul(style = "list-style-type: none;",
-               tags$li(icon("table"), "Sample MD"),
-               tags$li(icon("table"), "Candidates"),
-               tags$li(icon("table"), "Confirmations")
-               )),
       column(4, tags$h5(icon("folder"), " figures"),
              tags$ul(style = "list-style-type: none;",
-               tags$li(icon("folder"), " metabolite figures"),
-               tags$li(icon("folder"), " RSD figures"),
-               tags$li(icon("folder"), "PCA plots")
+                     tags$li(icon("folder"), " metabolite figures"),
+                     tags$li(icon("folder"), " RSD figures"),
+                     tags$li(icon("folder"), "PCA plots")
              )),
       column(4, tags$h5(icon("file-circle-check"), " quality_report.html"),
              tags$ul(style = "list-style-type: none;",
-               tags$li("Report describing all summaries, preprocessing steps, and figures generated from the app.")
+                     tags$li("Report describing all summaries, preprocessing steps, and figures generated from the app.")
              ))
-    ),
+      ),
     uiOutput(ns("download_all_ui"))
   ))
 }
@@ -103,9 +79,21 @@ mod_export_server <- function(id, data, params) {
         openxlsx::saveWorkbook(wb, xlsx_path, overwrite = TRUE)
         
         # Create and save rsd stats data file
-        stats_xlsx_path <- file.path(base_dir, sprintf("rsd_stats_%s.xlsx", Sys.Date()))
-        stats_wb <- export_stats_xlsx(p(), d())
-        openxlsx::saveWorkbook(stats_wb, stats_xlsx_path, overwrite = TRUE)
+        temp_params <- p()
+        temp_params$rsd_compare <- "filtered_cor_data"
+        stats_xlsx_path1 <- file.path(base_dir, sprintf("rsd_stats_%s_%s.xlsx", temp_params$rsd_compare, Sys.Date()))
+        stats_wb1 <- export_stats_xlsx(temp_params, d())
+        openxlsx::saveWorkbook(stats_wb1, stats_xlsx_path1, overwrite = TRUE)
+        
+        temp_params$rsd_compare <- "transformed_cor_data"
+        stats_xlsx_path2 <- file.path(base_dir, sprintf("rsd_stats_%s_%s.xlsx", temp_params$rsd_compare, Sys.Date()))
+        stats_wb2 <- export_stats_xlsx(temp_params, d())
+        openxlsx::saveWorkbook(stats_wb2, stats_xlsx_path2, overwrite = TRUE)
+        
+        # Create and save metabolite correlations data file
+        corr_xlsx_path <- file.path(base_dir, sprintf("metabolite_correlations_%s.xlsx", Sys.Date()))
+        corr_wb <- export_corr_xlsx(d()$all_corr)
+        openxlsx::saveWorkbook(corr_wb, corr_xlsx_path, overwrite = TRUE)
         
         # Create and save outlier data file
         outlier_xlsx_path <- file.path(base_dir, sprintf("extreme_values_%s.xlsx", Sys.Date()))
@@ -123,9 +111,11 @@ mod_export_server <- function(id, data, params) {
           "figures",
           basename(mv_xlsx_path),
           basename(xlsx_path),
-          basename(stats_xlsx_path),
+          basename(stats_xlsx_path1),
           basename(outlier_xlsx_path),
-          "quality_report.html"
+          basename(corr_xlsx_path),
+          "quality_report.html",
+          if (!identical(p()$transform, "none")) basename(stats_xlsx_path2)
         )
         rel <- rel[file.exists(file.path(base_dir, rel))]
         
