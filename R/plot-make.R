@@ -210,6 +210,59 @@ make_pca_loading_plot <- function(p, d) {
   })
 }
 
+#' @keywords internal
+#' @noRd
+make_all_pca_plots <- function(p, d) {
+  build_name <- function(compare, color) {
+    sprintf("pca_%s_%s", compare, color)
+  }
+  
+  # Base grid: plot types x calcs (always for filtered_cor_data)
+  specs <- expand.grid(
+    color_col       = c("batch", "class", "order"),
+    pca_compare   = "filtered_cor_data",
+    stringsAsFactors = FALSE
+  )
+  
+  # Add transformed_cor_data variants only when transform is not "none"
+  if (!identical(p$transform, "none")) {
+    specs_trans <- specs
+    specs_trans$pca_compare <- "transformed_cor_data"
+    specs <- rbind(specs, specs_trans)
+  }
+  
+  pca_plots   <- vector("list", nrow(specs))
+  plot_names  <- character(nrow(specs))
+  
+  for (i in seq_len(nrow(specs))) {
+    temp_params <- p
+    temp_params$color_col <- specs$color_col[i]
+    temp_params$pca_compare   <- specs$pca_compare[i]
+    
+    pca_plots[[i]]  <- make_pca_plot(temp_params, d)
+    plot_names[i]   <- build_name(temp_params$pca_compare,
+                                  temp_params$color_col)
+  }
+  pca_loading_plots <- vector("list", ifelse(!identical(p$transform, "none"), 2, 1))
+  loading_plot_names <- character(ifelse(!identical(p$transform, "none"), 2, 1))
+  temp_params$pca_compare <- "filtered_cor_data"
+  pca_loading_plots[[1]] <- make_pca_loading_plot(temp_params, d)
+  loading_plot_names[1] <- sprintf("pca_loadings_%s", temp_params$pca_compare)
+  
+  if (!identical(p$transform, "none")) {
+    temp_params$pca_compare <- "transformed_cor_data"
+    pca_loading_plots[[2]] <- make_pca_loading_plot(temp_params, d)
+    loading_plot_names[2] <- sprintf("pca_loadings_%s", temp_params$pca_compare)
+  }
+  
+  list(
+    pca_plots   = pca_plots,
+    plot_names  = plot_names,
+    pca_loading_plots = pca_loading_plots,
+    loading_plot_names = loading_plot_names
+  )
+}
+
 #' Make Hotelling PCA plot for report
 #'
 #' @param p List of parameters (must include qcImputeM, samImputeM, remove_imputed).
