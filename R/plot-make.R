@@ -82,6 +82,50 @@ make_rsd_plot <- function(p, d) {
 
 #' @keywords internal
 #' @noRd
+make_all_rsd_plots <- function(p, d) {
+  build_name <- function(plot_type, compare, cal) {
+    sprintf("rsd_%s_%s_%s", plot_type, compare, cal)
+  }
+  
+  # Base grid: plot types x calcs (always for filtered_cor_data)
+  specs <- expand.grid(
+    rsd_plot_type = c("dist", "scatter"),
+    rsd_cal       = c("class-met", "met"),
+    rsd_compare   = "filtered_cor_data",
+    stringsAsFactors = FALSE
+  )
+  
+  # Add transformed_cor_data variants only when transform is not "none"
+  if (!identical(p$transform, "none")) {
+    specs_trans <- specs
+    specs_trans$rsd_compare <- "transformed_cor_data"
+    specs <- rbind(specs, specs_trans)
+  }
+  
+  rsd_plots   <- vector("list", nrow(specs))
+  plot_names  <- character(nrow(specs))
+  
+  for (i in seq_len(nrow(specs))) {
+    temp_params <- p
+    temp_params$rsd_plot_type <- specs$rsd_plot_type[i]
+    temp_params$rsd_compare   <- specs$rsd_compare[i]
+    temp_params$rsd_cal       <- specs$rsd_cal[i]
+    
+    rsd_plots[[i]]  <- make_rsd_plot(temp_params, d)
+    plot_names[i]   <- build_name(temp_params$rsd_plot_type,
+                                  temp_params$rsd_compare,
+                                  temp_params$rsd_cal)
+  }
+  
+  list(
+    rsd_plots   = rsd_plots,
+    plot_names  = plot_names
+  )
+}
+
+
+#' @keywords internal
+#' @noRd
 # Helper for creating the PCA plot
 make_pca_plot <- function(p, d) {
   # get after based on pca_compare selected by user.

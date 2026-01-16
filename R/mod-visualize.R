@@ -231,7 +231,8 @@ mod_visualize_server <- function(id, data, params) {
           pca_compare = input$pca_compare,
           color_col   = input$color_col,
           fig_format  = input$fig_format,
-          remove_imputed = p()$remove_imputed
+          remove_imputed = p()$remove_imputed,
+          transform      = p()$transform
         )
         rv_data <- list(
           filtered           = d()$filtered,
