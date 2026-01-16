@@ -21,10 +21,10 @@ mod_import_ui <- function(id) {
                 shiny::icon("circle-info")
               ),
               report_text_data_req(),
-              shiny::tags$img(
-                src = "example_data_structure.png",
-                style = "width: 100%; height: auto; display: block;"
-              ),
+              #shiny::tags$img(
+              #  src = "example_data_structure.png",
+              #  style = "width: 100%; height: auto; display: block;"
+              #),
               title = "Required data structure and information",
               placement = "auto",
               options = list(container = "body",
