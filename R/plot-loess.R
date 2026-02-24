@@ -2,7 +2,7 @@
 #' @keywords internal
 #' @noRd
 
-met_scatter_loess <- function(data_raw, data_cor, i) {
+met_scatter_loess <- function(data_raw, data_cor, method, i) {
   data_raw <- dplyr::mutate(data_raw, type = ifelse(class=="QC","QC","Sample"),
                             panel = factor("Raw", levels=c("Raw","Corrected")))
   data_cor <- dplyr::mutate(data_cor, type = ifelse(class=="QC","QC","Sample"),
@@ -98,19 +98,42 @@ met_scatter_loess <- function(data_raw, data_cor, i) {
     dplyr::filter(type == "QC", panel == "Corrected") |>
     dplyr::filter(is.finite(order), is.finite(.data[[i]]))
   
-  add_loess <- function(p, df) {
-    has_line   <- nrow(df) >= 3L && dplyr::n_distinct(df$order) >= 2L
-    has_ribbon <- nrow(df) >= 10L && dplyr::n_distinct(df$order) >= 3L
+  add_qc_trend <- function(p, df_qc, method, i, span = 0.75) {
+    # Need enough points + varying x to draw anything meaningful
+    has_line <- nrow(df_qc) >= 3L && dplyr::n_distinct(df_qc$order) >= 2L
+    has_ribbon <- nrow(df_qc) >= 10L && dplyr::n_distinct(df_qc$order) >= 3L
     if (!has_line) return(p)
-    p + ggplot2::geom_smooth(
-      data = df,
-      ggplot2::aes(order, .data[[i]]),
-      method = "loess", formula = "y ~ x", span = 0.75,
-      se = has_ribbon, fill = "#305CDE", linewidth = 0.75, show.legend = FALSE
+    
+    deg <- switch(
+      method,
+      "local constant regression"    = 0L,
+      "local linear regression"      = 1L,  # local linear
+      "local polynomial regression" = 2L,  # local polynomial (quadratic)
+      2L
     )
+    
+    print(deg)
+    
+    p + ggplot2::geom_smooth(
+      data = df_qc,
+      mapping = ggplot2::aes(order, .data[[i]]),
+      method = "loess",
+      formula = y ~ x,
+      span = span,
+      method.args = list(
+        degree = deg,
+        family = "symmetric",
+        control = stats::loess.control(surface = "direct")
+      ),
+      se = has_ribbon,
+      fill = "#305CDE",
+      linewidth = 0.75,
+      show.legend = FALSE
+    )
+    
   }
   
-  p <- add_loess(p, qc_raw)
+  p <- add_qc_trend(p, qc_raw, method = method, i = i, span = 0.75)
   #p <- add_loess(p, qc_cor)
   
   p

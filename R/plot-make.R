@@ -15,8 +15,8 @@ make_met_scatter <- function(d, p, met_col) {
   tryCatch({
     if (cor_method %in% c("Random Forest", "Batchwise Random Forest")) {
       met_scatter_rf(df_raw, df_cor, i = met_col)
-    } else if (cor_method %in% c("local polynomial regression", "Batchwise LOESS")) {
-      met_scatter_loess(df_raw, df_cor, i = met_col)
+    } else if (cor_method %in% c("local polynomial regression", "Batchwise LOESS", "local constant regression", "local linear regression")) {
+      met_scatter_loess(df_raw, df_cor, cor_method, i = met_col)
     } else {
       ggplot2::ggplot() + ggplot2::labs(title = "No correction method selected.")
     }

@@ -24,7 +24,7 @@ correct_data <- function(df, metab_cols, corMethod) {
     parameters <- "fits study samples to the weighted mean of the nearby QC points."
     df_corrected <- loess_correction(df, metab_cols, degree = 0)
   } else if (corMethod == "LL") {
-    correction_str <- "local constant regression"
+    correction_str <- "local linear regression"
     parameters <- "fits study samples to the line created by nearby QC points."
     df_corrected <- loess_correction(df, metab_cols, degree = 1)
   }else if (corMethod == "BW_RF") {
