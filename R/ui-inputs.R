@@ -391,16 +391,16 @@ ui_correction_method <- function(df, ns = identity) {
   choices <- base_choices
   selected <- base_selected
   
-  if (num_batches > 1 && !any(qc_per_batch$qc_in_batch < 5)) {
-    choices <- c(
-      choices,
-      list(
-        "Batchwise random forest"              = "BW_RF",
-        "Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
-      )
-    )
+  #if (num_batches > 1 && !any(qc_per_batch$qc_in_batch < 5)) {
+    #choices <- c(
+      #choices,
+      #list(
+        #"Batchwise random forest"              = "BW_RF",
+        #"Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
+      #)
+    #)
     # keep selected as the base-selected method
-  }
+  #}
   
   shiny::radioButtons(
     inputId  = ns("corMethod"),

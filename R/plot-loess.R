@@ -98,42 +98,38 @@ met_scatter_loess <- function(data_raw, data_cor, method, i) {
     dplyr::filter(type == "QC", panel == "Corrected") |>
     dplyr::filter(is.finite(order), is.finite(.data[[i]]))
   
-  add_qc_trend <- function(p, df_qc, method, i, span = 0.75) {
-    # Need enough points + varying x to draw anything meaningful
-    has_line <- nrow(df_qc) >= 3L && dplyr::n_distinct(df_qc$order) >= 2L
+  add_qc_trend <- function(p, df_qc, method, i, span_val = 0.75) {
+    has_line   <- nrow(df_qc) >= 3L && dplyr::n_distinct(df_qc$order) >= 2L
     has_ribbon <- nrow(df_qc) >= 10L && dplyr::n_distinct(df_qc$order) >= 3L
     if (!has_line) return(p)
     
     deg <- switch(
-      method,
+      tolower(method),
       "local constant regression"    = 0L,
-      "local linear regression"      = 1L,  # local linear
-      "local polynomial regression" = 2L,  # local polynomial (quadratic)
+      "local linear regression"      = 1L,
+      "local polynomial regression"  = 2L,
       2L
     )
     
-    print(deg)
+    span_val <- as.numeric(span_val)[1]
+    if (!is.finite(span_val) || span_val <= 0) span_val <- 0.75
+    if (span_val > 1) span_val <- 1
     
     p + ggplot2::geom_smooth(
       data = df_qc,
       mapping = ggplot2::aes(order, .data[[i]]),
       method = "loess",
       formula = y ~ x,
-      span = span,
-      method.args = list(
-        degree = deg,
-        family = "symmetric",
-        control = stats::loess.control(surface = "direct")
-      ),
+      span = span_val,
+      method.args = list(degree = deg, family = "symmetric"),
       se = has_ribbon,
       fill = "#305CDE",
       linewidth = 0.75,
       show.legend = FALSE
     )
-    
   }
   
-  p <- add_qc_trend(p, qc_raw, method = method, i = i, span = 0.75)
+  p <- add_qc_trend(p, qc_raw, method = method, i = i, span_val = 0.75)
   #p <- add_loess(p, qc_cor)
   
   p
