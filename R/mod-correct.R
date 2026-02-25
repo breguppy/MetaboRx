@@ -19,8 +19,11 @@ mod_correct_ui <- function(id) {
         column(3, tags$h5("Choose Correction Method"), uiOutput(ns(
           "correctionMethod"
         ))),
-        column(3, tags$h5("Unavailable Options"), uiOutput(ns(
-          "unavailable_options"
+        #column(3, tags$h5("Unavailable Options"), uiOutput(ns(
+        #  "unavailable_options"
+        #))),
+        column(3, tags$h5("How to choose a correction method"), uiOutput(ns(
+          "how_to_correct"
         ))),
         actionButton(
           ns("correct"),
@@ -147,10 +150,13 @@ mod_correct_server <- function(id, data, params) {
       ui_correction_method(filtered_r()$df, ns = session$ns)
     })
     
-    output$unavailable_options <- renderUI({
+    #output$unavailable_options <- renderUI({
+    #  df <- filtered_r()$df
+    #  ui_unavailable_options(df)
+    #})
+    output$how_to_correct <- renderUI({
       df <- filtered_r()$df
-      mc <- setdiff(names(df), c('sample','batch','class','order'))
-      ui_unavailable_options(df, mc)
+      ui_how_to_correct(df)
     })
     
     metab_cols_r <- reactive({

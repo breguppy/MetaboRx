@@ -337,7 +337,7 @@ ui_correction_method <- function(df, ns = identity) {
   total_qcs   <- sum(df$class == "QC", na.rm = TRUE)
   
   label_with_info <- shiny::tagList(
-    shiny::span("Correction Method"),
+    shiny::span("Correction Regression Model"),
     bslib::popover(
       shiny::tags$button(
         type = "button",

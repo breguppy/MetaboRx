@@ -59,6 +59,182 @@ ui_qc_missing_warning <- function(df) {
   
 }
 
+ui_how_to_correct <- function(df,
+                              qc_label = "QC",
+                              class_col = "class",
+                              order_col = "order") {
+  stopifnot(is.data.frame(df))
+  stopifnot(class_col %in% names(df))
+  
+  total_qcs <- sum(df[[class_col]] == qc_label, na.rm = TRUE)
+  
+  # Compute QC spacing (assumes order_col exists and is usable at this point)
+  qc_gap_stats <- NULL
+  if (order_col %in% names(df)) {
+    ord <- df[[order_col]]
+    is_qc <- df[[class_col]] == qc_label
+    
+    keep <- !is.na(ord) & !is.na(is_qc)
+    ord <- ord[keep]
+    is_qc <- is_qc[keep]
+    
+    if (!is.numeric(ord)) {
+      ord_num <- suppressWarnings(as.numeric(ord))
+      if (!all(is.na(ord_num))) ord <- ord_num
+    }
+    
+    if (is.numeric(ord) && sum(is_qc) >= 2L) {
+      qc_orders <- sort(ord[is_qc])
+      gaps <- diff(qc_orders)
+      qc_gap_stats <- list(
+        max_gap = max(gaps, na.rm = TRUE),
+        median_gap = stats::median(gaps, na.rm = TRUE)
+      )
+    }
+  }
+  
+  gap_line <- if (!is.null(qc_gap_stats)) {
+    sprintf(
+      "QC spacing (injection order): median gap = %s, max gap = %s",
+      format(qc_gap_stats$median_gap, digits = 3),
+      format(qc_gap_stats$max_gap, digits = 3)
+    )
+  } else {
+    "QC spacing (injection order): unavailable (need ≥2 QCs with valid order)"
+  }
+  
+  summary_bits <- htmltools::tagList(
+    htmltools::tags$div(
+      class = "small text-muted",
+      sprintf("Total QCs detected: %d", total_qcs)
+    ),
+    htmltools::tags$div(
+      class = "small text-muted",
+      gap_line
+    )
+  )
+  
+  # Helper to render conditional warning text
+  warn_span <- function(show, text) {
+    if (!isTRUE(show)) return(NULL)
+    htmltools::tags$span(
+      icon("exclamation-triangle", class = "text-danger-emphasis"),
+      htmltools::tags$span(style = "margin-left: 6px;", text),
+      style = "display:block; margin-top:4px;"
+    )
+  }
+  
+  # Decide overfit-risk flags (data-driven when possible)
+  max_gap <- qc_gap_stats$max_gap %||% NA_real_
+  
+  # LOESS polynomial warning triggers
+  loess2_warn_low_qc <- total_qcs < 9
+  loess2_warn_gap <- is.finite(max_gap) && max_gap > 15
+  
+  # RF warning triggers (more conservative)
+  rf_warn_low_qc <- total_qcs < 12
+  rf_warn_gap <- is.finite(max_gap) && max_gap > 10
+  
+  # Base choices always available
+  items <- list(
+    htmltools::tags$li(
+      htmltools::tags$strong("Local constant: "),
+      "Use when the QC drift trend is flat, dominated by noise, or shows no consistent pattern."
+    ),
+    htmltools::tags$li(
+      htmltools::tags$strong("Local linear: "),
+      "Use when the QC drift trend is a gradual increase or decrease (approximately monotone)."
+    )
+  )
+  
+  # Add local polynomial when allowed
+  if (total_qcs >= 5 && total_qcs <= 8) {
+    items <- c(items, list(
+      htmltools::tags$li(
+        htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+        "Use when the QC drift trend is a smooth curve (nonlinear but smooth).",
+        warn_span(
+          show = loess2_warn_low_qc || loess2_warn_gap,
+          text = paste(
+            "Higher overfit risk with sparse QCs.",
+            if (loess2_warn_low_qc) "With <9 QCs, polynomial fits can be unstable." else "",
+            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15).", format(max_gap, digits = 3)) else "",
+            "If you see oscillations or worse non-QC variability, prefer degree 1."
+          )
+        )
+      )
+    ))
+  }
+  
+  # Add polynomial + RF when allowed
+  if (total_qcs > 8 && total_qcs <= 15) {
+    items <- c(items, list(
+      htmltools::tags$li(
+        htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+        "Use when drift is smooth and curved. Prefer degree 1 if drift is mostly linear.",
+        warn_span(
+          show = loess2_warn_gap,
+          text = paste(
+            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15), which can make polynomial LOESS unstable.", format(max_gap, digits = 3)) else "",
+            "If the correction curve looks wiggly, increase smoothing or use degree 1."
+          )
+        )
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Random forest (QC-RFSC): "),
+        "Use when drift is irregular, has local disruptions, or shows abrupt changes that a smooth curve cannot capture.",
+        warn_span(
+          show = rf_warn_low_qc || rf_warn_gap,
+          text = paste(
+            "Random forest is high-flexibility and can overfit with limited QC support.",
+            if (rf_warn_low_qc) "With <12 QCs, overfit risk is elevated." else "",
+            if (rf_warn_gap) sprintf("Your max QC gap is %s (>10).", format(max_gap, digits = 3)) else "",
+            "Prefer LOESS (degree 1/2) unless LOESS fails to reduce QC drift/RSD."
+          )
+        )
+      )
+    ))
+  }
+  
+  if (total_qcs > 15) {
+    items <- c(items, list(
+      htmltools::tags$li(
+        htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+        "Use when drift is smooth and curved.",
+        warn_span(
+          show = loess2_warn_gap,
+          text = if (loess2_warn_gap) {
+            sprintf("Your max QC gap is %s (>15). Large gaps can make LOESS less reliable between QC anchors.", format(max_gap, digits = 3))
+          } else {
+            NULL
+          }
+        )
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Random forest (QC-RFSC): "),
+        "Use when drift is irregular or has abrupt changes. Often a good option when QC frequency is high.",
+        warn_span(
+          show = rf_warn_gap,
+          text = if (rf_warn_gap) {
+            sprintf("Your max QC gap is %s (>10). Wide QC spacing increases RF overfit risk.", format(max_gap, digits = 3))
+          } else {
+            NULL
+          }
+        )
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Rule of thumb: "),
+        "If both LOESS polynomial and random forest are available, try both and compare QC drift/RSD reduction and non-QC stability."
+      )
+    ))
+  }
+  
+  htmltools::tagList(
+    summary_bits,
+    htmltools::tags$ul(items)
+  )
+}
+
 # Unavailable correction option description for section 2.1 Choose Correction settings
 ui_unavailable_options <- function(df, metab_cols) {
   # If there is only 1 class: class/metabolite impute for samples not available
