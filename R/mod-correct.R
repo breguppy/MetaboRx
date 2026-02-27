@@ -48,9 +48,28 @@ mod_correct_ui <- function(id) {
           "post_cor_filter_block"
         )), width = 400),
         fluidRow(column(
-          8, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
-        ), column(4, 
-                  uiOutput(ns("download_cor_rsd_btn")
+          4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
+        ), 
+        column(4, 
+               shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_rsd_table(),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
+        uiOutput(ns("rsd_comparison_stats"))),
+        column(4, uiOutput(ns("download_cor_rsd_btn")
         ))),
         fluidRow(column(8, uiOutput(
           ns("outliers_table")
@@ -232,7 +251,7 @@ mod_correct_server <- function(id, data, params) {
     })
     
     output$post_cor_filter_info <- renderUI({
-      req(corrected_r())                # ensures step 2.1 done
+      req(corrected_r())
       res <- req(filtered_corrected_r())
       
       remove_imputed <- isTRUE(input$remove_imputed)
@@ -242,6 +261,13 @@ mod_correct_server <- function(id, data, params) {
       ui_postcor_filter_info(res, remove_imputed, rsd_filter, post_cor_all)
     })
     
+    output$rsd_comparison_stats <- renderUI({
+      d <- list(filtered_corrected = filtered_corrected_r(),
+                filtered           = filtered_r())
+      ui_rsd_stats(compare_to = "filtered_cor_data",
+                   list(remove_imputed = input$remove_imputed), 
+                   d)
+    })
     
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())

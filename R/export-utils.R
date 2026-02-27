@@ -698,14 +698,26 @@ report_text_rsd_intro <- function(p, d) {
 #' @noRd
 report_text_rsd_table <- function() {
   htmltools::tagList(
-    htmltools::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
-                      "We include median as a more robust measure of \u0394 RSD."),
-    htmltools::tags$p("\u0394 RSD = After RSD - Before RSD. "),
+    htmltools::strong("Performance Metric"),
+    htmltools::tags$p("\u0394 RSD = RSD after correction \u2212 RSD before correction"),
+    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+                      "grouping samples based on the 'class' column."),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
-      "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
-      " In this situation, a more negative number is disirable for all four \u0394 metrics."
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " In this situation, a more negative number is disirable for all \u0394 metrics."
     ),
+    htmltools::tags$hr(),
+    htmltools::strong("Post-correction Change"),
+    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction.",
+                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+                      "based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " Ideally the percentage decreased should be much higher than the percentage increased."
+    )
   )
 }
 

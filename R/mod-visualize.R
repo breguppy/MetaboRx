@@ -54,24 +54,6 @@ mod_visualize_ui <- function(id) {
           )
         ),
         ui_rsd_eval(ns),
-        shiny::tags$div(
-          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-          shiny::tags$strong("Metric guide"),
-          bslib::popover(
-            shiny::tags$button(
-              type = "button",
-              class = "btn btn-link p-0",
-              style = "text-decoration:none;",
-              shiny::icon("circle-info")
-            ),
-            report_text_rsd_table(),
-            title = "What metrics are used to evaluate RSD?",
-            placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
-          )
-        ),
-        uiOutput(ns("rsd_comparison_stats")),
         width = 400
       ),
       plotOutput(ns("rsd_comparison_plot"), height = "540px", width = "900px") %>% withSpinner(color = "#404040")
@@ -157,11 +139,6 @@ mod_visualize_server <- function(id, data, params) {
       req(input$rsd_compare, input$rsd_cal)
       
       make_rsd_plot(list(rsd_compare = input$rsd_compare, rsd_cal = input$rsd_cal, rsd_plot_type = input$rsd_plot_type, remove_imputed = p()$remove_imputed), d())
-    })
-    
-    output$rsd_comparison_stats <- renderUI({
-      req(input$rsd_compare, input$rsd_cal)
-      ui_rsd_stats(list(rsd_compare = input$rsd_compare, rsd_cal = input$rsd_cal, remove_imputed = p()$remove_imputed), d())
     })
     
     #-- PCA plot

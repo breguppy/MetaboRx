@@ -3,7 +3,7 @@
 
 # Metric card for 1.2 Select non-metabolite columns
 metric_card <- function(label, value) {
-  div(
+  htmltools::tags$div(
     style = "background:#f8f9fa; padding:10px; border-radius:8px; flex:1;",
     p(style = "font-size:1.4em; font-weight:bold; margin:0;", value),
     h5(style = "margin:0;", label)
@@ -449,16 +449,22 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
                                    post_cor_filter) {
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
+    df <- filtered_corrected_result$df_mv
   } else {
     removed <- filtered_corrected_result$removed_metabolites_no_mv
+    df <- filtered_corrected_result$df_no_mv
   }
   n_removed <- length(removed)
   
   # get ISTD/ITSD metabolites
-  is_istd <- grepl("^(ISTD|ITSD)", removed, ignore.case = TRUE)
+  is_istd <- grepl("ISTD|ITSD", removed, ignore.case = FALSE)
   istd_names <- removed[is_istd]
   n_istd <- length(istd_names)
   
+  met_cols <- setdiff(names(df), c('sample','batch','class','order'))
+  total <- n_removed + length(met_cols)
+  
+  pct_below <- round((length(met_cols) / total) * 100, digits = 1)
   # optional warning banner
   warning_ui <- NULL
   if (n_istd > 0) {
@@ -475,6 +481,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   if (post_cor_filter == FALSE) {
     ui <- list(
       warning_ui,
+      metric_card(paste0("Metabolites with QC RSD at or below ", rsd_cutoff, "%"), paste0(pct_below, "%")),
       tags$span(
         style = "color: darkorange; font-weight: bold;",
         paste0(
