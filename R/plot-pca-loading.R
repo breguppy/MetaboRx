@@ -2,7 +2,7 @@
 #' @keywords internal
 #' @noRd
 plot_pca_loading <- function(p, before, after, compared_to,
-                             top_n = 10, label_width = 28) {
+                             top_n = 5, label_width = 28) {
   # Overlapping metabolite columns
   meta_cols   <- c("sample", "batch", "class", "order")
   metab_cols  <- intersect(setdiff(names(before), meta_cols),
