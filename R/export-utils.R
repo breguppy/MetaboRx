@@ -706,7 +706,7 @@ report_text_rsd_table <- function() {
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction, RSD should decrease for both QC and non-QC samples. ",
-      " In this situation, a more negative number is disirable for all \u0394 metrics."
+      " In this situation, a more negative number is desirable for all \u0394 metrics."
     ),
     htmltools::tags$hr(),
     htmltools::strong("Post-correction Change"),
@@ -716,7 +716,7 @@ report_text_rsd_table <- function() {
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction, RSD should decrease for both QC and non-QC samples. ",
-      " Ideally the percentage decreased should be much higher than the percentage increased."
+      " Ideally, the percentage decreased should be much higher than the percentage increased."
     )
   )
 }
