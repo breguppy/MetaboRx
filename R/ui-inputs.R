@@ -478,7 +478,7 @@ ui_post_cor_filter <- function(ns) {
 #' @keywords internal
 #' @noRd
 ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
-  has_istd <- any(grepl("^(ISTD|ITSD)", metab_cols, ignore.case = TRUE))
+  has_istd <- any(grepl("ISTD|ITSD", metab_cols, ignore.case = FALSE))
   
   choices <- if (has_istd) {
     list(
@@ -522,7 +522,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
         "Exclude internal standards from post-correction transformation.",
         TRUE
       ),
-      "Check this box if you do not want internal standards to be included in the transformation calculation.",
+      "Check this box if you do not want internal standards to be included in the transformation calculation. Internal standards will appear in this table, but not in the '3. Scaled or Normalized' tab of the Excel file.",
       placement = "right"
     ),
     shiny::conditionalPanel(

@@ -96,8 +96,8 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
   metab_cols_no_mv <- setdiff(names(df_no_mv), meta_cols)
   
   # Identify ISTD columns from the full metabolite sets
-  istd_names_mv <- metab_cols_mv[grepl("^(ISTD|ITSD)", metab_cols_mv, ignore.case = TRUE)]
-  istd_names_no_mv <- metab_cols_no_mv[grepl("^(ISTD|ITSD)", metab_cols_no_mv, ignore.case = TRUE)]
+  istd_names_mv <- metab_cols_mv[grepl("ISTD|ITSD", metab_cols_mv, ignore.case = FALSE)]
+  istd_names_no_mv <- metab_cols_no_mv[grepl("ISTD|ITSD", metab_cols_no_mv, ignore.case = FALSE)]
   
   
   withheld_cols_mv <- withheld_cols
