@@ -432,13 +432,14 @@ report_text_correction_descriptions <- function() {
 report_text_rsd_cal <- function() {
   htmltools::tags$p(
     htmltools::strong("Relative Standard Deviation (RSD): "),
-    "Computed for each metabolite by dividing standard deviation by mean and ",
-    "expressed as a percentage. Describes standard deviation as a percentage ",
-    "of the mean. Metabolites with QC RSD above the set threshold are removed ",
-    "from the dataset and are listed here."
+    "RSD = (SD / mean) × 100, ",
+    "where SD is the standard deviation and mean is the average metabolite signal ",
+    "across samples. Mean and standard deviation are computed for each metabolite ",
+    "with missing values removed. RSD describes variability as a ",
+    "percentage of the mean. Metabolites with QC RSD above the set threshold ",
+    "are removed from the dataset and are listed here."
   )
 }
-
 #' Extreme value detection description.
 #' @keywords internal
 #' @noRd
