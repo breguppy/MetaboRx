@@ -70,12 +70,19 @@ mod_correct_ui <- function(id) {
         ),
         uiOutput(ns("rsd_comparison_stats"))),
         column(4, uiOutput(ns("download_cor_rsd_btn")
-        ))),
-        fluidRow(column(8, uiOutput(
-          ns("outliers_table")
-        )), column(4, uiOutput(
-          ns("download_ev_btn")
         )))
+      )
+    ),
+    card(
+      fluidRow(
+        column(
+          width = 9,
+          uiOutput(ns("outliers_table"))
+        ),
+        column(
+          width = 3,
+          uiOutput(ns("download_ev_btn"))
+        )
       )
     ),
     card(layout_sidebar(

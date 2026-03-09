@@ -535,7 +535,12 @@ ui_outliers <- function(p, d,
   n_extreme_values  <- nrow(ev)
   
   cards <- shiny::div(
-    style = "display:flex; gap:10px; margin-bottom:10px;",
+    style = paste(
+      "display:flex;",
+      "gap:10px;",
+      "margin-bottom:10px;",
+      "flex-wrap:wrap;"
+    ),
     metric_card("Samples outside the Hotelling's T^2 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
@@ -547,13 +552,28 @@ ui_outliers <- function(p, d,
   }
   
   if (nrow(ev) == 0L) {
-    return(shiny::tagList(
-      plot_ui,
-      cards,
-      shiny::tags$em("No extreme metabolite values detected in outlier samples.")
-    ))
+    return(
+      shiny::tagList(
+        shiny::tags$div(
+          style = paste(
+            "display:flex;",
+            "gap:20px;",
+            "align-items:flex-start;",
+            "width:100%;"
+          ),
+          shiny::tags$div(
+            style = "flex: 0 0 42%;",
+            plot_ui
+          ),
+          shiny::tags$div(
+            style = "flex: 1 1 58%; min-width:0;",
+            cards,
+            shiny::tags$em("No extreme metabolite values detected in outlier samples.")
+          )
+        )
+      )
+    )
   }
-  
   required_cols <- c(
     sample_col, class_col, "metabolite",
     "z_global", "abs_z_global", "z_class", "abs_z_class", "T2"
@@ -603,13 +623,31 @@ ui_outliers <- function(p, d,
   )
   
   shiny::tagList(
-    plot_ui,
-    cards,
-    shiny::tags$span(
-      "Top 10 potential extreme values are listed below. ",
-      "The full list of potential extreme values 'extreme_values_*today's_date*.xlsx' ",
-      "is available for download."
-    ),
-    table_tag
+    shiny::tags$div(
+      style = paste(
+        "display:flex;",
+        "gap:20px;",
+        "align-items:flex-start;",
+        "width:100%;"
+      ),
+      shiny::tags$div(
+        style = "flex: 0 0 42%;",
+        plot_ui
+      ),
+      shiny::tags$div(
+        style = "flex: 1 1 58%; min-width:0;",
+        cards,
+        shiny::tags$p(
+          "Top 10 potential extreme values are listed below. ",
+          "The full list of potential extreme values ",
+          "'extreme_values_*today's_date*.xlsx' ",
+          "is available for download."
+        ),
+        shiny::tags$div(
+          style = "overflow-x:auto; width:100%;",
+          table_tag
+        )
+      )
+    )
   )
 }
