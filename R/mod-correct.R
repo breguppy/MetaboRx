@@ -120,7 +120,7 @@ mod_correct_ui <- function(id) {
     ))),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "2.4 Metabolite Correlation",
+        title = "2.4 Metabolite Correlation (Optional)",
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Pearson's r correlations"),
@@ -779,7 +779,7 @@ mod_correct_server <- function(id, data, params) {
     
     #---------- Next: Visualize Data
     output$next_visualization_ui <- renderUI({
-      req(all_corr_r()) 
+      #req(all_corr_r()) 
       actionButton(
         ns("next_visualization"), 
         "Next: Evaluate and Visualize Correction",
@@ -787,7 +787,7 @@ mod_correct_server <- function(id, data, params) {
         )
     })
     observeEvent(input$next_visualization, {
-      req(all_corr_r())
+      #req(all_corr_r())
       validate(
         need(!is.null(filtered_corrected_r()), "Missing corrected data"),
         need(!is.null(transformed_r()), "Missing transformed data data")
