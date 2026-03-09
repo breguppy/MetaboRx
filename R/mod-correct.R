@@ -95,10 +95,29 @@ mod_correct_ui <- function(id) {
       ),
       column(4, uiOutput(ns(
         "download_cor_btn"
-      )), uiOutput(ns(
+      )))),
+      fluidRow(
+        column(4, shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_rsd_tc_table(),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),uiOutput(ns("post_transform_rsd_compare"))),
+      column(4, uiOutput(ns(
         "download_tc_rsd_btn"
-      ))))
-    )),
+      )))
+    ))),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "2.4 Metabolite Correlation",
@@ -467,6 +486,15 @@ mod_correct_server <- function(id, data, params) {
         df <- transformed_r()$df_no_mv
       }
       df
+    })
+    
+    output$post_transform_rsd_compare <- renderUI({
+      d <- list(filtered_corrected = filtered_corrected_r(),
+                filtered           = filtered_r(),
+                transformed        = transformed_r())
+      ui_rsd_stats(compare_to = "transformed_data",
+                   list(remove_imputed = input$remove_imputed), 
+                   d)
     })
     
     output$download_tc_rsd_btn <- renderUI({

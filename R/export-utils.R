@@ -722,6 +722,34 @@ report_text_rsd_table <- function() {
   )
 }
 
+#' Change in RSD table description.
+#' @keywords internal
+#' @noRd
+report_text_rsd_tc_table <- function() {
+  htmltools::tagList(
+    htmltools::strong("Performance Metric"),
+    htmltools::tags$p("\u0394 RSD = RSD after correction and transformation \u2212 RSD in raw data"),
+    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+                      "grouping samples based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " In this situation, a more negative number is desirable for all \u0394 metrics."
+    ),
+    htmltools::tags$hr(),
+    htmltools::strong("Post-transformation Change"),
+    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction and transformation.",
+                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+                      "based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction and transformation, RSD should decrease for both QC and non-QC samples. ",
+      " Ideally, the percentage decreased should be much higher than the percentage increased."
+    )
+  )
+}
+
 #' PCA plot description
 #' @keywords internal
 #' @noRd

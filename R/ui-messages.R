@@ -310,12 +310,14 @@ ui_rsd_stats <- function(compare_to, p, d) {
   df_before <- d$filtered$df
   # Determine df_after based on rsd_compare selected by user.
   if (compare_to == "filtered_cor_data") {
+    title <- "Post-correction Changes"
     if (isTRUE(p$remove_imputed)) {
       df_after <- d$filtered_corrected$df_mv
     } else {
       df_after <- d$filtered_corrected$df_no_mv
     }
   } else {
+    title <- "Post-transformation Changes"
     if (isTRUE(p$remove_imputed)) {
       df_after <- d$transformed$df_mv
     } else {
@@ -382,7 +384,7 @@ ui_rsd_stats <- function(compare_to, p, d) {
       style = "border-collapse: collapse; margin-top:10px;",
       htmltools::tags$thead(
         htmltools::tags$tr(
-          htmltools::tags$th("Post-correction Changes",  style="padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"),
+          htmltools::tags$th(title,  style="padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"),
           htmltools::tags$th("Increased",   style="padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;"),
           htmltools::tags$th("Decreased",   style="padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;")
         )
