@@ -3,25 +3,57 @@
 #' @keywords internal
 #' @noRd
 filter_by_missing <- function(df, metab_cols, mv_cutoff) {
+  if (!"class" %in% names(df)) {
+    stop("`df` must contain a 'class' column.")
+  }
+  
   # get metadata columns
   meta_cols <- setdiff(names(df), metab_cols)
   
-  # Compute percentage of missing values per metabolite column
-  missing_pct <- sapply(df[metab_cols], function(col) {
-    mean(is.na(col)) * 100
-  })
+  # classes used for group-wise missingness checks
+  classes_seen <- sort(unique(df$class))
   
-  # Keep only columns with missing percentage <= mv_cutoff
-  mv_keep_cols <- metab_cols[missing_pct <= mv_cutoff]
+  # compute class-specific missing percentages for each metabolite
+  # missing is defined as NA or <= 0
+  missing_pct_by_class <- lapply(metab_cols, function(met) {
+    vals <- df[[met]]
+    
+    stats::setNames(
+      vapply(classes_seen, function(cl) {
+        idx <- which(df$class == cl)
+        
+        if (length(idx) == 0L) {
+          return(100)
+        }
+        
+        x <- vals[idx]
+        mean(is.na(x) | x <= 0) * 100
+      }, numeric(1L)),
+      classes_seen
+    )
+  })
+  names(missing_pct_by_class) <- metab_cols
+  
+  # remove metabolite if any class exceeds mv_cutoff
+  mv_keep_cols <- metab_cols[
+    vapply(
+      missing_pct_by_class,
+      function(x) all(x <= mv_cutoff),
+      logical(1L)
+    )
+  ]
   
   # list columns removed due to missing value %
   mv_removed_cols <- setdiff(metab_cols, mv_keep_cols)
   
-  # Get all class-metabolite pairs where all values are missing
-  classes_seen <- sort(unique(df$class))
-  
+  # Get all class-metabolite pairs where all values are missing-like
+  # among retained metabolites. Missing-like means NA or <= 0.
   class_metab_all_missing <- if (length(classes_seen) == 0L || length(mv_keep_cols) == 0L) {
-    data.frame(class = character(0), metabolite = character(0), n_rows_in_class = integer(0))
+    data.frame(
+      class = character(0),
+      metabolite = character(0),
+      n_rows_in_class = integer(0)
+    )
   } else {
     out <- vector("list", length(classes_seen))
     names(out) <- classes_seen
@@ -30,12 +62,15 @@ filter_by_missing <- function(df, metab_cols, mv_cutoff) {
       idx <- which(df$class == cl)
       n_in_class <- length(idx)
       
-      # If no rows for this class, treat as "all missing" for every kept metabolite
       if (n_in_class == 0L) {
         miss_all <- rep(TRUE, length(mv_keep_cols))
       } else {
         sub <- df[idx, mv_keep_cols, drop = FALSE]
-        miss_all <- vapply(sub, function(x) all(is.na(x)), logical(1L))
+        miss_all <- vapply(
+          sub,
+          function(x) all(is.na(x) | x <= 0),
+          logical(1L)
+        )
       }
       
       mets <- mv_keep_cols[miss_all]
@@ -52,19 +87,25 @@ filter_by_missing <- function(df, metab_cols, mv_cutoff) {
     }
     
     do.call(rbind, Filter(Negate(is.null), out)) %||%
-      data.frame(class = character(0), metabolite = character(0), n_rows_in_class = integer(0))
+      data.frame(
+        class = character(0),
+        metabolite = character(0),
+        n_rows_in_class = integer(0)
+      )
   }
   
   # filter data by metabolite missing value
   df_filtered <- df[, c(meta_cols, mv_keep_cols), drop = FALSE]
   
-  # Get metabolites that have QCs with missing values
+  # Get retained metabolites that have QC missing-like values
   qc_idx <- which(df_filtered$class == "QC")
   if (length(mv_keep_cols) == 0L || length(qc_idx) == 0L) {
     qc_missing_mets <- character(0)
   } else {
     sub <- df_filtered[qc_idx, mv_keep_cols, drop = FALSE]
-    qc_missing_mets <- mv_keep_cols[colSums(is.na(sub)) > 0]
+    qc_missing_mets <- mv_keep_cols[
+      vapply(sub, function(x) any(is.na(x) | x <= 0), logical(1L))
+    ]
   }
   
   return(list(

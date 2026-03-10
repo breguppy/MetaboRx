@@ -251,7 +251,7 @@ mod_import_server <- function(id) {
     output$download_mv_btn <- renderUI({
       req(filtered_r())
       download_card("Download Missing Value Summary",
-                    "Creates Excel file with missing value summarized by metabolite, sample, class, and batch.",
+                    "Creates Excel file with missing value summarized by metabolite, sample, class, batch and class-metabolite.",
                     div(
                       style = "width: 100%; text-align: center;",
                       div(

@@ -165,7 +165,7 @@ ui_control_class_selector <- function(df, ns) {
 ui_filter_slider <- function(ns) {
   tooltip(
     sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites with missing % above this threshold are removed.", 
+    "Metabolites with missing % above this threshold for at least 1 class are removed.", 
     placement = "right"
   )
 }
