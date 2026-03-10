@@ -24,8 +24,11 @@ To install the QCcorrection package:
 # Install QCcorrection (core functionality)
 remotes::install_github("breguppy/QCcorrection", dependencies = TRUE)
 
-# Install optional features
-QCcorrection::install_all_dependencies()
+# make sure required packages are installed
+QCcorrection::check_required_dependencies()
+
+# install optional dependencies
+QCcorrection::install_optional_dependencies()
 ```
 
 ## To run App
