@@ -124,7 +124,7 @@ QCcorrection:::report_text_rsd_plots()
 
 ```{r}
 QCcorrection:::report_text_rsd_table()
-QCcorrection:::ui_rsd_stats(params$p, params$d)
+QCcorrection:::ui_rsd_stats("filtered_cor_data", params$p, params$d)
 ```
 
 ### PCA Comparison

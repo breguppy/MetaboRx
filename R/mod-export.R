@@ -19,7 +19,7 @@ mod_export_ui <- function(id) {
                        tags$li("Corrected Data RSD Summary"),
                        tags$li("Transformed Data RSD Summary")),
                tags$li(icon("file-excel"),"Extreme Value Summary"),
-               tags$li(icon("file-excel"),"Metabolite Correlations")
+               tags$li(icon("file-excel"),"Metabolite Correlations (optional)")
              )),
       column(4, tags$h5(icon("folder"), " figures"),
              tags$ul(style = "list-style-type: none;",
@@ -91,9 +91,12 @@ mod_export_server <- function(id, data, params) {
         openxlsx::saveWorkbook(stats_wb2, stats_xlsx_path2, overwrite = TRUE)
         
         # Create and save metabolite correlations data file
-        corr_xlsx_path <- file.path(base_dir, sprintf("metabolite_correlations_%s.xlsx", Sys.Date()))
-        corr_wb <- export_corr_xlsx(d()$all_corr)
-        openxlsx::saveWorkbook(corr_wb, corr_xlsx_path, overwrite = TRUE)
+        if (!is.null(d()$all_corr)) {
+          corr_xlsx_path <- file.path(base_dir, sprintf("metabolite_correlations_%s.xlsx", Sys.Date()))
+          corr_wb <- export_corr_xlsx(d()$all_corr)
+          openxlsx::saveWorkbook(corr_wb, corr_xlsx_path, overwrite = TRUE)
+        }
+        
         
         # Create and save outlier data file
         outlier_xlsx_path <- file.path(base_dir, sprintf("extreme_values_%s.xlsx", Sys.Date()))
@@ -113,7 +116,7 @@ mod_export_server <- function(id, data, params) {
           basename(xlsx_path),
           basename(stats_xlsx_path1),
           basename(outlier_xlsx_path),
-          basename(corr_xlsx_path),
+          if (!is.null(d()$all_corr)) basename(corr_xlsx_path),
           "quality_report.html",
           if (!identical(p()$transform, "none")) basename(stats_xlsx_path2)
         )
