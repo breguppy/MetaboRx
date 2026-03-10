@@ -21,6 +21,9 @@ clean_data <- function(df,
   names(df)[names(df) == class]  <- "class"
   names(df)[names(df) == order]  <- "order"
   
+  # make class column factor
+  df$class <- as.character(df$class)
+  
   # get names of non-numeric columns that are not metadata columns
   non_numeric_cols <- names(df)[vapply(df, function(col) {
     vals <- col[!is.na(col)]
