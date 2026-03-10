@@ -33,7 +33,7 @@ export_figures <- function(p, d, out_dir = tempdir()) {
       )
     } else {
       ggplot2::ggsave(
-        path,
+        filename = path,
         plot = plot,
         width = w,
         height = h,
