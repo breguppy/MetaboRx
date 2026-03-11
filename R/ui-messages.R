@@ -224,7 +224,7 @@ ui_how_to_correct <- function(df,
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Rule of thumb: "),
-        "If both LOESS polynomial and random forest are available, try both and compare QC drift/RSD reduction and non-QC stability."
+        "If both local polynomial and random forest are available, try both and compare RSD reduction and potential extreme values below. Then compare QC drift and PCA on the next tab."
       )
     ))
   }
