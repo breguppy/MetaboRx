@@ -782,16 +782,17 @@ export_pca_loadings_xlsx <- function(
   }
   
   wb <- openxlsx::createWorkbook()
-  
-  header_style <- openxlsx::createStyle(
-    textDecoration = "bold",
-    fgFill = "#D9EAF7",
-    border = "bottom"
-  )
+  bold  <- openxlsx::createStyle(textDecoration = "Bold")
+  note  <- openxlsx::createStyle(wrapText = TRUE,
+                                 valign = "top",
+                                 fgFill = "#f8cbad")
   
   num_style <- openxlsx::createStyle(numFmt = "0.0000")
   
   ev_all <- list()
+  
+  # leave space for title + description + blank row
+  data_start_row <- 5L
   
   for (nm in names(pca_results)) {
     res <- compute_pca_loadings_table_from_result(
@@ -809,23 +810,23 @@ export_pca_loadings_xlsx <- function(
     
     sheet_name <- substr(sheet_name, 1L, 31L)
     
+    description_text <- paste(
+      "PCA loadings describe how strongly each metabolite contributes to each principal component (PC).",
+      "Larger absolute loading values indicate stronger influence on that PC.",
+      "The sign indicates direction along the component, but the magnitude is usually the more important quantity when identifying influential metabolites.",
+      "Columns abs_PC1 and abs_PC2 give the absolute loading magnitude for PC1 and PC2, and max_abs_loading gives the largest absolute loading across all PCs for each metabolite."
+    )
+    
     openxlsx::addWorksheet(wb, sheet_name)
-    openxlsx::writeDataTable(
+    openxlsx::writeData(
       wb,
       sheet = sheet_name,
       x = res$loadings,
-      withFilter = TRUE,
-      tableStyle = "TableStyleMedium2"
-    )
-    
-    openxlsx::addStyle(
-      wb,
-      sheet = sheet_name,
-      style = header_style,
-      rows = 1,
-      cols = seq_len(ncol(res$loadings)),
-      gridExpand = TRUE,
-      stack = TRUE
+      startRow = data_start_row,
+      startCol = 1,
+      rowNames = FALSE,
+      headerStyle = bold,
+      withFilter = TRUE
     )
     
     numeric_cols <- which(vapply(res$loadings, is.numeric, logical(1)))
@@ -834,72 +835,104 @@ export_pca_loadings_xlsx <- function(
         wb,
         sheet = sheet_name,
         style = num_style,
-        rows = 2:(nrow(res$loadings) + 1L),
+        rows = (data_start_row + 1L):(data_start_row + nrow(res$loadings)),
         cols = numeric_cols,
         gridExpand = TRUE,
         stack = TRUE
       )
     }
+    openxlsx::setColWidths(wb, sheet = sheet_name, cols = 1, widths = 25)
+    openxlsx::setColWidths(wb, sheet = sheet_name, cols = 2:ncol(res$loadings), widths = "auto")
     
-    openxlsx::freezePane(wb, sheet = sheet_name, firstRow = TRUE)
-    openxlsx::setColWidths(
+    openxlsx::writeData(
       wb,
       sheet = sheet_name,
-      cols = 1:ncol(res$loadings),
-      widths = "auto"
+      x = description_text,
+      startRow = 1,
+      startCol = 1,
+      colNames = FALSE,
+      rowNames = FALSE
     )
+    openxlsx::mergeCells(wb, sheet = sheet_name, cols = 1:8, rows = 1)
+    openxlsx::addStyle(
+      wb,
+      sheet = sheet_name,
+      style = note,
+      rows = 1,
+      cols = 1,
+      gridExpand = TRUE
+    )
+    openxlsx::setRowHeights(wb,  sheet = sheet_name, rows = 1, heights = 60)
     
     ev_all[[nm]] <- res$explained_variance
   }
   
   explained_variance_df <- do.call(rbind, ev_all)
   
-  openxlsx::addWorksheet(wb, "Explained Variance")
-  openxlsx::writeDataTable(
-    wb,
-    sheet = "Explained Variance",
-    x = explained_variance_df,
-    withFilter = TRUE,
-    tableStyle = "TableStyleMedium2"
+  ev_sheet_name <- "Explained Variance"
+  ev_description_text <- paste(
+    "Explained variance gives the proportion of total variance captured by each principal component (PC).",
+    "Higher explained_variance means that PC summarizes more of the structure in the data.",
+    "cumulative_explained_variance shows the running total across PCs and is useful for assessing how many components are needed to represent the dataset."
   )
   
-  openxlsx::addStyle(
+  openxlsx::addWorksheet(wb, ev_sheet_name)
+  openxlsx::writeData(
     wb,
-    sheet = "Explained Variance",
-    style = header_style,
-    rows = 1,
-    cols = seq_len(ncol(explained_variance_df)),
-    gridExpand = TRUE,
-    stack = TRUE
+    sheet = ev_sheet_name,
+    x = explained_variance_df,
+    startRow = data_start_row,
+    startCol = 1,
+    rowNames = FALSE,
+    headerStyle = bold,
+    withFilter = TRUE
   )
   
   numeric_cols_ev <- which(vapply(explained_variance_df, is.numeric, logical(1)))
   if (length(numeric_cols_ev) > 0L) {
     openxlsx::addStyle(
       wb,
-      sheet = "Explained Variance",
+      sheet = ev_sheet_name,
       style = num_style,
-      rows = 2:(nrow(explained_variance_df) + 1L),
+      rows = (data_start_row + 1L):(data_start_row + nrow(explained_variance_df)),
       cols = numeric_cols_ev,
       gridExpand = TRUE,
       stack = TRUE
     )
   }
-  
-  openxlsx::freezePane(wb, sheet = "Explained Variance", firstRow = TRUE)
+  openxlsx::setColWidths(wb, sheet = ev_sheet_name, cols = 1, widths = 25)
   openxlsx::setColWidths(
     wb,
-    sheet = "Explained Variance",
-    cols = 1:ncol(explained_variance_df),
+    sheet = ev_sheet_name,
+    cols = 2:ncol(explained_variance_df),
     widths = "auto"
   )
+  openxlsx::writeData(
+    wb,
+    sheet = ev_sheet_name,
+    x = ev_description_text,
+    startRow = 1,
+    startCol = 1,
+    colNames = FALSE,
+    rowNames = FALSE
+  )
   
+  openxlsx::mergeCells(wb, sheet = ev_sheet_name, cols = 1:8, rows = 1)
+  openxlsx::addStyle(
+    wb,
+    sheet = ev_sheet_name,
+    style = note,
+    rows = 1,
+    cols = 1,
+    gridExpand = TRUE
+  )
+  openxlsx::setRowHeights(wb,  sheet = ev_sheet_name, rows = 1, heights = 60)
+
   out_path <- file.path(pca_dir, file_name)
   openxlsx::saveWorkbook(wb, out_path, overwrite = TRUE)
   
   normalizePath(out_path, winslash = "/", mustWork = TRUE)
 }
-
 
 #' Get before/after data for a PCA comparison option
 #'
