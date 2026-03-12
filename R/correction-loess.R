@@ -48,7 +48,7 @@
 
 
 
-loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 5) {
+loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 3) {
   df <- df[order(df$order), , drop = FALSE]
   if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC")))
     stop("First and last samples must be QCs.")
