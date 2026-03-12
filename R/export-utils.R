@@ -129,8 +129,9 @@ report_text_data_req <- function() {
 report_text_data_inspection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "Before correction, the app performs a lightweight cleaning step and runs a set of checks ",
-      "so you can confirm the dataset is formatted correctly and identify common quality issues."
+      "Before correction, the app performs a lightweight cleaning and runs a set of checks ",
+      "confirming the dataset is formatted correctly. This step identifies common quality issues ",
+      "by flagging invaild metabolite values, duplicate metabolites/columns, and possible contaminates."
     ),
     
     htmltools::tags$h4("Cleaning performed"),
@@ -234,11 +235,25 @@ report_text_withheld_columns <- function(p, d) {
 #' @noRd
 report_text_mv_filter <- function() {
   htmltools::tagList(
-    htmltools::tags$p("Metabolites with missing value percentage above the selected threshold are removed from the dataset."),
-    htmltools::tags$p("After filtering by missing value percentage, metabolites that have at least 1 missing value for QC samples are displayed.",
-                "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
-    htmltools::tags$p("If a metabolite is missing for all samples in a single class, a warning will appear stating the class and metabolite with all missing values."),
-    htmltools::tags$p("Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, and class.")
+    htmltools::tags$p("Metabolites with missing value percentage above the ",
+      "selected threshold for at least 1 sample class are removed from the ",
+      " dataset. After filtering by missing value percentage, metabolites that ",
+      "have at least 1 missing value for QC samples are displayed. Since missing",
+      "values for QC samples is not common, further investigation is need to ",
+      "determine if the value is truly not detected."),
+    htmltools::tags$p("If a metabolite is missing for all samples in a single ",
+    "class, a warning will appear stating the class and metabolite with all ",
+    "missing values."),
+    htmltools::tags$h4("How to use this section"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        "Review the metabolite that are removed based on missing value percentage."
+      ),
+      htmltools::tags$li("Double check that QC missing values are truly missing in the raw data."),
+      htmltools::tags$li(
+        "Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, class, and class-metabolite."
+      ),
+    )
   )
 }
 
@@ -256,18 +271,6 @@ report_text_correlations <- function() {
       "To further investigate metabolite correlations view the Excel file '*_metabolite_correlations.xlsx'. ",
       "Take special note of any pair of metabolites what have strong correlation, but no biological explanation and investigate further if needed. "
     )
-    # htmltools::tags$p(
-    #   "Two metababolites might have a strong positive linear correlation without a biological explanation if "
-    # ),
-    # htmltools::tags$ul(
-    #   htmltools::tags$li(
-    #     "they are from the same chromotography peak, but viewed under different filters during the peak-picking process."
-    #   ),
-    #   htmltools::tags$li(
-    #     "They have similar signal drift patterns that confounds biological signal."
-    #   )
-    # ),
-    
   )
 }
 
@@ -344,24 +347,84 @@ report_text_correction <- function(p, d) {
 #' @noRd
 report_text_correction_descriptions <- function() {
   htmltools::tagList(
-    htmltools::tags$p("QC-based signal drift correction methods:"),
+    htmltools::tags$strong("QC-based signal drift correction methods:"),
     htmltools::tags$ul(
       htmltools::tags$li(
-        htmltools::strong("Random Forest (RF) = QC-RFSC: "),
-        "Fit a random forest model using QC samples (QC intensity vs injection order) to estimate drift and correct samples."
+        htmltools::strong("Local constant regression (Nadaraya–Watson estimator): "),
+        "Uses the weighted mean of nearby QC samples (vs injection order) to estimate drift and correct samples.",
+        htmltools::tags$ul(
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Strengths: "),
+              "Most stable and least complex method."
+            )
+          ),
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Weaknesses: "),
+              "Can underfit real signal drift and leave residual trend."
+            )
+          )
+        )
       ),
       htmltools::tags$li(
-        htmltools::strong("Local Polynomial Fit (LOESS) = QC-RLSC: "),
-        "Uses LOESS smoothing on QC samples to estimate drift and correct samples."
+        htmltools::strong("Local linear regression: "),
+        "Uses weighted local lines fit to QC samples (vs injection order) to estimate drift and correct samples.",
+        htmltools::tags$ul(
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Strengths: "),
+              "Stable and captures gradual increasing or decreasing drift trends."
+            )
+          ),
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Weaknesses: "),
+              "Cannot capture strong curvature well and can chase QC noise when QCs are sparse."
+            )
+          )
+        )
       ),
       htmltools::tags$li(
-        htmltools::strong("Batchwise versions (BW_RF / BW_LOESS): "),
-        "Apply the same approach within each batch and then recombine."
+        htmltools::strong("Local polynomial regression (QC-RLSC / LOESS): "),
+        "Uses weighted local polynomials (quadratic by default) fit to QC samples (vs injection order) to estimate drift and correct samples.",
+        htmltools::tags$ul(
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Strengths: "),
+              "Captures smooth nonlinear (curved) drift trends."
+            )
+          ),
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Weaknesses: "),
+              "Can overfit with sparse QCs and typically performs poorly for abrupt, step-like drift."
+            )
+          )
+        )
+      ),
+      htmltools::tags$li(
+        htmltools::strong("Random forest (QC-RFSC): "),
+        "Fits a random forest model on QC samples (QC intensity vs injection order) to estimate drift and correct samples.",
+        htmltools::tags$ul(
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Strengths: "),
+              "Flexible; can model irregular drift and abrupt changes."
+            )
+          ),
+          htmltools::tags$li(
+            htmltools::tags$p(
+              htmltools::strong("Weaknesses: "),
+              "Prefers many QCs (often ≥12–15). Highest overfitting risk because it can memorize QC noise. Less interpretable and does not enforce a smooth drift curve."
+            )
+          )
+        )
       )
     ),
     htmltools::tags$p(
-      htmltools::strong("Rule of thumb: "),
-      "If the number of QCs is low, prefer local polynomial fit (LOESS); batchwise methods require adequate QCs in every batch."
+      htmltools::strong("General note: "),
+      "All methods require QC samples that span the run (ideally at regular frequency). If QCs are sparse, clustered, or unstable, correction can be unreliable."
     )
   )
 }
@@ -372,21 +435,23 @@ report_text_correction_descriptions <- function() {
 report_text_rsd_cal <- function() {
   htmltools::tags$p(
     htmltools::strong("Relative Standard Deviation (RSD): "),
-    "Computed for each metabolite by dividing standard deviation by mean and ",
-    "expressed as a percentage. Describes standard deviation as a percentage ",
-    "of the mean. Metabolites with QC RSD above the set threshold are removed ",
-    "from the dataset and are listed here."
+    "RSD = (SD / mean) × 100, ",
+    "where SD is the standard deviation and mean is the average metabolite signal ",
+    "across samples. Mean and standard deviation are computed for each metabolite ",
+    "with missing values removed. RSD describes variability as a ",
+    "percentage of the mean. Metabolites with QC RSD above the set threshold ",
+    "are removed from the dataset and are listed here."
   )
 }
-
 #' Extreme value detection description.
 #' @keywords internal
 #' @noRd
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "This screen flags potential extreme values using a 2D PCA / Hotelling T² approach fit on non-QC samples.",
-      "Hotelling’s T² here is computed as the squared Mahalanobis distance in PC1–PC2 space using a PCA model fit on non-QC samples:"
+      "This step flags potential extreme values using a 2D PCA / Mahalanobis ",
+      "distance on non-QC samples. The squared Mahalanobis distance is computed ",
+      "in the PC1–PC2 space using a PCA model fit on non-QC samples:"
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
@@ -398,8 +463,8 @@ report_text_ev_detection <- function() {
         "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
       ),
       htmltools::tags$li(
-        htmltools::strong("T² in PC space for all samples: "),
-        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance (Hotelling T²)."
+        htmltools::strong("Mahalanobis distance in PC space for all samples: "),
+        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance."
       ),
       htmltools::tags$li(
         htmltools::strong("Ellipse cutoff: "),
@@ -419,7 +484,8 @@ report_text_ev_detection <- function() {
       htmltools::strong("Interpretation: "),
       "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
     ),
-    htmltools::tags$p(htmltools::strong("Caution: "),
+    htmltools::tags$p(
+      htmltools::tags$b("Caution: ",style = "color: red;"),
                   "Candidate extreme values are displayed for the user's benefit. ",
                   "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."),
     htmltools::tags$p(htmltools::strong("Note:" ),
@@ -477,7 +543,7 @@ report_text_transform_methods <- function() {
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
-      htmltools::strong("Caution: "),
+      htmltools::tags$b("Caution: ",style = "color: red;"),
       "Internal Standard Normalization should not be used when only a single internal standard is measured.", 
       "The single internal standard may not be representive of all metabolites measured in the samples.",
       "Total Ratio Normalization (TRN) relies on the assuption that total intensity should be the same across as samples",
@@ -638,14 +704,54 @@ report_text_rsd_intro <- function(p, d) {
 #' @noRd
 report_text_rsd_table <- function() {
   htmltools::tagList(
-    htmltools::tags$p("The following table show the average and median change in (\u0394) RSD for both QC samples and non-QC samples.",
-                      "We include median as a more robust measure of \u0394 RSD."),
-    htmltools::tags$p("\u0394 RSD = After RSD - Before RSD. "),
+    htmltools::strong("Performance Metric"),
+    htmltools::tags$p("\u0394 RSD = RSD after correction \u2212 RSD before correction"),
+    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+                      "grouping samples based on the 'class' column."),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
-      "after correction/transformation and correction, RSD should decrease for both QC and non-QC samples. ",
-      " In this situation, a more negative number is disirable for all four \u0394 metrics."
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " In this situation, a more negative number is desirable for all \u0394 metrics."
     ),
+    htmltools::tags$hr(),
+    htmltools::strong("Post-correction Change"),
+    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction.",
+                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+                      "based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " Ideally, the percentage decreased should be much higher than the percentage increased."
+    )
+  )
+}
+
+#' Change in RSD table description.
+#' @keywords internal
+#' @noRd
+report_text_rsd_tc_table <- function() {
+  htmltools::tagList(
+    htmltools::strong("Performance Metric"),
+    htmltools::tags$p("\u0394 RSD = RSD after correction and transformation \u2212 RSD in raw data"),
+    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+                      "grouping samples based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction, RSD should decrease for both QC and non-QC samples. ",
+      " In this situation, a more negative number is desirable for all \u0394 metrics."
+    ),
+    htmltools::tags$hr(),
+    htmltools::strong("Post-transformation Change"),
+    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction and transformation.",
+                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+                      "based on the 'class' column."),
+    htmltools::tags$p(
+      htmltools::strong("Goal: "),
+      "After correction and transformation, RSD should decrease for both QC and non-QC samples. ",
+      " Ideally, the percentage decreased should be much higher than the percentage increased."
+    )
   )
 }
 
@@ -677,7 +783,7 @@ report_text_pca_plots <- function() {
     htmltools::tags$hr(),
     htmltools::strong("PCA loading plots"),
     htmltools::tags$p(
-      "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
+      "The loading values show how much a metabolite contributes to that PC and the top 5 metabolites for each PC are shown below the PCA plot. ",
       "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
       "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
       "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",

@@ -14,11 +14,18 @@
   qy <- qy[ord]
   
   n <- length(qx)
-  if (n < 8L) {
+  
+  # if too few QCs for stable loess, use interpolation
+  # (this keeps behavior predictable for degree 0/1/2)
+  if (n < (degree + 2L)) {
     return(stats::approx(qx, qy, xout = newx, rule = 2)$y)
   }
   
-  deg <- if (n < 12L) 1L else min(2L, degree)
+  # Respect the requested degree, but clamp to [0, 2]
+  deg_req <- as.integer(degree)
+  deg <- max(0L, min(2L, deg_req))
+  
+  # Span guardrail: ensure enough effective neighbors
   spn <- max(span, min(1, 8 / n))
   
   pred <- tryCatch({
@@ -40,7 +47,8 @@
 }
 
 
-loess_correction <- function(df, metab_cols, degree = 2, span = 0.75, min_qc = 5) {
+
+loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 3) {
   df <- df[order(df$order), , drop = FALSE]
   if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC")))
     stop("First and last samples must be QCs.")

@@ -54,24 +54,6 @@ mod_visualize_ui <- function(id) {
           )
         ),
         ui_rsd_eval(ns),
-        shiny::tags$div(
-          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-          shiny::tags$strong("Metric guide"),
-          bslib::popover(
-            shiny::tags$button(
-              type = "button",
-              class = "btn btn-link p-0",
-              style = "text-decoration:none;",
-              shiny::icon("circle-info")
-            ),
-            report_text_rsd_table(),
-            title = "What metrics are used to evaluate RSD?",
-            placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
-          )
-        ),
-        uiOutput(ns("rsd_comparison_stats")),
         width = 400
       ),
       plotOutput(ns("rsd_comparison_plot"), height = "540px", width = "900px") %>% withSpinner(color = "#404040")
@@ -127,20 +109,20 @@ mod_visualize_ui <- function(id) {
 mod_visualize_server <- function(id, data, params) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    d <- reactive(data())          
+    d <- reactive(data())
     p <- reactive(params())
     
     #-- Let user select which metabolite to display in scatter plot
     output$met_plot_selectors <- renderUI({
       req(d()$filtered, d()$filtered_corrected)
       df_raw <- d()$filtered$df
-      if (isTRUE(p()$remove_imputed)){
+      if (isTRUE(p()$remove_imputed)) {
         df_cor <- d()$filtered_corrected$df_mv
       } else {
         df_cor <- d()$filtered_corrected$df_no_mv
       }
-      raw_cols <- setdiff(names(df_raw), c("sample","batch","class","order"))
-      cor_cols <- setdiff(names(df_cor), c("sample","batch","class","order"))
+      raw_cols <- setdiff(names(df_raw), c("sample", "batch", "class", "order"))
+      cor_cols <- setdiff(names(df_cor), c("sample", "batch", "class", "order"))
       cols <- intersect(raw_cols, cor_cols)
       validate(need(length(cols) >= 1, "No overlapping metabolites."))
       selectInput(ns("met_col"), "Metabolite column", choices = cols, selected = cols[1])
@@ -153,57 +135,96 @@ mod_visualize_server <- function(id, data, params) {
     }, res = 120)
     
     #-- RSD comparison plot
-    output$rsd_comparison_plot <- renderPlot(execOnResize = FALSE, res = 120,{
+    output$rsd_comparison_plot <- renderPlot(execOnResize = FALSE, res = 120, {
       req(input$rsd_compare, input$rsd_cal)
       
-      make_rsd_plot(list(rsd_compare = input$rsd_compare, rsd_cal = input$rsd_cal, rsd_plot_type = input$rsd_plot_type, remove_imputed = p()$remove_imputed), d())
+      make_rsd_plot(
+        list(
+          rsd_compare = input$rsd_compare,
+          rsd_cal = input$rsd_cal,
+          rsd_plot_type = input$rsd_plot_type,
+          remove_imputed = p()$remove_imputed
+        ),
+        d()
+      )
     })
     
-    output$rsd_comparison_stats <- renderUI({
-      req(input$rsd_compare, input$rsd_cal)
-      ui_rsd_stats(list(rsd_compare = input$rsd_compare, rsd_cal = input$rsd_cal, remove_imputed = p()$remove_imputed), d())
+    #-- PCA comparison data for the selected compare mode
+    pca_compare_data <- reactive({
+      req(input$pca_compare)
+      get_pca_compare_data(
+        p = p(),
+        d = d(),
+        pca_compare = input$pca_compare
+      )
     })
     
-    #-- PCA plot
+    #-- Compute PCA once and reuse for both PCA plots
+    pca_pair_reactive <- reactive({
+      cmp <- pca_compare_data()
+      
+      compute_pca_pair(
+        before = cmp$before,
+        after = cmp$after,
+        p = p(),
+        before_label = "Before",
+        after_label = "After"
+      )
+    })
+    
+    #-- PCA score plot
     output$pca_plot <- renderPlot({
       req(input$pca_compare, input$color_col)
+      
       pca_p <- p()
       pca_p$pca_compare <- input$pca_compare
       pca_p$color_col <- input$color_col
-      make_pca_plot(pca_p, d())
+      
+      cmp <- pca_compare_data()
+      
+      plot_pca_from_result(
+        p = pca_p,
+        pca_pair = pca_pair_reactive(),
+        compared_to = cmp$compared_to
+      )
     }, res = 120)
     
+    #-- PCA loading plot
     output$pca_loading_plot <- renderPlot({
-      req(input$pca_compare, input$color_col)
-      pca_p <- p()
-      pca_p$pca_compare <- input$pca_compare
-      pca_p$color_col <- input$color_col
-      make_pca_loading_plot(pca_p, d())
+      req(input$pca_compare)
+      
+      cmp <- pca_compare_data()
+      
+      plot_pca_loading_from_result(
+        pca_pair = pca_pair_reactive(),
+        compared_to = cmp$compared_to
+      )
     }, res = 120)
     
     #-- Download all figures as zip folder.
     output$download_fig_zip_btn <- renderUI({
-      req(d()$transformed)
+      req(d()$filtered, d()$filtered_corrected)
       
       download_card(
         "Download Figures",
         "If there are many metabolites, downloading figures may take a few minutes.",
         div(
-        style = "width: 100%; text-align: center;",
-        div(
-          style = "max-width: 250px; display: inline-block;",
-          downloadButton(
-            outputId = ns("download_fig_zip"),
-            label    = "Download All Figures",
-            class    = "btn btn-secondary btn-lg"
+          style = "width: 100%; text-align: center;",
+          div(
+            style = "max-width: 250px; display: inline-block;",
+            downloadButton(
+              outputId = ns("download_fig_zip"),
+              label = "Download All Figures",
+              class = "btn btn-secondary btn-lg"
+            )
           )
         )
       )
-      )
-      
     })
+    
     # -- progress bar
     progress_reactive <- reactiveVal(0)
+    
     #-- progress for downloading all images
     output$progress_ui <- renderUI({
       req(progress_reactive() > 0, progress_reactive() <= 1)
@@ -225,24 +246,21 @@ mod_visualize_server <- function(id, data, params) {
       },
       content = function(file) {
         .require_pkg("zip", "create a zip archive")
+        
         choices <- list(
-          rsd_cal     = input$rsd_cal,
+          rsd_cal = input$rsd_cal,
           rsd_compare = input$rsd_compare,
           rsd_plot_type = input$rsd_plot_type,
           pca_compare = input$pca_compare,
-          color_col   = input$color_col,
-          fig_format  = input$fig_format,
+          color_col = input$color_col,
+          fig_format = input$fig_format,
           remove_imputed = p()$remove_imputed,
-          transform      = p()$transform
+          transform = p()$transform,
+          qcImputeM = p()$qcImputeM,
+          samImputeM = p()$samImputeM
         )
-        rv_data <- list(
-          filtered           = d()$filtered,
-          imputed            = d()$imputed,
-          corrected          = d()$corrected,
-          filtered_corrected = d()$filtered_corrected,
-          transformed        = d()$transformed
-        )
-        figs <- export_figures(p = choices, d = rv_data, out_dir = tempdir())
+        
+        figs <- export_figures(p = choices, d = d(), out_dir = tempdir())
         
         fig_dir <- normalizePath(figs$fig_dir, winslash = "/", mustWork = TRUE)
         zipfile <- tempfile(fileext = ".zip")
@@ -253,7 +271,6 @@ mod_visualize_server <- function(id, data, params) {
         unlink(figs$fig_dir, recursive = TRUE, force = TRUE)
         unlink(zipfile, force = TRUE)
         
-        # Remove progress bar
         progress_reactive(0)
       }
     )
@@ -263,15 +280,16 @@ mod_visualize_server <- function(id, data, params) {
       updateTabsetPanel(session$rootScope(), "main_steps", "tab_export")
     })
     
-    list(progress = progress_reactive, 
-         params   = reactive(list(
-           rsd_compare = input$rsd_compare,
-           rsd_cal     = input$rsd_cal,
-           rsd_plot_type = input$rsd_plot_type,
-           pca_compare = input$pca_compare,
-           color_col   = input$color_col,
-           fig_format  = input$fig_format
-        ))
+    list(
+      progress = progress_reactive,
+      params = reactive(list(
+        rsd_compare = input$rsd_compare,
+        rsd_cal = input$rsd_cal,
+        rsd_plot_type = input$rsd_plot_type,
+        pca_compare = input$pca_compare,
+        color_col = input$color_col,
+        fig_format = input$fig_format
+      ))
     )
   })
 }

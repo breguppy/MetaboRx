@@ -165,7 +165,7 @@ ui_control_class_selector <- function(df, ns) {
 ui_filter_slider <- function(ns) {
   tooltip(
     sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites with missing % above this threshold are removed.", 
+    "Metabolites with missing % above this threshold for at least 1 class are removed.", 
     placement = "right"
   )
 }
@@ -331,12 +331,13 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
 ui_correction_method <- function(df, ns = identity) {
   qc_per_batch <- df %>%
     dplyr::group_by(batch) %>%
-    dplyr::summarise(qc_in_batch = sum(class == "QC"), .groups = "drop")
+    dplyr::summarise(qc_in_batch = sum(class == "QC", na.rm = TRUE), .groups = "drop")
   
   num_batches <- dplyr::n_distinct(df$batch)
+  total_qcs   <- sum(df$class == "QC", na.rm = TRUE)
   
   label_with_info <- shiny::tagList(
-    shiny::span("Correction Method"),
+    shiny::span("Correction Regression Model"),
     bslib::popover(
       shiny::tags$button(
         type = "button",
@@ -351,46 +352,64 @@ ui_correction_method <- function(df, ns = identity) {
     )
   )
   
-  # Build choices based on your existing logic
-  choices <- NULL
-  selected <- "RF"
+  # ---- Base choices depend ONLY on total number of QCs ----
+  base_choices <- NULL
+  base_selected <- NULL
   
-  if (num_batches == 1) {
-    if (any(qc_per_batch$qc_in_batch <= 5)) {
-      choices <- list("Local polynomial Fit (LOESS)" = "LOESS")
-      selected <- "LOESS"
-    } else {
-      choices <- list(
-        "Random forest" = "RF",
-        "Local polynomial Fit (LOESS)" = "LOESS"
-      )
-      selected <- "RF"
-    }
+  if (total_qcs <= 4) {
+    base_choices <- list(
+      "Local constant" = "LC",
+      "Local linear"   = "LL"
+    )
+    base_selected <- "LL"
+  } else if (total_qcs <= 8) {
+    base_choices <- list(
+      "Local constant"   = "LC",
+      "Local linear"     = "LL",
+      "Local polynomial" = "LOESS"
+    )
+    base_selected <- "LL"
+  } else if (total_qcs <= 15) {
+    base_choices <- list(
+      "Local constant"   = "LC",
+      "Local linear"     = "LL",
+      "Local polynomial" = "LOESS",
+      "Random forest"    = "RF"
+    )
+    base_selected <- "LOESS"
   } else {
-    if (any(qc_per_batch$qc_in_batch < 5)) {
-      choices <- list(
-        "Random forest" = "RF",
-        "Local polynomial Fit (LOESS)" = "LOESS"
-      )
-      selected <- "RF"
-    } else {
-      choices <- list(
-        "Random forest" = "RF",
-        "Local polynomial fit (LOESS)" = "LOESS",
-        "Batchwise random forest" = "BW_RF",
-        "Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
-      )
-      selected <- "RF"
-    }
+    base_choices <- list(
+      "Local constant"   = "LC",
+      "Local linear"     = "LL",
+      "Local polynomial" = "LOESS",
+      "Random forest"    = "RF"
+    )
+    base_selected <- "RF"
   }
   
+  # ---- Keep the existing batch-wise option logic unchanged ----
+  choices <- base_choices
+  selected <- base_selected
+  
+  #if (num_batches > 1 && !any(qc_per_batch$qc_in_batch < 5)) {
+    #choices <- c(
+      #choices,
+      #list(
+        #"Batchwise random forest"              = "BW_RF",
+        #"Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
+      #)
+    #)
+    # keep selected as the base-selected method
+  #}
+  
   shiny::radioButtons(
-    inputId = ns("corMethod"),
-    label = label_with_info,
-    choices = choices,
+    inputId  = ns("corMethod"),
+    label    = label_with_info,
+    choices  = choices,
     selected = selected
   )
 }
+
 
 #---------- 2.2 Post-Correction Filtering inputs
 #' Post-correction filtering
@@ -433,23 +452,6 @@ ui_post_cor_filter <- function(ns) {
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
         placement = "right"
       )
-    ),
-    htmltools::tags$h5("Candidate Extreme Values"),
-    shiny::tags$div(
-      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-      shiny::tags$strong("How detection works"),
-      bslib::popover(
-        shiny::tags$button(
-          type = "button",
-          class = "btn btn-link p-0",
-          style = "text-decoration:none;",
-          shiny::icon("circle-info")
-        ),
-        report_text_ev_detection(),
-        title = "Candidate extreme value detection",
-        placement = "auto",
-        options = list(container = "body", customClass = "popover-responsive")
-      )
     )
   )
 }
@@ -459,7 +461,7 @@ ui_post_cor_filter <- function(ns) {
 #' @keywords internal
 #' @noRd
 ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
-  has_istd <- any(grepl("^(ISTD|ITSD)", metab_cols, ignore.case = TRUE))
+  has_istd <- any(grepl("ISTD|ITSD", metab_cols, ignore.case = FALSE))
   
   choices <- if (has_istd) {
     list(
@@ -503,7 +505,7 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
         "Exclude internal standards from post-correction transformation.",
         TRUE
       ),
-      "Check this box if you do not want internal standards to be included in the transformation calculation.",
+      "Check this box if you do not want internal standards to be included in the transformation calculation. Internal standards will appear in this table, but not in the '3. Scaled or Normalized' tab of the Excel file.",
       placement = "right"
     ),
     shiny::conditionalPanel(

@@ -19,8 +19,11 @@ mod_correct_ui <- function(id) {
         column(3, tags$h5("Choose Correction Method"), uiOutput(ns(
           "correctionMethod"
         ))),
-        column(3, tags$h5("Unavailable Options"), uiOutput(ns(
-          "unavailable_options"
+        #column(3, tags$h5("Unavailable Options"), uiOutput(ns(
+        #  "unavailable_options"
+        #))),
+        column(3, tags$h5("How to choose a correction method"), uiOutput(ns(
+          "how_to_correct"
         ))),
         actionButton(
           ns("correct"),
@@ -45,19 +48,67 @@ mod_correct_ui <- function(id) {
           "post_cor_filter_block"
         )), width = 400),
         fluidRow(column(
-          8, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
-        ), column(4, 
-                  uiOutput(ns("download_cor_rsd_btn")
-        ))),
-        fluidRow(column(8, uiOutput(
-          ns("outliers_table")
-        )), column(4, uiOutput(
-          ns("download_ev_btn")
+          4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
+        ), 
+        column(4, 
+               shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_rsd_table(),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),
+        uiOutput(ns("rsd_comparison_stats"))),
+        column(4, uiOutput(ns("download_cor_rsd_btn")
         )))
       )
     ),
+    card(
+      fluidRow(
+        column(
+          width = 4,
+          htmltools::tags$h4("2.3 Candidate Extreme Values"),
+          shiny::tags$div(
+        style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+        shiny::tags$strong("How detection works"),
+        bslib::popover(
+          shiny::tags$button(
+            type = "button",
+            class = "btn btn-link p-0",
+            style = "text-decoration:none;",
+            shiny::icon("circle-info")
+          ),
+          report_text_ev_detection(),
+          title = "Candidate extreme value detection",
+          placement = "auto",
+          options = list(container = "body", customClass = "popover-responsive")
+        )
+      )
+        )
+      ),
+      fluidRow(
+        column(
+          width = 9,
+          uiOutput(ns("outliers_table"))
+        ),
+        column(
+          width = 3,
+          uiOutput(ns("download_ev_btn"))
+        )
+      )
+    ),
     card(layout_sidebar(
-      sidebar = ui_sidebar_block(title = "2.3 Post-Correction Transformation", uiOutput(ns(
+      sidebar = ui_sidebar_block(title = "2.4 Post-Correction Transformation", uiOutput(ns(
         "transform_block"
       )), width = 400),
       fluidRow(column(
@@ -66,13 +117,32 @@ mod_correct_ui <- function(id) {
       ),
       column(4, uiOutput(ns(
         "download_cor_btn"
-      )), uiOutput(ns(
+      )))),
+      fluidRow(
+        column(4, shiny::tags$div(
+          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+          shiny::tags$strong("Metric guide"),
+          bslib::popover(
+            shiny::tags$button(
+              type = "button",
+              class = "btn btn-link p-0",
+              style = "text-decoration:none;",
+              shiny::icon("circle-info")
+            ),
+            report_text_rsd_tc_table(),
+            title = "What metrics are used to evaluate RSD?",
+            placement = "auto",
+            options = list(container = "body",
+                           customClass = "popover-responsive") 
+          )
+        ),uiOutput(ns("post_transform_rsd_compare"))),
+      column(4, uiOutput(ns(
         "download_tc_rsd_btn"
-      ))))
-    )),
+      )))
+    ))),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "2.4 Metabolite Correlation",
+        title = "2.5 Metabolite Correlation (Optional)",
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Pearson's r correlations"),
@@ -147,10 +217,13 @@ mod_correct_server <- function(id, data, params) {
       ui_correction_method(filtered_r()$df, ns = session$ns)
     })
     
-    output$unavailable_options <- renderUI({
+    #output$unavailable_options <- renderUI({
+    #  df <- filtered_r()$df
+    #  ui_unavailable_options(df)
+    #})
+    output$how_to_correct <- renderUI({
       df <- filtered_r()$df
-      mc <- setdiff(names(df), c('sample','batch','class','order'))
-      ui_unavailable_options(df, mc)
+      ui_how_to_correct(df)
     })
     
     metab_cols_r <- reactive({
@@ -226,7 +299,7 @@ mod_correct_server <- function(id, data, params) {
     })
     
     output$post_cor_filter_info <- renderUI({
-      req(corrected_r())                # ensures step 2.1 done
+      req(corrected_r())
       res <- req(filtered_corrected_r())
       
       remove_imputed <- isTRUE(input$remove_imputed)
@@ -236,6 +309,13 @@ mod_correct_server <- function(id, data, params) {
       ui_postcor_filter_info(res, remove_imputed, rsd_filter, post_cor_all)
     })
     
+    output$rsd_comparison_stats <- renderUI({
+      d <- list(filtered_corrected = filtered_corrected_r(),
+                filtered           = filtered_r())
+      ui_rsd_stats(compare_to = "filtered_cor_data",
+                   list(remove_imputed = input$remove_imputed), 
+                   d)
+    })
     
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())
@@ -428,6 +508,15 @@ mod_correct_server <- function(id, data, params) {
         df <- transformed_r()$df_no_mv
       }
       df
+    })
+    
+    output$post_transform_rsd_compare <- renderUI({
+      d <- list(filtered_corrected = filtered_corrected_r(),
+                filtered           = filtered_r(),
+                transformed        = transformed_r())
+      ui_rsd_stats(compare_to = "transformed_data",
+                   list(remove_imputed = input$remove_imputed), 
+                   d)
     })
     
     output$download_tc_rsd_btn <- renderUI({
@@ -712,7 +801,7 @@ mod_correct_server <- function(id, data, params) {
     
     #---------- Next: Visualize Data
     output$next_visualization_ui <- renderUI({
-      req(all_corr_r()) 
+      #req(all_corr_r()) 
       actionButton(
         ns("next_visualization"), 
         "Next: Evaluate and Visualize Correction",
@@ -720,7 +809,7 @@ mod_correct_server <- function(id, data, params) {
         )
     })
     observeEvent(input$next_visualization, {
-      req(all_corr_r())
+      #req(all_corr_r())
       validate(
         need(!is.null(filtered_corrected_r()), "Missing corrected data"),
         need(!is.null(transformed_r()), "Missing transformed data data")

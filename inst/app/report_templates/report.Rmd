@@ -26,23 +26,21 @@ library(dplyr)
 library(QCcorrection)
 ```
 # Raw Data
+### Metabolite columns removed before correction
 ```{r}
-QCcorrection:::report_text_data_req()
 QCcorrection:::report_text_withheld_columns(params$p, params$d)
 ```
 
 ### Raw Data Summary and Structural Checks
-
-**Raw data summary and structural checks.** 
 ```{r}
-QCcorrection:::report_text_data_inspection()
 QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
+QCcorrection:::report_text_data_inspection()
 ```
 
 ### Filter Missing Values in Raw Data
 ```{r}
-QCcorrection:::report_text_mv_filter()
 QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets, params$d$filtered$class_metab_all_missing)
+QCcorrection:::report_text_mv_filter()
 ```
 
 # Imputation, Signal Drift Correction, and Transformation.
@@ -57,6 +55,10 @@ QCcorrection:::report_text_imputation(params$p, params$d)
 QCcorrection:::report_text_correction(params$p, params$d)
 QCcorrection:::report_text_correction_descriptions()
 ```
+##### How to choose a correction method
+```{r}
+QCcorrection:::ui_how_to_correct(params$d$filtered$df)
+```
 
 ### Post-correction Filtering
 #### QC RSD Filtering
@@ -65,12 +67,13 @@ QCcorrection:::report_text_correction_descriptions()
 QCcorrection:::report_text_rsd_cal()
 QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
 ```
-
-#### Candidate Extreme Values
-
 ```{r}
-QCcorrection:::report_text_ev_detection()
+QCcorrection:::ui_rsd_stats(compare_to = "filtered_cor_data", params$p, params$d)
+QCcorrection:::report_text_rsd_table()
 ```
+
+### Candidate Extreme Values
+
 ```{r, echo=FALSE, fig.width=7.5, fig.height=5.5}
 hp <- params$plots[["Hotelling PCA"]]
 if (!is.null(hp)) {
@@ -81,12 +84,19 @@ if (!is.null(hp)) {
 ```
 ```{r}
 QCcorrection:::ui_outliers(params$p, params$d, include_plot = FALSE) 
+QCcorrection:::report_text_ev_detection()
 ```
 
-### Transformation Description
+### Transformation
 ```{r}
 QCcorrection:::report_text_transformation(params$p, params$d)
 QCcorrection:::report_text_transform_methods()
+```
+
+#### RSD Post-transformation Comparison
+```{r}
+QCcorrection:::ui_rsd_stats(compare_to = "transformed_cor_data", params$p, params$d)
+QCcorrection:::report_text_rsd_tc_table()
 ```
 
 ###  Metabolite Correlations
@@ -110,7 +120,7 @@ QCcorrection:::report_text_scatter_intro(params$p, params$d)
 QCcorrection:::report_text_met_scatter()
 ```
 
-### RSD Comparison
+### RSD Comparison Plots
 To judge the quality of the cleaned data, we can visualize the change in variation with the relative standard deviation (RSD) comparison plots. RSD is sometimes called coefficient of variation (CV) and is computed as RSD = (standard deviation / mean) * 100%. High RSD indicates that the values for that metabolite are more spread out around the mean, which may be an expected result in the experimental samples. For QC samples, RSD should decrease after correction.
 ```{r}
 QCcorrection:::report_text_rsd_intro(params$p, params$d)
@@ -122,19 +132,16 @@ print(params$plots[["RSD Comparison"]])
 QCcorrection:::report_text_rsd_plots()
 ```
 
-```{r}
-QCcorrection:::report_text_rsd_table()
-QCcorrection:::ui_rsd_stats(params$p, params$d)
-```
+### PCA Comparison Plots
+To evaluate the quality of the cleaned data principal component analysis (PCA) score plots help visualize metabolomics data, identify sample groups, and determine which metabolites contribute the most variation. 
 
-### PCA Comparison
-```{r}
-QCcorrection:::report_text_pca_plots()
-```
 ```{r, echo=FALSE, fig.width=8.333, fig.height=4.417}
 print(params$plots[["PCA Comparison"]])
 ```
 
 ```{r, echo=FALSE, fig.width=8.75, fig.height=4.417}
 print(params$plots[["PCA Loading"]])
+```
+```{r}
+QCcorrection:::report_text_pca_plots()
 ```

@@ -3,7 +3,7 @@
 
 # Metric card for 1.2 Select non-metabolite columns
 metric_card <- function(label, value) {
-  div(
+  htmltools::tags$div(
     style = "background:#f8f9fa; padding:10px; border-radius:8px; flex:1;",
     p(style = "font-size:1.4em; font-weight:bold; margin:0;", value),
     h5(style = "margin:0;", label)
@@ -449,16 +449,22 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
                                    post_cor_filter) {
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
+    df <- filtered_corrected_result$df_mv
   } else {
     removed <- filtered_corrected_result$removed_metabolites_no_mv
+    df <- filtered_corrected_result$df_no_mv
   }
   n_removed <- length(removed)
   
   # get ISTD/ITSD metabolites
-  is_istd <- grepl("^(ISTD|ITSD)", removed, ignore.case = TRUE)
+  is_istd <- grepl("ISTD|ITSD", removed, ignore.case = FALSE)
   istd_names <- removed[is_istd]
   n_istd <- length(istd_names)
   
+  met_cols <- setdiff(names(df), c('sample','batch','class','order'))
+  total <- n_removed + length(met_cols)
+  
+  pct_below <- round((length(met_cols) / total) * 100, digits = 1)
   # optional warning banner
   warning_ui <- NULL
   if (n_istd > 0) {
@@ -475,6 +481,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   if (post_cor_filter == FALSE) {
     ui <- list(
       warning_ui,
+      metric_card(paste0("Metabolites with QC RSD at or below ", rsd_cutoff, "%"), paste0(pct_below, "%")),
       tags$span(
         style = "color: darkorange; font-weight: bold;",
         paste0(
@@ -528,8 +535,13 @@ ui_outliers <- function(p, d,
   n_extreme_values  <- nrow(ev)
   
   cards <- shiny::div(
-    style = "display:flex; gap:10px; margin-bottom:10px;",
-    metric_card("Samples outside the Hotelling's T^2 95% limit", n_outlier_samples),
+    style = paste(
+      "display:flex;",
+      "gap:10px;",
+      "margin-bottom:10px;",
+      "flex-wrap:wrap;"
+    ),
+    metric_card("Samples outside the Mahalanobis 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
   
@@ -540,11 +552,32 @@ ui_outliers <- function(p, d,
   }
   
   if (nrow(ev) == 0L) {
-    return(shiny::tagList(
-      plot_ui,
+    
+    content <- shiny::tagList(
       cards,
       shiny::tags$em("No extreme metabolite values detected in outlier samples.")
-    ))
+    )
+    
+    if (include_plot) {
+      return(
+        shiny::tagList(
+          shiny::tags$div(
+            style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
+            shiny::tags$div(style = "flex:0 0 42%;", plot_ui),
+            shiny::tags$div(style = "flex:1 1 58%; min-width:0;", content)
+          )
+        )
+      )
+    } else {
+      return(
+        shiny::tagList(
+          shiny::tags$div(
+            style = "width:100%;",
+            content
+          )
+        )
+      )
+    }
   }
   
   required_cols <- c(
@@ -559,11 +592,9 @@ ui_outliers <- function(p, d,
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
   ev_top    <- head(ev_sorted, top_n)
   
-  z_g_fmt    <- formatC(ev_top$z_global,     format = "f", digits = digits_z)
-  #absz_g_fmt <- formatC(ev_top$abs_z_global, format = "f", digits = digits_z)
-  z_c_fmt    <- formatC(ev_top$z_class,      format = "f", digits = digits_z)
-  #absz_c_fmt <- formatC(ev_top$abs_z_class,  format = "f", digits = digits_z)
-  T2_fmt     <- formatC(ev_top$T2,           format = "f", digits = digits_T2)
+  z_g_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
+  z_c_fmt <- formatC(ev_top$z_class,  format = "f", digits = digits_z)
+  T2_fmt  <- formatC(ev_top$T2,       format = "f", digits = digits_T2)
   
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
@@ -571,9 +602,7 @@ ui_outliers <- function(p, d,
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
       shiny::tags$td(z_g_fmt[i]),
-      #shiny::tags$td(absz_g_fmt[i]),
       shiny::tags$td(z_c_fmt[i]),
-      #shiny::tags$td(absz_c_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
@@ -586,23 +615,47 @@ ui_outliers <- function(p, d,
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
         shiny::tags$th("Global z-score"),
-        #shiny::tags$th("|z| (global)"),
         shiny::tags$th("Class z-score"),
-        #shiny::tags$th("|z| (class)"),
         shiny::tags$th("Mahalanobis^2")
       )
     ),
     shiny::tags$tbody(rows)
   )
   
-  shiny::tagList(
-    plot_ui,
+  table_content <- shiny::tagList(
     cards,
-    shiny::tags$span(
+    shiny::tags$p(
       "Top 10 potential extreme values are listed below. ",
-      "The full list of potential extreme values 'extreme_values_*today's_date*.xlsx' ",
+      "The full list of potential extreme values ",
+      "'extreme_values_*today's_date*.xlsx' ",
       "is available for download."
     ),
-    table_tag
+    shiny::tags$div(
+      style = "overflow-x:auto; width:100%;",
+      table_tag
+    )
   )
+  
+  if (include_plot) {
+    shiny::tagList(
+      shiny::tags$div(
+        style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
+        shiny::tags$div(
+          style = "flex:0 0 42%;",
+          plot_ui
+        ),
+        shiny::tags$div(
+          style = "flex:1 1 58%; min-width:0;",
+          table_content
+        )
+      )
+    )
+  } else {
+    shiny::tagList(
+      shiny::tags$div(
+        style = "width:100%;",
+        table_content
+      )
+    )
+  }
 }
