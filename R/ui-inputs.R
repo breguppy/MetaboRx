@@ -452,23 +452,6 @@ ui_post_cor_filter <- function(ns) {
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
         placement = "right"
       )
-    ),
-    htmltools::tags$h5("Candidate Extreme Values"),
-    shiny::tags$div(
-      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-      shiny::tags$strong("How detection works"),
-      bslib::popover(
-        shiny::tags$button(
-          type = "button",
-          class = "btn btn-link p-0",
-          style = "text-decoration:none;",
-          shiny::icon("circle-info")
-        ),
-        report_text_ev_detection(),
-        title = "Candidate extreme value detection",
-        placement = "auto",
-        options = list(container = "body", customClass = "popover-responsive")
-      )
     )
   )
 }

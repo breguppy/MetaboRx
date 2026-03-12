@@ -76,6 +76,28 @@ mod_correct_ui <- function(id) {
     card(
       fluidRow(
         column(
+          width = 4,
+          htmltools::tags$h4("2.3 Candidate Extreme Values"),
+          shiny::tags$div(
+        style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+        shiny::tags$strong("How detection works"),
+        bslib::popover(
+          shiny::tags$button(
+            type = "button",
+            class = "btn btn-link p-0",
+            style = "text-decoration:none;",
+            shiny::icon("circle-info")
+          ),
+          report_text_ev_detection(),
+          title = "Candidate extreme value detection",
+          placement = "auto",
+          options = list(container = "body", customClass = "popover-responsive")
+        )
+      )
+        )
+      ),
+      fluidRow(
+        column(
           width = 9,
           uiOutput(ns("outliers_table"))
         ),
@@ -86,7 +108,7 @@ mod_correct_ui <- function(id) {
       )
     ),
     card(layout_sidebar(
-      sidebar = ui_sidebar_block(title = "2.3 Post-Correction Transformation", uiOutput(ns(
+      sidebar = ui_sidebar_block(title = "2.4 Post-Correction Transformation", uiOutput(ns(
         "transform_block"
       )), width = 400),
       fluidRow(column(
@@ -120,7 +142,7 @@ mod_correct_ui <- function(id) {
     ))),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
-        title = "2.4 Metabolite Correlation (Optional)",
+        title = "2.5 Metabolite Correlation (Optional)",
         shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Pearson's r correlations"),

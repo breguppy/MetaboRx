@@ -446,8 +446,8 @@ report_text_rsd_cal <- function() {
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "This screen flags potential extreme values using a 2D PCA / Hotelling T² approach fit on non-QC samples.",
-      "Hotelling’s T² here is computed as the squared Mahalanobis distance in PC1–PC2 space using a PCA model fit on non-QC samples:"
+      "This screen flags potential extreme values using a 2D PCA / Mahalanobis fit on non-QC samples.",
+      "The squared Mahalanobis distance is computed in the PC1–PC2 space using a PCA model fit on non-QC samples:"
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
@@ -459,8 +459,8 @@ report_text_ev_detection <- function() {
         "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
       ),
       htmltools::tags$li(
-        htmltools::strong("T² in PC space for all samples: "),
-        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance (Hotelling T²)."
+        htmltools::strong("Mahalanobis distance in PC space for all samples: "),
+        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance."
       ),
       htmltools::tags$li(
         htmltools::strong("Ellipse cutoff: "),
@@ -480,7 +480,8 @@ report_text_ev_detection <- function() {
       htmltools::strong("Interpretation: "),
       "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
     ),
-    htmltools::tags$p(htmltools::strong("Caution: "),
+    htmltools::tags$p(
+      htmltools::tags$b("Caution: ",style = "color: red;"),
                   "Candidate extreme values are displayed for the user's benefit. ",
                   "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."),
     htmltools::tags$p(htmltools::strong("Note:" ),
@@ -538,7 +539,7 @@ report_text_transform_methods <- function() {
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
-      htmltools::strong("Caution: "),
+      htmltools::tags$b("Caution: ",style = "color: red;"),
       "Internal Standard Normalization should not be used when only a single internal standard is measured.", 
       "The single internal standard may not be representive of all metabolites measured in the samples.",
       "Total Ratio Normalization (TRN) relies on the assuption that total intensity should be the same across as samples",

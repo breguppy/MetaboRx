@@ -541,7 +541,7 @@ ui_outliers <- function(p, d,
       "margin-bottom:10px;",
       "flex-wrap:wrap;"
     ),
-    metric_card("Samples outside the Hotelling's T^2 95% limit", n_outlier_samples),
+    metric_card("Samples outside the Mahalanobis 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
   

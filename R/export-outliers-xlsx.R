@@ -3,12 +3,15 @@
 #' @noRd
 export_outliers_xlsx <- function(p, d, file = NULL) {
   .require_pkg("openxlsx", "write Excel workbooks")
+  
   wb <- openxlsx::createWorkbook()
-  # make column names bold and descriptions with orange backgroud
-  bold  <- openxlsx::createStyle(textDecoration = "Bold")
-  note  <- openxlsx::createStyle(wrapText = TRUE,
-                                 valign = "top",
-                                 fgFill = "#f8cbad")
+  
+  bold <- openxlsx::createStyle(textDecoration = "Bold")
+  note <- openxlsx::createStyle(
+    wrapText = TRUE,
+    valign = "top",
+    fgFill = "#f8cbad"
+  )
   
   .add_sheet <- function(name) {
     nm <- gsub("[\\[\\]\\*\\?:/\\\\]", "_", name)
@@ -17,12 +20,50 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
     nm
   }
   
-  df <- d$filtered_corrected$df_no_mv
-
-  res <- detect_hotelling_nonqc_dual_z(df, p)
-  
-  outlier_samples <- unique(res$data$sample[res$data$is_outlier_sample])
-  pc_loadings <- res$pc_loadings
+  .write_described_sheet <- function(wb,
+                                     sheet_name,
+                                     description,
+                                     x,
+                                     merge_cols = NULL,
+                                     start_row_data = 3L,
+                                     start_col_data = 1L,
+                                     header_style = bold,
+                                     note_style = note,
+                                     note_row_height = 60) {
+    s <- .add_sheet(sheet_name)
+    
+    openxlsx::writeData(
+      wb,
+      s,
+      x = description,
+      startCol = 1,
+      startRow = 1
+    )
+    
+    if (!is.null(merge_cols) && merge_cols >= 1L) {
+      openxlsx::mergeCells(wb, s, cols = 1:merge_cols, rows = 1)
+      openxlsx::addStyle(
+        wb,
+        s,
+        style = note_style,
+        rows = 1,
+        cols = 1,
+        gridExpand = TRUE
+      )
+      openxlsx::setRowHeights(wb, s, rows = 1, heights = note_row_height)
+    }
+    
+    openxlsx::writeData(
+      wb,
+      s,
+      x = x,
+      startRow = start_row_data,
+      startCol = start_col_data,
+      headerStyle = header_style
+    )
+    
+    invisible(s)
+  }
   
   hotelling_table_df <- function(res,
                                  sample_col = "sample",
@@ -53,28 +94,25 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
       )
     }
     
-    # Sort exactly like ui_outliers (but no head(top_n))
     ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
     
     if (!format) {
-      # Return numeric columns as-is (better for export / further analysis)
       out <- data.frame(
-        Sample        = ev_sorted[[sample_col]],
-        Class         = ev_sorted[[class_col]],
-        Metabolite    = ev_sorted$metabolite,
-        z_global      = ev_sorted$z_global,
-        abs_z_global  = ev_sorted$abs_z_global,
-        z_class       = ev_sorted$z_class,
-        abs_z_class   = ev_sorted$abs_z_class,
-        T2            = ev_sorted$T2,
+        Sample       = ev_sorted[[sample_col]],
+        Class        = ev_sorted[[class_col]],
+        Metabolite   = ev_sorted$metabolite,
+        z_global     = ev_sorted$z_global,
+        abs_z_global = ev_sorted$abs_z_global,
+        z_class      = ev_sorted$z_class,
+        abs_z_class  = ev_sorted$abs_z_class,
+        T2           = ev_sorted$T2,
         stringsAsFactors = FALSE
       )
     } else {
-      # Return formatted character columns, matching the UI table styling
       out <- data.frame(
-        Sample        = ev_sorted[[sample_col]],
-        Class         = ev_sorted[[class_col]],
-        Metabolite    = ev_sorted$metabolite,
+        Sample             = ev_sorted[[sample_col]],
+        Class              = ev_sorted[[class_col]],
+        Metabolite         = ev_sorted$metabolite,
         `Global z-score`   = formatC(ev_sorted$z_global,     format = "f", digits = digits_z),
         `|z| (global)`     = formatC(ev_sorted$abs_z_global, format = "f", digits = digits_z),
         `Class z-score`    = formatC(ev_sorted$z_class,      format = "f", digits = digits_z),
@@ -87,106 +125,101 @@ export_outliers_xlsx <- function(p, d, file = NULL) {
     out
   }
   
+  df <- d$filtered_corrected$df_no_mv
+  res <- detect_hotelling_nonqc_dual_z(df, p)
   
+  outlier_samples <- unique(res$data$sample[res$data$is_outlier_sample])
   tab_numeric <- hotelling_table_df(res)
   
-  shiny::withProgress(message = "Creating extreme_values_*today's_date*.xlsx...", value = 0, {
-    s1 <- .add_sheet("Samples Outside Ellipse")
-    txt1 <- paste(
-      "Tab 1. This tab shows samples outside the Hotelling's T^2 95% ellipse.",
-      "The ellipse is computed in the PC1-PC2 space using the non-QC samples in",
-      "the signal drift corrected data."
-    )
-    openxlsx::writeData(wb,
-                        s1,
-                        x = txt1,
-                        startCol = 1,
-                        startRow = 1)
-    openxlsx::mergeCells(wb, s1, cols = 1:20, rows = 1)
-    openxlsx::addStyle(
-      wb,
-      s1,
-      style = note,
-      rows = 1,
-      cols = 1,
-      gridExpand = TRUE
-    )
-    openxlsx::setRowHeights(wb, s1, rows = 1, heights = 60)
-    openxlsx::writeData(
-      wb,
-      s1,
-      x = outlier_samples,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
-    )
-    shiny::incProgress(1 / 3, detail = "Saved: Samples Outside Ellipse")
-    
-    s2 <- .add_sheet("PC Loadings")
-    txt2 <- paste(
-      "Tab 2. This tab shows the loadings for PC1 and PC2 computed using the",
-      "non-QC samples in the corrected data."
-    )
-    openxlsx::writeData(wb,
-                        s2,
-                        x = txt2,
-                        startCol = 1,
-                        startRow = 1)
-    openxlsx::mergeCells(wb, s2, cols = 1:12, rows = 1)
-    openxlsx::addStyle(
-      wb,
-      s2,
-      style = note,
-      rows = 1,
-      cols = 1,
-      gridExpand = TRUE
-    )
-    openxlsx::setRowHeights(wb, s2, rows = 1, heights = 60)
-    openxlsx::writeData(
-      wb,
-      s2,
-      x = res$pc_loadings,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
-    )
-    shiny::incProgress(1 / 3, detail = "Saved: PC Loadings")
-    
-    s3 <- .add_sheet("Potential Extreme Values")
-    txt3 <- paste(
-       "Tab 3. This tab shows samples outside the Hotelling's T^2 95% ellipse",
-       "with AND have at least 1 potential extreme metabolite value meaning",
-       "global AND class |z| is greater than 3 in the corrected data."
-    )
-    openxlsx::writeData(wb,
-                        s3,
-                        x = txt3,
-                        startCol = 1,
-                        startRow = 1)
-    openxlsx::mergeCells(wb, s3, cols = 1:16, rows = 1)
-    openxlsx::addStyle(
-      wb,
-      s3,
-      style = note,
-      rows = 1,
-      cols = 1,
-      gridExpand = TRUE
-    )
-    openxlsx::setRowHeights(wb, s3, rows = 1, heights = 60)
-    openxlsx::writeData(
-      wb,
-      s3,
-      x = tab_numeric,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
-    )
-    shiny::incProgress(1 / 3, detail = "Saved: Potential Extreme Values")
-    
-    if (!is.null(file)) {
-      openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      return(normalizePath(file, winslash = "/"))
+  shiny::withProgress(
+    message = "Creating extreme_values_*today's_date*.xlsx...",
+    value = 0,
+    {
+      .write_described_sheet(
+        wb = wb,
+        sheet_name = "Samples Outside Ellipse",
+        description = paste(
+          "Tab 1. This tab shows samples outside the Malahanois 95% ellipse.",
+          "The ellipse is computed in the PC1-PC2 space using the non-QC samples in",
+          "the signal drift corrected data."
+        ),
+        x = data.frame(Sample = outlier_samples, stringsAsFactors = FALSE),
+        merge_cols = 12
+      )
+      shiny::incProgress(1 / 5, detail = "Saved: Samples Outside Ellipse")
+      
+      .write_described_sheet(
+        wb = wb,
+        sheet_name = "PC Loadings",
+        description = paste(
+          "Tab 2. This tab shows the loadings for PC1 and PC2 computed using the",
+          "non-QC samples in the corrected data."
+        ),
+        x = res$pc_loadings,
+        merge_cols = 12
+      )
+      shiny::incProgress(1 / 5, detail = "Saved: PC Loadings")
+      
+      .write_described_sheet(
+        wb = wb,
+        sheet_name = "Potential Extreme Values",
+        description = paste(
+          "Tab 3. This tab shows samples outside the Mahalanobis 95% ellipse",
+          "that also have at least 1 potential extreme metabolite value, meaning",
+          "global AND class |z| is greater than 3 in the corrected data."
+        ),
+        x = tab_numeric,
+        merge_cols = 12
+      )
+      shiny::incProgress(1 / 5, detail = "Saved: Potential Extreme Values")
+      
+      global_export <- res$z_global
+      global_export[setdiff(names(global_export), c("sample", "batch", "class", "order"))] <-
+        lapply(
+          global_export[setdiff(names(global_export), c("sample", "batch", "class", "order"))],
+          function(x) round(x, 3)
+        )
+      
+      .write_described_sheet(
+        wb = wb,
+        sheet_name = "Global Z-Scores",
+        description = paste(
+          "Tab 4. This tab shows pooled global z-scores for each retained metabolite",
+          "in the corrected data. These z-scores are computed by centering and scaling",
+          "all samples using the pooled non-QC samples only."
+        ),
+        x = global_export,
+        merge_cols = min(12L, ncol(res$z_global))
+      )
+      shiny::incProgress(1 / 5, detail = "Saved: Global Z-Scores")
+      
+      class_export <- res$z_class
+      class_export[setdiff(names(class_export), c("sample", "batch", "class", "order"))] <-
+        lapply(
+          class_export[setdiff(names(class_export), c("sample", "batch", "class", "order"))],
+          function(x) round(x, 3)
+        )
+      
+      .write_described_sheet(
+        wb = wb,
+        sheet_name = "Class Z-Scores",
+        description = paste(
+          "Tab 5. This tab shows class-based z-scores for each retained metabolite",
+          "in the corrected data. For non-QC samples, z-scores are computed within",
+          "their class using the class-specific mean and standard deviation.",
+          "QC rows are expected to be NA on this sheet."
+        ),
+        x = class_export,
+        merge_cols = min(12L, ncol(res$z_class))
+      )
+      shiny::incProgress(1 / 5, detail = "Saved: Class Z-Scores")
+      
+      if (!is.null(file)) {
+        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+        return(normalizePath(file, winslash = "/"))
+      }
     }
-  })
-  return(wb)
+  )
+  
+  wb
 }
