@@ -552,28 +552,34 @@ ui_outliers <- function(p, d,
   }
   
   if (nrow(ev) == 0L) {
-    return(
-      shiny::tagList(
-        shiny::tags$div(
-          style = paste(
-            "display:flex;",
-            "gap:20px;",
-            "align-items:flex-start;",
-            "width:100%;"
-          ),
+    
+    content <- shiny::tagList(
+      cards,
+      shiny::tags$em("No extreme metabolite values detected in outlier samples.")
+    )
+    
+    if (include_plot) {
+      return(
+        shiny::tagList(
           shiny::tags$div(
-            style = "flex: 0 0 42%;",
-            plot_ui
-          ),
-          shiny::tags$div(
-            style = "flex: 1 1 58%; min-width:0;",
-            cards,
-            shiny::tags$em("No extreme metabolite values detected in outlier samples.")
+            style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
+            shiny::tags$div(style = "flex:0 0 42%;", plot_ui),
+            shiny::tags$div(style = "flex:1 1 58%; min-width:0;", content)
           )
         )
       )
-    )
+    } else {
+      return(
+        shiny::tagList(
+          shiny::tags$div(
+            style = "width:100%;",
+            content
+          )
+        )
+      )
+    }
   }
+  
   required_cols <- c(
     sample_col, class_col, "metabolite",
     "z_global", "abs_z_global", "z_class", "abs_z_class", "T2"
@@ -586,11 +592,9 @@ ui_outliers <- function(p, d,
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
   ev_top    <- head(ev_sorted, top_n)
   
-  z_g_fmt    <- formatC(ev_top$z_global,     format = "f", digits = digits_z)
-  #absz_g_fmt <- formatC(ev_top$abs_z_global, format = "f", digits = digits_z)
-  z_c_fmt    <- formatC(ev_top$z_class,      format = "f", digits = digits_z)
-  #absz_c_fmt <- formatC(ev_top$abs_z_class,  format = "f", digits = digits_z)
-  T2_fmt     <- formatC(ev_top$T2,           format = "f", digits = digits_T2)
+  z_g_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
+  z_c_fmt <- formatC(ev_top$z_class,  format = "f", digits = digits_z)
+  T2_fmt  <- formatC(ev_top$T2,       format = "f", digits = digits_T2)
   
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
@@ -598,9 +602,7 @@ ui_outliers <- function(p, d,
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
       shiny::tags$td(z_g_fmt[i]),
-      #shiny::tags$td(absz_g_fmt[i]),
       shiny::tags$td(z_c_fmt[i]),
-      #shiny::tags$td(absz_c_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
@@ -613,41 +615,47 @@ ui_outliers <- function(p, d,
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
         shiny::tags$th("Global z-score"),
-        #shiny::tags$th("|z| (global)"),
         shiny::tags$th("Class z-score"),
-        #shiny::tags$th("|z| (class)"),
         shiny::tags$th("Mahalanobis^2")
       )
     ),
     shiny::tags$tbody(rows)
   )
   
-  shiny::tagList(
+  table_content <- shiny::tagList(
+    cards,
+    shiny::tags$p(
+      "Top 10 potential extreme values are listed below. ",
+      "The full list of potential extreme values ",
+      "'extreme_values_*today's_date*.xlsx' ",
+      "is available for download."
+    ),
     shiny::tags$div(
-      style = paste(
-        "display:flex;",
-        "gap:20px;",
-        "align-items:flex-start;",
-        "width:100%;"
-      ),
+      style = "overflow-x:auto; width:100%;",
+      table_tag
+    )
+  )
+  
+  if (include_plot) {
+    shiny::tagList(
       shiny::tags$div(
-        style = "flex: 0 0 42%;",
-        plot_ui
-      ),
-      shiny::tags$div(
-        style = "flex: 1 1 58%; min-width:0;",
-        cards,
-        shiny::tags$p(
-          "Top 10 potential extreme values are listed below. ",
-          "The full list of potential extreme values ",
-          "'extreme_values_*today's_date*.xlsx' ",
-          "is available for download."
+        style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
+        shiny::tags$div(
+          style = "flex:0 0 42%;",
+          plot_ui
         ),
         shiny::tags$div(
-          style = "overflow-x:auto; width:100%;",
-          table_tag
+          style = "flex:1 1 58%; min-width:0;",
+          table_content
         )
       )
     )
-  )
+  } else {
+    shiny::tagList(
+      shiny::tags$div(
+        style = "width:100%;",
+        table_content
+      )
+    )
+  }
 }

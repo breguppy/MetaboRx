@@ -159,7 +159,7 @@ ui_how_to_correct <- function(df,
             "Higher overfit risk with sparse QCs.",
             if (loess2_warn_low_qc) "With <9 QCs, polynomial fits can be unstable." else "",
             if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15).", format(max_gap, digits = 3)) else "",
-            "If you see oscillations or worse non-QC variability, prefer degree 1."
+            "If you see oscillations or worse non-QC variability, prefer local linear."
           )
         )
       )
@@ -171,12 +171,12 @@ ui_how_to_correct <- function(df,
     items <- c(items, list(
       htmltools::tags$li(
         htmltools::tags$strong("Local polynomial (QC-RLSC): "),
-        "Use when drift is smooth and curved. Prefer degree 1 if drift is mostly linear.",
+        "Use when drift is smooth and curved. Prefer local linear if drift is mostly linear.",
         warn_span(
           show = loess2_warn_gap,
           text = paste(
-            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15), which can make polynomial LOESS unstable.", format(max_gap, digits = 3)) else "",
-            "If the correction curve looks wiggly, increase smoothing or use degree 1."
+            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15), which can make local polynomial unstable.", format(max_gap, digits = 3)) else "",
+            "If the correction curve looks too wiggly, use local linear."
           )
         )
       ),
@@ -189,7 +189,7 @@ ui_how_to_correct <- function(df,
             "Random forest is high-flexibility and can overfit with limited QC support.",
             if (rf_warn_low_qc) "With <12 QCs, overfit risk is elevated." else "",
             if (rf_warn_gap) sprintf("Your max QC gap is %s (>10).", format(max_gap, digits = 3)) else "",
-            "Prefer LOESS (degree 1/2) unless LOESS fails to reduce QC drift/RSD."
+            "Prefer Local polynomial unless local polynomial fails to reduce QC drift/RSD."
           )
         )
       )
@@ -204,7 +204,7 @@ ui_how_to_correct <- function(df,
         warn_span(
           show = loess2_warn_gap,
           text = if (loess2_warn_gap) {
-            sprintf("Your max QC gap is %s (>15). Large gaps can make LOESS less reliable between QC anchors.", format(max_gap, digits = 3))
+            sprintf("Your max QC gap is %s (>15). Large gaps can make local polynomial less reliable between QC anchors.", format(max_gap, digits = 3))
           } else {
             NULL
           }
@@ -224,7 +224,7 @@ ui_how_to_correct <- function(df,
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Rule of thumb: "),
-        "If both local polynomial and random forest are available, try both and compare RSD reduction and potential extreme values below. Then compare QC drift and PCA on the next tab."
+        "If both local polynomial and random forest are available, try both and compare RSD reduction, potential extreme values, QC drift, PCA after correction."
       )
     ))
   }

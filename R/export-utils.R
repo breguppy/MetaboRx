@@ -129,8 +129,9 @@ report_text_data_req <- function() {
 report_text_data_inspection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "Before correction, the app performs a lightweight cleaning step and runs a set of checks ",
-      "so you can confirm the dataset is formatted correctly and identify common quality issues."
+      "Before correction, the app performs a lightweight cleaning and runs a set of checks ",
+      "confirming the dataset is formatted correctly. This step identifies common quality issues ",
+      "by flagging invaild metabolite values, duplicate metabolites/columns, and possible contaminates."
     ),
     
     htmltools::tags$h4("Cleaning performed"),
@@ -234,11 +235,25 @@ report_text_withheld_columns <- function(p, d) {
 #' @noRd
 report_text_mv_filter <- function() {
   htmltools::tagList(
-    htmltools::tags$p("Metabolites with missing value percentage above the selected threshold for at least 1 sample class are removed from the dataset."),
-    htmltools::tags$p("After filtering by missing value percentage, metabolites that have at least 1 missing value for QC samples are displayed.",
-                "Since missing values for QC samples is not common, further investigation is need to determine if the value is truly not detected."),
-    htmltools::tags$p("If a metabolite is missing for all samples in a single class, a warning will appear stating the class and metabolite with all missing values."),
-    htmltools::tags$p("Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, class, and class-metabolite.")
+    htmltools::tags$p("Metabolites with missing value percentage above the ",
+      "selected threshold for at least 1 sample class are removed from the ",
+      " dataset. After filtering by missing value percentage, metabolites that ",
+      "have at least 1 missing value for QC samples are displayed. Since missing",
+      "values for QC samples is not common, further investigation is need to ",
+      "determine if the value is truly not detected."),
+    htmltools::tags$p("If a metabolite is missing for all samples in a single ",
+    "class, a warning will appear stating the class and metabolite with all ",
+    "missing values."),
+    htmltools::tags$h4("How to use this section"),
+    htmltools::tags$ul(
+      htmltools::tags$li(
+        "Review the metabolite that are removed based on missing value percentage."
+      ),
+      htmltools::tags$li("Double check that QC missing values are truly missing in the raw data."),
+      htmltools::tags$li(
+        "Use the 'missing_value_counts.xlsx' to investigate patterns in missing values by viewing counts by sample, metabolite, batch, class, and class-metabolite."
+      ),
+    )
   )
 }
 
@@ -256,18 +271,6 @@ report_text_correlations <- function() {
       "To further investigate metabolite correlations view the Excel file '*_metabolite_correlations.xlsx'. ",
       "Take special note of any pair of metabolites what have strong correlation, but no biological explanation and investigate further if needed. "
     )
-    # htmltools::tags$p(
-    #   "Two metababolites might have a strong positive linear correlation without a biological explanation if "
-    # ),
-    # htmltools::tags$ul(
-    #   htmltools::tags$li(
-    #     "they are from the same chromotography peak, but viewed under different filters during the peak-picking process."
-    #   ),
-    #   htmltools::tags$li(
-    #     "They have similar signal drift patterns that confounds biological signal."
-    #   )
-    # ),
-    
   )
 }
 
@@ -344,7 +347,7 @@ report_text_correction <- function(p, d) {
 #' @noRd
 report_text_correction_descriptions <- function() {
   htmltools::tagList(
-    htmltools::tags$p("QC-based signal drift correction methods:"),
+    htmltools::tags$strong("QC-based signal drift correction methods:"),
     htmltools::tags$ul(
       htmltools::tags$li(
         htmltools::strong("Local constant regression (Nadaraya–Watson estimator): "),
@@ -446,8 +449,9 @@ report_text_rsd_cal <- function() {
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "This screen flags potential extreme values using a 2D PCA / Mahalanobis fit on non-QC samples.",
-      "The squared Mahalanobis distance is computed in the PC1–PC2 space using a PCA model fit on non-QC samples:"
+      "This step flags potential extreme values using a 2D PCA / Mahalanobis ",
+      "distance on non-QC samples. The squared Mahalanobis distance is computed ",
+      "in the PC1–PC2 space using a PCA model fit on non-QC samples:"
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
@@ -779,7 +783,7 @@ report_text_pca_plots <- function() {
     htmltools::tags$hr(),
     htmltools::strong("PCA loading plots"),
     htmltools::tags$p(
-      "The loading values show how much a metabolite contributes to that PC and the top 10 metabolites for each PC are shown below the PCA plot. ",
+      "The loading values show how much a metabolite contributes to that PC and the top 5 metabolites for each PC are shown below the PCA plot. ",
       "The magnitude of the loading corresponds to the metabolite's strength of correlation to that PC. ",
       "A metabolite with a large magnitude (close to 1 or -1) has a strong influence/contribution to that PC ",
       "and a metabolite with a small magnitude close to 0 has weak influence/contribution to that PC. ",
