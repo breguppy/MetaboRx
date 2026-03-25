@@ -217,7 +217,7 @@ ui_basic_info <- function(df,
     below_blank_threshold <- unique(stats::na.omit(as.character(below_blank_threshold)))
     
     blank_body <- sprintf(
-      "%d blank sample(s) detected and excluded from processing.",
+      "%d blank/processing blank sample(s) detected and excluded from processing.",
       n_blanks
     )
     
@@ -225,7 +225,7 @@ ui_basic_info <- function(df,
       tags$div(
         tags$p(
           style = "font-weight: 600; margin-top: 8px; margin-bottom: 6px;",
-          sprintf("%d Metabolites failing the 3× blank-average threshold for QC samples:",
+          sprintf("%d Metabolites failing the 3× blank-average threshold for QC samples (excluding internal standards):",
                   length(below_blank_threshold)
           )
         ),

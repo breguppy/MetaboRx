@@ -21,62 +21,89 @@ clean_data <- function(df,
   names(df)[names(df) == class]  <- "class"
   names(df)[names(df) == order]  <- "order"
   
-  # make class column factor
+  # make class/order consistent
   df$class <- as.character(df$class)
+  df$order <- as.numeric(df$order)
   
   # get names of non-numeric columns that are not metadata columns
-  non_numeric_cols <- names(df)[vapply(df, function(col) {
-    vals <- col[!is.na(col)]
-    all(is.na(suppressWarnings(as.numeric(vals))))
-  }, logical(1L))]
+  non_numeric_cols <- names(df)[vapply(
+    df,
+    function(col) {
+      vals <- col[!is.na(col)]
+      all(is.na(suppressWarnings(as.numeric(vals))))
+    },
+    logical(1L)
+  )]
   non_numeric_cols <- setdiff(non_numeric_cols, c("sample", "batch", "class", "order"))
   
   df <- df[, !(names(df) %in% non_numeric_cols), drop = FALSE]
   
-  # make sure data is in injection order (do this early so blanks/QCs relate to order)
+  # make sure data is in injection order
   df <- df[order(df$order), , drop = FALSE]
   metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
   
-  # ---- Normalize QC labels BEFORE blank detection (so NA class becomes QC, not blank) ----
-  df$class[is.na(df$class)] <- "QC"
-  df$class[df$class %in% c("qc", "Qc")] <- "QC"
-  
-  # ---- Define blank_df + remove blanks BEFORE replacement counting (NEW ORDER) ----
+  # ---- Normalize class labels ----
   class_chr <- trimws(as.character(df$class))
-  is_blank  <- tolower(class_chr) == "blank"
+  class_chr[is.na(class_chr) | class_chr == ""] <- "QC"
+  
+  qc_idx_norm <- tolower(class_chr) %in% c("qc")
+  class_chr[qc_idx_norm] <- "QC"
+  
+  df$class <- class_chr
+  
+  # ---- Remove HP rows BEFORE building blank_df ----
+  is_hp <- toupper(trimws(df$class)) == "HP"
+  if (any(is_hp, na.rm = TRUE)) {
+    df <- df[!is_hp, , drop = FALSE]
+  }
+  
+  # keep df in injection order after HP removal
+  df <- df[order(df$order), , drop = FALSE]
+  
+  # ---- Define blank-like rows and remove them before replacement counting ----
+  blank_like_labels <- c("blank", "pb", "processing blank")
+  class_chr <- trimws(as.character(df$class))
+  is_blank_like <- tolower(class_chr) %in% blank_like_labels
   
   blank_df <- df[0, , drop = FALSE]
   below_blank_threshold <- character(0)
+  below_blank_threshold_ex_ISTD <- character(0)
   
-  if (any(is_blank, na.rm = TRUE)) {
-    blank_df <- df[is_blank, , drop = FALSE]
-    df       <- df[!is_blank, , drop = FALSE]
+  if (any(is_blank_like, na.rm = TRUE)) {
+    blank_df <- df[is_blank_like, , drop = FALSE]
+    df <- df[!is_blank_like, , drop = FALSE]
     
-    # keep df in injection order after removal
+    # keep df in injection order after blank/PB removal
     df <- df[order(df$order), , drop = FALSE]
     
-    # Means (ignore NAs) using CURRENT metabolite set
+    qc_idx <- trimws(as.character(df$class)) == "QC"
+    if (!any(qc_idx)) {
+      stop("No QC samples remain after removing blanks/PBs; cannot compute blank threshold.")
+    }
+    
     blank_means <- vapply(
       blank_df[, metab, drop = FALSE],
       function(x) mean(suppressWarnings(as.numeric(x)), na.rm = TRUE),
       numeric(1L)
     )
-    qc_idx <- df$class == "QC"
-    if (!any(qc_idx)) {
-      stop("No QC samples remain after removing blanks; cannot compute blank threshold.")
-    }
-    df_means <- vapply(
+    
+    qc_means <- vapply(
       df[qc_idx, metab, drop = FALSE],
       function(x) mean(suppressWarnings(as.numeric(x)), na.rm = TRUE),
       numeric(1L)
     )
     
-    # flag metabolites where df_mean < 3 * blank_mean (only when blank_mean is finite & > 0)
-    eligible <- is.finite(blank_means) & blank_means > 0
-    below_blank_threshold <- names(df_means)[eligible & (df_means < (3 * blank_means))]
+    # flag metabolites where QC mean < 3 * blank/PB mean
+    eligible <- is.finite(blank_means) & !is.na(blank_means) & (blank_means > 0)
+    below_blank_threshold <- names(qc_means)[eligible & (qc_means < (3 * blank_means))]
   }
   
-  # ---- Replacement counting happens AFTER blanks removed (NEW ORDER) ----
+  # ---- Exclude ISTD / ITSD metabolites from threshold flag ----
+  below_blank_threshold_ex_ISTD <- below_blank_threshold[
+    !grepl("ISTD|ITSD", below_blank_threshold, ignore.case = TRUE)
+  ]
+  
+  # ---- Replacement counting happens AFTER HP + blank/PB removal ----
   repl <- tibble::tibble(
     metabolite = metab,
     non_numeric_replaced = 0L,
@@ -84,23 +111,23 @@ clean_data <- function(df,
   )
   
   for (i in seq_along(metab)) {
-    col  <- metab[i]
+    col <- metab[i]
     orig <- df[[col]]
-    num  <- suppressWarnings(as.numeric(orig))
+    num <- suppressWarnings(as.numeric(orig))
     
-    cnt1 <- sum(is.na(num) & !is.na(orig))          # non-numeric -> NA
-    cnt2 <- sum(num == 0, na.rm = TRUE)             # exactly 0 -> NA
+    cnt1 <- sum(is.na(num) & !is.na(orig))
+    cnt2 <- sum(num == 0, na.rm = TRUE)
     
     num[num == 0] <- NA
     df[[col]] <- num
     
     repl$non_numeric_replaced[i] <- cnt1
-    repl$zero_replaced[i]        <- cnt2
+    repl$zero_replaced[i] <- cnt2
   }
   
   # make sure data starts and ends with a QC
   if (nrow(df) == 0L) {
-    stop("No non-blank rows remain after preprocessing.")
+    stop("No non-blank/non-HP rows remain after preprocessing.")
   }
   if (df$class[1] != "QC") {
     stop("Data sorted by injection order must begin with a QC sample.")
@@ -109,7 +136,7 @@ clean_data <- function(df,
     stop("Data sorted by injection order must end with a QC sample.")
   }
   
-  # equal columns:
+  # equal columns
   duplicate_mets <- find_equal_metabolite_cols(df, metab, tolerance = 1e-3)
   
   return(list(
@@ -119,7 +146,8 @@ clean_data <- function(df,
     non_numeric_cols = non_numeric_cols,
     duplicate_mets = duplicate_mets,
     blank_df = blank_df,
-    below_blank_threshold = below_blank_threshold
+    below_blank_threshold = below_blank_threshold,
+    below_blank_threshold_ex_ISTD = below_blank_threshold_ex_ISTD
   ))
 }
 
@@ -147,11 +175,10 @@ find_equal_metabolite_cols <- function(df, cols = NULL, ...) {
     return(data.frame(col1 = character(0), col2 = character(0)))
   }
   
-  # All unique unordered column pairs
   pairs <- utils::combn(cols, 2L, simplify = FALSE)
   
   results <- vector("list", length(pairs))
-  keep    <- logical(length(pairs))
+  keep <- logical(length(pairs))
   
   for (i in seq_along(pairs)) {
     c1 <- pairs[[i]][1L]
@@ -160,15 +187,17 @@ find_equal_metabolite_cols <- function(df, cols = NULL, ...) {
     x <- df[[c1]]
     y <- df[[c2]]
     
-    # Only compare rows where both are non-NA
     idx <- !is.na(x) & !is.na(y)
     if (!any(idx)) {
       next
     }
     
-    # all.equal() returns TRUE or a string; we only want TRUE
     if (isTRUE(all.equal(x[idx], y[idx], ...))) {
-      results[[i]] <- data.frame(col1 = c1, col2 = c2, stringsAsFactors = FALSE)
+      results[[i]] <- data.frame(
+        col1 = c1,
+        col2 = c2,
+        stringsAsFactors = FALSE
+      )
       keep[i] <- TRUE
     }
   }

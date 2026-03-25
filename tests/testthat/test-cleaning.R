@@ -23,7 +23,7 @@ test_that("clean_data basic cleaning and outputs", {
   
   # structure
   expect_type(out, "list")
-  expect_named(out, c("df", "replacement_counts", "withheld_cols", "non_numeric_cols", "duplicate_mets", "blank_df", "below_blank_threshold"))
+  expect_named(out, c("df", "replacement_counts", "withheld_cols", "non_numeric_cols", "duplicate_mets", "blank_df", "below_blank_threshold", "below_blank_threshold_ex_ISTD"))
   expect_equal(out$withheld_cols, "note")
   
   # columns renamed, withheld removed, order applied

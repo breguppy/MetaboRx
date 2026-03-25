@@ -12,7 +12,7 @@ ui_column_warning <- function(data, selected) {
   } else if (length(unique(selected)) < 4) {
     warnings[[length(warnings) + 1]] <- tags$span(style = "color:darkred; font-weight:bold;",
                                                   icon("exclamation-triangle"),
-                                                  " Each selected column must be unique.")
+                                                  " The same column is selected multiple times.")
   }
   
   if (!any(selected == "") && length(unique(selected)) == 4) {
@@ -24,7 +24,11 @@ ui_column_warning <- function(data, selected) {
                                                     icon("exclamation-triangle"),
                                                     " Duplicate sample names detected!")
     }
-    
+    if (!is.numeric(order_vec)) {
+      warnings[[length(warnings) + 1]] <- tags$span(style = "color:darkred; font-weight:bold; display:block; margin-top:5px;",
+                                                    icon("exclamation-triangle"),
+                                                    " Order column must contain numbers.")
+    }
     if (anyDuplicated(order_vec) > 0) {
       warnings[[length(warnings) + 1]] <- tags$span(style = "color:darkred; font-weight:bold; display:block; margin-top:5px;",
                                                     icon("exclamation-triangle"),

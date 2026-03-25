@@ -89,7 +89,6 @@ export_figures <- function(p, d, out_dir = tempdir()) {
       )
       shiny::incProgress(1 / N, detail = "Saved: pca loading figure")
     }
-    
     # Export PCA loadings workbook into the PCA plots folder
     pca_loadings_xlsx <- export_pca_loadings_xlsx(
       p = p,
