@@ -206,7 +206,11 @@ mod_import_server <- function(id) {
     cleaned_r <- reactive({
       df  <- req(data_raw())
       sel <- selections_r()
+      col_warn <- ui_column_warning(df,
+                        c(sel$sample, sel$batch, sel$class, sel$order))
+      req(is.null(col_warn))
       withheld <- withheld_r()
+      # column warings must be NULL for cleaning to happen.
       req(all(nzchar(
         c(sel$sample, sel$batch, sel$class, sel$order)
       )))
@@ -219,7 +223,7 @@ mod_import_server <- function(id) {
     output$basic_info <- renderUI({
       cd <- cleaned_r()
       req(cd)
-      ui_basic_info(cd$df, cd$replacement_counts, cd$non_numeric_cols, cd$duplicate_mets, cd$blank_df, cd$below_blank_threshold)
+      ui_basic_info(cd$df, cd$replacement_counts, cd$non_numeric_cols, cd$duplicate_mets, cd$blank_df, cd$below_blank_threshold_ex_ISTD)
     })
     output$ui_control_class_selector <- renderUI({
       cd <- cleaned_r()

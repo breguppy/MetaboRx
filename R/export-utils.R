@@ -186,7 +186,7 @@ report_text_data_inspection <- function() {
       ),
       htmltools::tags$li(
         htmltools::tags$strong("QC coverage by batch: "),
-        "counts of QC injections in each batch (useful for interpreting which correction options are available)."
+        "counts of QC injections in each batch."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Potential duplicate metabolites (informational): "),
