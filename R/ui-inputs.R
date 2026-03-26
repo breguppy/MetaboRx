@@ -44,10 +44,10 @@ ui_nonmet_cols <- function(cols, ns = identity) {
   dropdown_choices <- c("Select a column..." = "", cols)
   
   tagList(
-    htmltools::tags$h5("Select Non-Metabolite Columns"),
+    htmltools::tags$h5("Select Required Metadata Columns"),
     tooltip(
       selectInput(ns("sample_col"), "sample column", dropdown_choices, ""),
-      "Column that contains unique sample names.",
+      "Column that sample names. Data cannot have repeated sample names.",
       placement ="right"
     ),
     tooltip(
@@ -75,7 +75,7 @@ ui_nonmet_cols <- function(cols, ns = identity) {
         dropdown_choices,
         ""
       ),
-      "Column that indicates injection order.",
+      "Column that indicates the order in which samples were injected into the instrument.",
       placement = "right"
     )
   )
@@ -87,8 +87,8 @@ ui_nonmet_cols <- function(cols, ns = identity) {
 ui_withhold_toggle <- function(ns) {
   tooltip(
     checkboxInput(ns("withhold_cols"),
-                  "Withhold additional columns from correction", FALSE),
-    "Select if there are extra non-metabolite or specific metabolite columns to withhold.",
+                  "Data contains additional metadata columns", FALSE),
+    "Select if there are extra non-metabolite columns in the dataset.",
     placement = "right"
   )
 }
@@ -98,7 +98,7 @@ ui_withhold_toggle <- function(ns) {
 #' @noRd
 ui_withhold_count <- function(ns, max_withhold) {
   numericInput(ns("n_withhold"),
-               "Number of columns to withhold",
+               "Number of additional metadata columns",
                value = if (max_withhold > 0) 1 else 0,
                min   = 0,
                max   = max_withhold,
@@ -121,7 +121,7 @@ ui_withhold_selectors <- function(ids, cols, prev, ns) {
     choices_i <- c("Select a column..." = "", setdiff(cols, other))
     selectInput(
       ns(id),
-      label   = paste("Select column to withhold #", i),
+      label   = paste("Select additional metadata column #", i),
       choices = choices_i,
       selected = if (nzchar(prior) && prior %in% choices_i) prior else ""
     )
