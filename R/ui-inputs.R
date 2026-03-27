@@ -560,17 +560,32 @@ ui_rsd_eval <- function(ns) {
 #' visualization pca evaluation
 #' @keywords internal
 #' @noRd
-ui_pca_eval <- function(ns){
+ui_pca_eval <- function(meta_df, ns){
+  color_options <- setdiff(names(meta_df), "sample")
+  
+  # optional prioritization
+  priority <- c("batch", "class", "order")
+  color_options <- c(
+    intersect(priority, color_options),
+    setdiff(color_options, priority)
+  )
+  
   tagList(
-    radioButtons(ns("pca_compare"), 
-                 "Compare raw data to", 
-                 list("Corrected data" = "filtered_cor_data", 
-                      "Transformed and corrected data" = "transformed_cor_data"), 
-                 "filtered_cor_data"),
-    radioButtons(ns("color_col"), 
-                 "Color PCA by", 
-                 list("batch" = "batch", "class" = "class", "order" = "order"), 
-                 "batch")
+    radioButtons(
+      ns("pca_compare"), 
+      "Compare raw data to", 
+      choices = c(
+        "Corrected data" = "filtered_cor_data", 
+        "Transformed and corrected data" = "transformed_cor_data"
+      ), 
+      selected = "filtered_cor_data"
+    ),
+    radioButtons(
+      ns("color_col"), 
+      "Color PCA by", 
+      choices = stats::setNames(color_options, color_options),
+      selected = color_options[1]
+    )
   )
 }
 

@@ -80,7 +80,7 @@ mod_visualize_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        ui_pca_eval(ns),
+        uiOutput(ns("pca_options")),
         width = 400
       ),
       plotOutput(ns("pca_plot"), height = "530px", width = "1000px") %>% withSpinner(color = "#404040"),
@@ -149,6 +149,10 @@ mod_visualize_server <- function(id, data, params) {
       )
     })
     
+    #-- PCA options
+    output$pca_options <- renderUI({
+      ui_pca_eval(d()$cleaned$meta_df, ns = session$ns)
+    })
     #-- PCA comparison data for the selected compare mode
     pca_compare_data <- reactive({
       req(input$pca_compare)
