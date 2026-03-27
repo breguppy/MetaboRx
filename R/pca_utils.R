@@ -31,15 +31,15 @@ validate_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
   if (is.null(meta_df)) {
     stop("`meta_df` cannot be NULL.")
   }
-  
+
   if (!sample_col %in% names(df)) {
     stop(sprintf("PCA data frame must contain '%s'.", sample_col))
   }
-  
+
   if (!sample_col %in% names(meta_df)) {
     stop(sprintf("`meta_df` must contain '%s'.", sample_col))
   }
-  
+
   if (anyDuplicated(meta_df[[sample_col]]) > 0L) {
     dupes <- unique(meta_df[[sample_col]][duplicated(meta_df[[sample_col]])])
     stop(
@@ -49,7 +49,7 @@ validate_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
       )
     )
   }
-  
+
   missing_meta <- setdiff(df[[sample_col]], meta_df[[sample_col]])
   if (length(missing_meta) > 0L) {
     stop(
@@ -59,7 +59,7 @@ validate_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
       )
     )
   }
-  
+
   meta_df
 }
 
@@ -81,7 +81,7 @@ validate_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
 #' @noRd
 align_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
   meta_df <- validate_pca_meta_df(df = df, meta_df = meta_df, sample_col = sample_col)
-  
+
   idx <- match(df[[sample_col]], meta_df[[sample_col]])
   meta_df[idx, , drop = FALSE]
 }
@@ -103,9 +103,9 @@ align_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
 #'
 #' @noRd
 get_shared_pca_metab_cols <- function(
-    before,
-    after,
-    meta_cols = c("sample", "batch", "class", "order")
+  before,
+  after,
+  meta_cols = c("sample", "batch", "class", "order")
 ) {
   intersect(
     setdiff(names(before), meta_cols),
@@ -135,14 +135,14 @@ prep_pca_matrix <- function(df, p, metab_cols) {
   if (length(metab_cols) == 0L) {
     stop("No metabolite columns available for PCA.")
   }
-  
+
   out <- df[, metab_cols, drop = FALSE]
-  
+
   if (anyNA(out)) {
     results <- impute_missing(df, metab_cols, p$qcImputeM, p$samImputeM)
     out <- results$df[, metab_cols, drop = FALSE]
   }
-  
+
   is_num <- vapply(out, is.numeric, logical(1))
   if (!all(is_num)) {
     bad_cols <- names(out)[!is_num]
@@ -153,7 +153,7 @@ prep_pca_matrix <- function(df, p, metab_cols) {
       )
     )
   }
-  
+
   out
 }
 
@@ -183,16 +183,16 @@ prep_pca_matrix <- function(df, p, metab_cols) {
 #'
 #' @noRd
 compute_single_pca <- function(
-    df,
-    p,
-    metab_cols,
-    meta_cols = c("sample", "batch", "class", "order"),
-    meta_df = NULL,
-    sample_col = "sample"
+  df,
+  p,
+  metab_cols,
+  meta_cols = c("sample", "batch", "class", "order"),
+  meta_df = NULL,
+  sample_col = "sample"
 ) {
   x <- prep_pca_matrix(df = df, p = p, metab_cols = metab_cols)
   fit <- stats::prcomp(x, center = TRUE, scale. = TRUE)
-  
+
   if (is.null(meta_df)) {
     meta_source <- df
   } else {
@@ -205,7 +205,7 @@ compute_single_pca <- function(
     if (anyDuplicated(meta_df[[sample_col]]) > 0L) {
       stop("`meta_df` contains duplicate sample values.")
     }
-    
+
     idx <- match(df[[sample_col]], meta_df[[sample_col]])
     if (anyNA(idx)) {
       missing_samples <- df[[sample_col]][is.na(idx)]
@@ -216,24 +216,24 @@ compute_single_pca <- function(
         )
       )
     }
-    
+
     meta_source <- meta_df[idx, , drop = FALSE]
   }
-  
+
   available_meta <- intersect(meta_cols, names(meta_source))
-  
+
   if (!sample_col %in% available_meta && sample_col %in% names(meta_source)) {
     available_meta <- c(sample_col, available_meta)
   }
-  
+
   scores_df <- as.data.frame(fit$x, stringsAsFactors = FALSE)
   scores_df <- dplyr::bind_cols(scores_df, meta_source[, available_meta, drop = FALSE])
-  
+
   loadings_df <- as.data.frame(fit$rotation, stringsAsFactors = FALSE)
   loadings_df$variable <- rownames(loadings_df)
   rownames(loadings_df) <- NULL
   loadings_df <- loadings_df[, c("variable", setdiff(names(loadings_df), "variable")), drop = FALSE]
-  
+
   explained_var <- (fit$sdev^2) / sum(fit$sdev^2)
   explained_variance_df <- data.frame(
     PC = paste0("PC", seq_along(explained_var)),
@@ -241,7 +241,7 @@ compute_single_pca <- function(
     cumulative_explained_variance = cumsum(as.numeric(explained_var)),
     stringsAsFactors = FALSE
   )
-  
+
   list(
     fit = fit,
     scores = scores_df,
@@ -275,21 +275,21 @@ compute_single_pca <- function(
 #'
 #' @noRd
 compute_pca_pair <- function(
-    before,
-    after,
-    p,
-    before_label = "Before",
-    after_label = "After",
-    meta_cols = c("sample", "batch", "class", "order"),
-    meta_df = NULL,
-    sample_col = "sample"
+  before,
+  after,
+  p,
+  before_label = "Before",
+  after_label = "After",
+  meta_cols = c("sample", "batch", "class", "order"),
+  meta_df = NULL,
+  sample_col = "sample"
 ) {
   metab_cols <- get_shared_pca_metab_cols(
     before = before,
     after = after,
     meta_cols = meta_cols
   )
-  
+
   before_res <- compute_single_pca(
     df = before,
     p = p,
@@ -298,7 +298,7 @@ compute_pca_pair <- function(
     meta_df = meta_df,
     sample_col = sample_col
   )
-  
+
   after_res <- compute_single_pca(
     df = after,
     p = p,
@@ -307,10 +307,10 @@ compute_pca_pair <- function(
     meta_df = meta_df,
     sample_col = sample_col
   )
-  
+
   before_res$label <- before_label
   after_res$label <- after_label
-  
+
   list(
     before = before_res,
     after = after_res,
@@ -336,21 +336,21 @@ compute_pca_pair <- function(
 plot_pca_from_result <- function(p, pca_pair, compared_to) {
   before_df <- pca_pair$before$scores
   after_df <- pca_pair$after$scores
-  
+
   if (!all(c("PC1", "PC2") %in% names(before_df))) {
     stop("PCA scores do not contain PC1 and PC2 for the before dataset.")
   }
   if (!all(c("PC1", "PC2") %in% names(after_df))) {
     stop("PCA scores do not contain PC1 and PC2 for the after dataset.")
   }
-  
+
   combined <- dplyr::bind_rows(before_df, after_df)
   x_limits <- range(combined$PC1, na.rm = TRUE)
   y_limits <- range(combined$PC2, na.rm = TRUE)
-  
+
   var_raw <- 100 * pca_pair$before$explained_variance$explained_variance[1:2]
   var_cor <- 100 * pca_pair$after$explained_variance$explained_variance[1:2]
-  
+
   cbPalette <- c(
     "#F3C300", "#875692", "#ee7733", "#A1CAF1", "#BE0032",
     "#C2B280", "#555555", "#008856", "#E68FAC", "#0067A5",
@@ -358,36 +358,36 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     "#882D17", "#8DB600", "#654522", "#E25822", "#2B3D26",
     "#bbbbbb", "#000000", "#33bbee", "#ccddaa", "#225555"
   )
-  
+
   col <- p$color_col %||% "class"
-  
+
   if (!col %in% names(before_df) || !col %in% names(after_df)) {
     stop(sprintf("Column '%s' not found in PCA score data.", col))
   }
-  
+
   is_numeric_like <- function(x) {
     is.numeric(x) || is.integer(x)
   }
-  
+
   before_is_numeric <- is_numeric_like(before_df[[col]])
   after_is_numeric <- is_numeric_like(after_df[[col]])
-  
+
   if (before_is_numeric != after_is_numeric) {
     stop(sprintf(
       "Column '%s' is not of the same type in before/after PCA score data.",
       col
     ))
   }
-  
+
   use_gradient <- before_is_numeric && after_is_numeric
-  
+
   if (use_gradient) {
     combined[[col]] <- as.numeric(combined[[col]])
     before_df[[col]] <- as.numeric(before_df[[col]])
     after_df[[col]] <- as.numeric(after_df[[col]])
-    
+
     order_range <- range(combined[[col]], na.rm = TRUE)
-    
+
     scale_color_pca <- function() {
       ggplot2::scale_color_viridis_c(
         option = "viridis",
@@ -400,13 +400,13 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     if (length(lvls) > length(cbPalette)) {
       stop("Too many groups for palette.")
     }
-    
+
     cols <- stats::setNames(cbPalette[seq_along(lvls)], lvls)
-    
+
     combined[[col]] <- factor(combined[[col]], levels = lvls)
     before_df[[col]] <- factor(before_df[[col]], levels = lvls)
     after_df[[col]] <- factor(after_df[[col]], levels = lvls)
-    
+
     scale_color_pca <- function() {
       ggplot2::scale_color_manual(
         values = cols,
@@ -416,7 +416,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       )
     }
   }
-  
+
   big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
@@ -425,7 +425,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       legend.title = ggplot2::element_text(size = 12, face = "bold"),
       legend.text = ggplot2::element_text(size = 10)
     )
-  
+
   p1 <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2, alpha = 0.8) +
     ggplot2::labs(
@@ -442,7 +442,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
       plot.margin = ggplot2::margin(10, 5, 10, 5)
     )
-  
+
   p2 <- ggplot2::ggplot(after_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2, alpha = 0.8) +
     ggplot2::labs(
@@ -459,7 +459,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
       plot.margin = ggplot2::margin(10, 5, 10, 5)
     )
-  
+
   p_leg <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2) +
     scale_color_pca() +
@@ -475,9 +475,9 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       legend.position = "right",
       legend.box.margin = ggplot2::margin(0, 0, 0, 0)
     )
-  
+
   leg <- cowplot::get_legend(p_leg)
-  
+
   comb <- cowplot::plot_grid(
     p1, p2, leg,
     nrow = 1,
@@ -486,7 +486,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     align = "hv",
     axis = "tblr"
   )
-  
+
   cowplot::ggdraw() +
     cowplot::draw_label(
       paste("Comparison of PCA Before and After", compared_to),
@@ -523,17 +523,17 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
 #'
 #' @noRd
 plot_pca_loading_from_result <- function(
-    pca_pair,
-    compared_to,
-    top_n = 5,
-    label_width = 28
+  pca_pair,
+  compared_to,
+  top_n = 5,
+  label_width = 28
 ) {
   tidy_top <- function(loadings_df, label) {
     keep_cols <- intersect(c("PC1", "PC2"), names(loadings_df))
     if (length(keep_cols) == 0L) {
       stop("PCA loading data does not contain PC1 or PC2.")
     }
-    
+
     df <- loadings_df[, c("variable", keep_cols), drop = FALSE]
     df <- tidyr::pivot_longer(
       df,
@@ -541,19 +541,19 @@ plot_pca_loading_from_result <- function(
       names_to = "PC",
       values_to = "loading"
     )
-    
+
     df <- dplyr::mutate(
       df,
       abs_loading = abs(.data$loading),
       sign = ifelse(.data$loading >= 0, "Positive", "Negative"),
       panel = label
     )
-    
+
     df <- df |>
       dplyr::group_by(.data$PC) |>
       dplyr::slice_max(.data$abs_loading, n = top_n, with_ties = FALSE) |>
       dplyr::ungroup()
-    
+
     df <- df |>
       dplyr::group_by(.data$panel, .data$PC) |>
       dplyr::arrange(dplyr::desc(.data$abs_loading), .by_group = TRUE) |>
@@ -562,16 +562,16 @@ plot_pca_loading_from_result <- function(
         variable_wrapped = factor(.data$variable_wrapped, levels = rev(unique(.data$variable_wrapped)))
       ) |>
       dplyr::ungroup()
-    
+
     df
   }
-  
+
   before_top <- tidy_top(pca_pair$before$loadings, "Before")
   after_top <- tidy_top(pca_pair$after$loadings, "After")
-  
+
   lim <- max(c(before_top$abs_loading, after_top$abs_loading), na.rm = TRUE)
   y_limits <- c(-lim, lim)
-  
+
   big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
@@ -581,12 +581,12 @@ plot_pca_loading_from_result <- function(
       legend.title = ggplot2::element_text(size = 11, face = "bold"),
       legend.text = ggplot2::element_text(size = 10)
     )
-  
+
   mk_plot <- function(df, title) {
     ggplot2::ggplot(df, ggplot2::aes(x = .data$variable_wrapped, y = .data$loading, fill = .data$sign)) +
       ggplot2::geom_col(width = 0.7) +
       ggplot2::coord_flip(clip = "off") +
-      ggplot2::facet_wrap(~ PC, nrow = 2, scales = "free_y") +
+      ggplot2::facet_wrap(~PC, nrow = 2, scales = "free_y") +
       ggplot2::scale_y_continuous(
         limits = y_limits,
         expand = ggplot2::expansion(mult = c(0.02, 0.05))
@@ -603,10 +603,10 @@ plot_pca_loading_from_result <- function(
         plot.margin = ggplot2::margin(10, 5, 10, 5)
       )
   }
-  
+
   p_before <- mk_plot(before_top, "Before")
   p_after <- mk_plot(after_top, "After")
-  
+
   p_leg <- ggplot2::ggplot(before_top, ggplot2::aes(x = variable_wrapped, y = loading, fill = sign)) +
     ggplot2::geom_col() +
     ggplot2::scale_fill_manual(
@@ -621,9 +621,9 @@ plot_pca_loading_from_result <- function(
     ) +
     big_font_theme +
     ggplot2::theme(legend.position = "right")
-  
+
   leg <- cowplot::get_legend(p_leg)
-  
+
   comb <- cowplot::plot_grid(
     p_before, p_after, leg,
     nrow = 1,
@@ -632,7 +632,7 @@ plot_pca_loading_from_result <- function(
     align = "hv",
     axis = "tblr"
   )
-  
+
   cowplot::ggdraw() +
     cowplot::draw_label(
       paste0("Top ", top_n, " Loadings for PC1 and PC2, Before vs After ", compared_to),
@@ -669,7 +669,7 @@ plot_pca <- function(p, before, after, compared_to) {
     before_label = "Before",
     after_label = "After"
   )
-  
+
   plot_pca_from_result(
     p = p,
     pca_pair = pca_pair,
@@ -697,12 +697,12 @@ plot_pca <- function(p, before, after, compared_to) {
 #'
 #' @noRd
 plot_pca_loading <- function(
-    p,
-    before,
-    after,
-    compared_to,
-    top_n = 5,
-    label_width = 28
+  p,
+  before,
+  after,
+  compared_to,
+  top_n = 5,
+  label_width = 28
 ) {
   pca_pair <- compute_pca_pair(
     before = before,
@@ -711,7 +711,7 @@ plot_pca_loading <- function(
     before_label = "Before",
     after_label = "After"
   )
-  
+
   plot_pca_loading_from_result(
     pca_pair = pca_pair,
     compared_to = compared_to,
@@ -734,16 +734,16 @@ plot_pca_loading <- function(
 #' @noRd
 compute_pca_loadings_table_from_result <- function(pca_res, dataset_label) {
   loadings_df <- pca_res$loadings
-  
+
   pc_cols <- grep("^PC\\d+$", names(loadings_df), value = TRUE)
-  
+
   if ("PC1" %in% pc_cols) {
     loadings_df$abs_PC1 <- abs(loadings_df$PC1)
   }
   if ("PC2" %in% pc_cols) {
     loadings_df$abs_PC2 <- abs(loadings_df$PC2)
   }
-  
+
   if (length(pc_cols) > 0L) {
     loadings_df$max_abs_loading <- apply(
       abs(loadings_df[, pc_cols, drop = FALSE]),
@@ -754,14 +754,14 @@ compute_pca_loadings_table_from_result <- function(pca_res, dataset_label) {
   } else {
     loadings_df$max_abs_loading <- NA_real_
   }
-  
+
   loadings_df$dataset <- dataset_label
   loadings_df <- loadings_df[, c("dataset", setdiff(names(loadings_df), "dataset")), drop = FALSE]
-  
+
   explained_variance_df <- pca_res$explained_variance
   explained_variance_df$dataset <- dataset_label
   explained_variance_df <- explained_variance_df[, c("dataset", setdiff(names(explained_variance_df), "dataset")), drop = FALSE]
-  
+
   list(
     loadings = loadings_df,
     explained_variance = explained_variance_df
@@ -785,20 +785,20 @@ compute_pca_loadings_table_from_result <- function(pca_res, dataset_label) {
 #'
 #' @noRd
 compute_pca_loadings_table <- function(
-    df,
-    p,
-    dataset_label,
-    meta_cols = c("sample", "batch", "class", "order")
+  df,
+  p,
+  dataset_label,
+  meta_cols = c("sample", "batch", "class", "order")
 ) {
   metab_cols <- setdiff(names(df), meta_cols)
-  
+
   pca_res <- compute_single_pca(
     df = df,
     p = p,
     metab_cols = metab_cols,
     meta_cols = meta_cols
   )
-  
+
   compute_pca_loadings_table_from_result(
     pca_res = pca_res,
     dataset_label = dataset_label
@@ -819,15 +819,15 @@ compute_pca_loadings_table <- function(
 #' @noRd
 get_pca_export_datasets <- function(p, d) {
   datasets <- list()
-  
+
   datasets$raw_data <- d$filtered$df
-  
+
   datasets$corrected_data <- if (isTRUE(p$remove_imputed)) {
     d$filtered_corrected$df_mv
   } else {
     d$filtered_corrected$df_no_mv
   }
-  
+
   if (!identical(p$transform, "none")) {
     datasets$transformed_data <- if (isTRUE(p$remove_imputed)) {
       d$transformed$df_mv
@@ -835,7 +835,7 @@ get_pca_export_datasets <- function(p, d) {
       d$transformed$df_no_mv
     }
   }
-  
+
   datasets
 }
 
@@ -854,12 +854,12 @@ get_pca_export_datasets <- function(p, d) {
 #'
 #' @noRd
 compute_all_pca_export_results <- function(
-    p,
-    d,
-    meta_cols = c("sample", "batch", "class", "order")
+  p,
+  d,
+  meta_cols = c("sample", "batch", "class", "order")
 ) {
   datasets <- get_pca_export_datasets(p, d)
-  
+
   lapply(datasets, function(df) {
     metab_cols <- setdiff(names(df), meta_cols)
     compute_single_pca(
@@ -895,54 +895,55 @@ compute_all_pca_export_results <- function(
 #'
 #' @noRd
 export_pca_loadings_xlsx <- function(
-    p,
-    d,
-    pca_dir,
-    file_name = "pca_loadings.xlsx",
-    pca_results = NULL
+  p,
+  d,
+  pca_dir,
+  file_name = "pca_loadings.xlsx",
+  pca_results = NULL
 ) {
   .require_pkg("openxlsx", "write PCA loadings workbook")
-  
+
   if (is.null(pca_results)) {
     pca_results <- compute_all_pca_export_results(p = p, d = d)
   }
-  
+
   wb <- openxlsx::createWorkbook()
-  bold  <- openxlsx::createStyle(textDecoration = "Bold")
-  note  <- openxlsx::createStyle(wrapText = TRUE,
-                                 valign = "top",
-                                 fgFill = "#f8cbad")
-  
+  bold <- openxlsx::createStyle(textDecoration = "Bold")
+  note <- openxlsx::createStyle(
+    wrapText = TRUE,
+    valign = "top",
+    fgFill = "#f8cbad"
+  )
+
   num_style <- openxlsx::createStyle(numFmt = "0.0000")
-  
+
   ev_all <- list()
-  
+
   # leave space for title + description + blank row
   data_start_row <- 5L
-  
+
   for (nm in names(pca_results)) {
     res <- compute_pca_loadings_table_from_result(
       pca_res = pca_results[[nm]],
       dataset_label = nm
     )
-    
-    sheet_name <- switch(
-      nm,
+
+    sheet_name <- switch(nm,
       raw_data = "Raw PCA Loadings",
       corrected_data = "Corrected PCA Loadings",
       transformed_data = "Transformed PCA Loadings",
       nm
     )
-    
+
     sheet_name <- substr(sheet_name, 1L, 31L)
-    
+
     description_text <- paste(
       "PCA loadings describe how strongly each metabolite contributes to each principal component (PC).",
       "Larger absolute loading values indicate stronger influence on that PC.",
       "The sign indicates direction along the component, but the magnitude is usually the more important quantity when identifying influential metabolites.",
       "Columns abs_PC1 and abs_PC2 give the absolute loading magnitude for PC1 and PC2, and max_abs_loading gives the largest absolute loading across all PCs for each metabolite."
     )
-    
+
     openxlsx::addWorksheet(wb, sheet_name)
     openxlsx::writeData(
       wb,
@@ -954,7 +955,7 @@ export_pca_loadings_xlsx <- function(
       headerStyle = bold,
       withFilter = TRUE
     )
-    
+
     numeric_cols <- which(vapply(res$loadings, is.numeric, logical(1)))
     if (length(numeric_cols) > 0L) {
       openxlsx::addStyle(
@@ -969,7 +970,7 @@ export_pca_loadings_xlsx <- function(
     }
     openxlsx::setColWidths(wb, sheet = sheet_name, cols = 1, widths = 25)
     openxlsx::setColWidths(wb, sheet = sheet_name, cols = 2:ncol(res$loadings), widths = "auto")
-    
+
     openxlsx::writeData(
       wb,
       sheet = sheet_name,
@@ -988,20 +989,20 @@ export_pca_loadings_xlsx <- function(
       cols = 1,
       gridExpand = TRUE
     )
-    openxlsx::setRowHeights(wb,  sheet = sheet_name, rows = 1, heights = 60)
-    
+    openxlsx::setRowHeights(wb, sheet = sheet_name, rows = 1, heights = 60)
+
     ev_all[[nm]] <- res$explained_variance
   }
-  
+
   explained_variance_df <- do.call(rbind, ev_all)
-  
+
   ev_sheet_name <- "Explained Variance"
   ev_description_text <- paste(
     "Explained variance gives the proportion of total variance captured by each principal component (PC).",
     "Higher explained_variance means that PC summarizes more of the structure in the data.",
     "cumulative_explained_variance shows the running total across PCs and is useful for assessing how many components are needed to represent the dataset."
   )
-  
+
   openxlsx::addWorksheet(wb, ev_sheet_name)
   openxlsx::writeData(
     wb,
@@ -1013,7 +1014,7 @@ export_pca_loadings_xlsx <- function(
     headerStyle = bold,
     withFilter = TRUE
   )
-  
+
   numeric_cols_ev <- which(vapply(explained_variance_df, is.numeric, logical(1)))
   if (length(numeric_cols_ev) > 0L) {
     openxlsx::addStyle(
@@ -1042,7 +1043,7 @@ export_pca_loadings_xlsx <- function(
     colNames = FALSE,
     rowNames = FALSE
   )
-  
+
   openxlsx::mergeCells(wb, sheet = ev_sheet_name, cols = 1:8, rows = 1)
   openxlsx::addStyle(
     wb,
@@ -1052,11 +1053,11 @@ export_pca_loadings_xlsx <- function(
     cols = 1,
     gridExpand = TRUE
   )
-  openxlsx::setRowHeights(wb,  sheet = ev_sheet_name, rows = 1, heights = 60)
+  openxlsx::setRowHeights(wb, sheet = ev_sheet_name, rows = 1, heights = 60)
 
   out_path <- file.path(pca_dir, file_name)
   openxlsx::saveWorkbook(wb, out_path, overwrite = TRUE)
-  
+
   normalizePath(out_path, winslash = "/", mustWork = TRUE)
 }
 
@@ -1075,21 +1076,19 @@ export_pca_loadings_xlsx <- function(
 #' @noRd
 get_pca_compare_data <- function(p, d, pca_compare) {
   before <- d$filtered$df
-  
-  after <- switch(
-    pca_compare,
+
+  after <- switch(pca_compare,
     filtered_cor_data = if (isTRUE(p$remove_imputed)) d$filtered_corrected$df_mv else d$filtered_corrected$df_no_mv,
     transformed_cor_data = if (isTRUE(p$remove_imputed)) d$transformed$df_mv else d$transformed$df_no_mv,
     stop(sprintf("Unsupported pca_compare value: %s", pca_compare))
   )
-  
-  compared_to <- switch(
-    pca_compare,
+
+  compared_to <- switch(pca_compare,
     filtered_cor_data = "Corrected Data",
     transformed_cor_data = "Transformed Data",
     pca_compare
   )
-  
+
   list(
     before = before,
     after = after,
@@ -1116,7 +1115,7 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
   build_name <- function(compare, color) {
     sprintf("pca_%s_%s", compare, color)
   }
-  
+
   if (is.null(meta_df)) {
     color_choices <- c("batch", "class", "order")
     meta_cols <- c("sample", "batch", "class", "order")
@@ -1124,21 +1123,21 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
     color_choices <- setdiff(names(meta_df), "sample")
     meta_cols <- c("sample", color_choices)
   }
-  
+
   specs <- expand.grid(
     color_col = color_choices,
     pca_compare = "filtered_cor_data",
     stringsAsFactors = FALSE
   )
-  
+
   if (!identical(p$transform, "none")) {
     specs_trans <- specs
     specs_trans$pca_compare <- "transformed_cor_data"
     specs <- rbind(specs, specs_trans)
   }
-  
+
   unique_compares <- unique(specs$pca_compare)
-  
+
   pca_pairs <- stats::setNames(vector("list", length(unique_compares)), unique_compares)
   for (cmp in unique_compares) {
     compare_data <- get_pca_compare_data(p = p, d = d, pca_compare = cmp)
@@ -1154,28 +1153,28 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
     )
     pca_pairs[[cmp]]$compared_to <- compare_data$compared_to
   }
-  
+
   pca_plots <- vector("list", nrow(specs))
   plot_names <- character(nrow(specs))
-  
+
   for (i in seq_len(nrow(specs))) {
     temp_params <- p
     temp_params$color_col <- specs$color_col[i]
     temp_params$pca_compare <- specs$pca_compare[i]
-    
+
     pca_plots[[i]] <- plot_pca_from_result(
       p = temp_params,
       pca_pair = pca_pairs[[temp_params$pca_compare]],
       compared_to = pca_pairs[[temp_params$pca_compare]]$compared_to
     )
-    
+
     plot_names[i] <- build_name(temp_params$pca_compare, temp_params$color_col)
   }
-  
+
   loading_compares <- unique(specs$pca_compare)
   pca_loading_plots <- vector("list", length(loading_compares))
   loading_plot_names <- character(length(loading_compares))
-  
+
   for (i in seq_along(loading_compares)) {
     cmp <- loading_compares[i]
     pca_loading_plots[[i]] <- plot_pca_loading_from_result(
@@ -1184,7 +1183,7 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
     )
     loading_plot_names[i] <- sprintf("pca_loadings_%s", cmp)
   }
-  
+
   list(
     pca_plots = pca_plots,
     plot_names = plot_names,
