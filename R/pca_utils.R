@@ -11,7 +11,80 @@
 #   sample, batch, class, order
 #
 # @keywords internal
+#' Validate PCA plotting metadata
+#'
+#' Ensures the metadata contains a sample column, has unique samples, and
+#' includes all samples present in the PCA data frame.
+#'
+#' @param df data.frame
+#'   PCA input data frame.
+#' @param meta_df data.frame
+#'   Metadata data frame used for plotting.
+#' @param sample_col character
+#'   Sample identifier column.
+#'
+#' @return data.frame
+#'   A validated metadata data frame.
+#'
+#' @noRd
+validate_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
+  if (is.null(meta_df)) {
+    stop("`meta_df` cannot be NULL.")
+  }
+  
+  if (!sample_col %in% names(df)) {
+    stop(sprintf("PCA data frame must contain '%s'.", sample_col))
+  }
+  
+  if (!sample_col %in% names(meta_df)) {
+    stop(sprintf("`meta_df` must contain '%s'.", sample_col))
+  }
+  
+  if (anyDuplicated(meta_df[[sample_col]]) > 0L) {
+    dupes <- unique(meta_df[[sample_col]][duplicated(meta_df[[sample_col]])])
+    stop(
+      sprintf(
+        "`meta_df` contains duplicate sample identifiers. Examples: %s",
+        paste(utils::head(dupes, 10L), collapse = ", ")
+      )
+    )
+  }
+  
+  missing_meta <- setdiff(df[[sample_col]], meta_df[[sample_col]])
+  if (length(missing_meta) > 0L) {
+    stop(
+      sprintf(
+        "Some PCA samples are missing from `meta_df`. Examples: %s",
+        paste(utils::head(missing_meta, 10L), collapse = ", ")
+      )
+    )
+  }
+  
+  meta_df
+}
 
+
+#' Align metadata rows to PCA data by sample
+#'
+#' Returns metadata ordered to match the input PCA data frame.
+#'
+#' @param df data.frame
+#'   PCA input data frame.
+#' @param meta_df data.frame
+#'   Metadata data frame used for plotting.
+#' @param sample_col character
+#'   Sample identifier column.
+#'
+#' @return data.frame
+#'   Metadata rows aligned to `df`.
+#'
+#' @noRd
+align_pca_meta_df <- function(df, meta_df, sample_col = "sample") {
+  meta_df <- validate_pca_meta_df(df = df, meta_df = meta_df, sample_col = sample_col)
+  
+  idx <- match(df[[sample_col]], meta_df[[sample_col]])
+  meta_df[idx, , drop = FALSE]
+}
 #' Get shared metabolite columns for paired PCA
 #'
 #' Identifies the overlapping non-metadata columns between two data frames.
@@ -91,38 +164,70 @@ prep_pca_matrix <- function(df, p, metab_cols) {
 #' and explained variance.
 #'
 #' @param df data.frame
-#'   Input data frame containing metadata and metabolite columns.
+#'   Input data frame containing metabolite columns and a sample column.
 #' @param p list
 #'   Parameter list containing imputation settings.
 #' @param metab_cols character
 #'   Metabolite columns to include in PCA.
 #' @param meta_cols character
 #'   Metadata columns to retain in the score output.
+#' @param meta_df data.frame or NULL
+#'   Optional external metadata data frame used for plotting. Must contain
+#'   at least the sample column and any requested metadata columns.
+#' @param sample_col character
+#'   Sample identifier column used to align metadata.
 #'
 #' @return list
-#'   A list containing:
-#'   \itemize{
-#'     \item \code{fit}: prcomp result
-#'     \item \code{scores}: sample scores with metadata appended
-#'     \item \code{loadings}: variable loadings
-#'     \item \code{explained_variance}: explained variance table
-#'     \item \code{metab_cols}: metabolite columns used in the PCA
-#'   }
+#'   A list containing PCA fit, scores, loadings, explained variance,
+#'   and metabolite columns used.
 #'
 #' @noRd
 compute_single_pca <- function(
     df,
     p,
     metab_cols,
-    meta_cols = c("sample", "batch", "class", "order")
+    meta_cols = c("sample", "batch", "class", "order"),
+    meta_df = NULL,
+    sample_col = "sample"
 ) {
   x <- prep_pca_matrix(df = df, p = p, metab_cols = metab_cols)
   fit <- stats::prcomp(x, center = TRUE, scale. = TRUE)
   
-  available_meta <- intersect(meta_cols, names(df))
+  if (is.null(meta_df)) {
+    meta_source <- df
+  } else {
+    if (!sample_col %in% names(df)) {
+      stop(sprintf("`df` must contain '%s'.", sample_col))
+    }
+    if (!sample_col %in% names(meta_df)) {
+      stop(sprintf("`meta_df` must contain '%s'.", sample_col))
+    }
+    if (anyDuplicated(meta_df[[sample_col]]) > 0L) {
+      stop("`meta_df` contains duplicate sample values.")
+    }
+    
+    idx <- match(df[[sample_col]], meta_df[[sample_col]])
+    if (anyNA(idx)) {
+      missing_samples <- df[[sample_col]][is.na(idx)]
+      stop(
+        sprintf(
+          "Some PCA samples are missing from `meta_df`. Examples: %s",
+          paste(utils::head(missing_samples, 10L), collapse = ", ")
+        )
+      )
+    }
+    
+    meta_source <- meta_df[idx, , drop = FALSE]
+  }
+  
+  available_meta <- intersect(meta_cols, names(meta_source))
+  
+  if (!sample_col %in% available_meta && sample_col %in% names(meta_source)) {
+    available_meta <- c(sample_col, available_meta)
+  }
   
   scores_df <- as.data.frame(fit$x, stringsAsFactors = FALSE)
-  scores_df <- dplyr::bind_cols(scores_df, df[, available_meta, drop = FALSE])
+  scores_df <- dplyr::bind_cols(scores_df, meta_source[, available_meta, drop = FALSE])
   
   loadings_df <- as.data.frame(fit$rotation, stringsAsFactors = FALSE)
   loadings_df$variable <- rownames(loadings_df)
@@ -146,11 +251,7 @@ compute_single_pca <- function(
   )
 }
 
-
 #' Compute paired PCA results for before/after comparison
-#'
-#' Uses the same shared metabolite columns for both data sets so that the
-#' resulting PCA summaries are directly comparable.
 #'
 #' @param before data.frame
 #'   Data frame for the "Before" dataset.
@@ -164,6 +265,10 @@ compute_single_pca <- function(
 #'   Label for the second dataset.
 #' @param meta_cols character
 #'   Metadata columns to retain in the score output.
+#' @param meta_df data.frame or NULL
+#'   Optional external metadata data frame used for coloring and labeling.
+#' @param sample_col character
+#'   Sample identifier column.
 #'
 #' @return list
 #'   Paired PCA results.
@@ -175,7 +280,9 @@ compute_pca_pair <- function(
     p,
     before_label = "Before",
     after_label = "After",
-    meta_cols = c("sample", "batch", "class", "order")
+    meta_cols = c("sample", "batch", "class", "order"),
+    meta_df = NULL,
+    sample_col = "sample"
 ) {
   metab_cols <- get_shared_pca_metab_cols(
     before = before,
@@ -187,14 +294,18 @@ compute_pca_pair <- function(
     df = before,
     p = p,
     metab_cols = metab_cols,
-    meta_cols = meta_cols
+    meta_cols = meta_cols,
+    meta_df = meta_df,
+    sample_col = sample_col
   )
   
   after_res <- compute_single_pca(
     df = after,
     p = p,
     metab_cols = metab_cols,
-    meta_cols = meta_cols
+    meta_cols = meta_cols,
+    meta_df = meta_df,
+    sample_col = sample_col
   )
   
   before_res$label <- before_label
@@ -249,11 +360,26 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   )
   
   col <- p$color_col %||% "class"
-  use_gradient <- identical(col, "order")
   
   if (!col %in% names(before_df) || !col %in% names(after_df)) {
     stop(sprintf("Column '%s' not found in PCA score data.", col))
   }
+  
+  is_numeric_like <- function(x) {
+    is.numeric(x) || is.integer(x)
+  }
+  
+  before_is_numeric <- is_numeric_like(before_df[[col]])
+  after_is_numeric <- is_numeric_like(after_df[[col]])
+  
+  if (before_is_numeric != after_is_numeric) {
+    stop(sprintf(
+      "Column '%s' is not of the same type in before/after PCA score data.",
+      col
+    ))
+  }
+  
+  use_gradient <- before_is_numeric && after_is_numeric
   
   if (use_gradient) {
     combined[[col]] <- as.numeric(combined[[col]])
@@ -974,26 +1100,33 @@ get_pca_compare_data <- function(p, d, pca_compare) {
 
 #' Make all PCA score and loading plots
 #'
-#' Computes each PCA comparison once and reuses the result for score plots
-#' and loading plots.
-#'
 #' @param p list
 #'   Parameter list.
 #' @param d list
 #'   Data object.
+#' @param meta_df data.frame or NULL
+#'   Optional external metadata data frame for coloring PCA scores.
 #'
 #' @return list
 #'   A list containing PCA plots, names, loading plots, loading names, and
 #'   paired PCA results.
 #'
 #' @noRd
-make_all_pca_plots <- function(p, d) {
+make_all_pca_plots <- function(p, d, meta_df = NULL) {
   build_name <- function(compare, color) {
     sprintf("pca_%s_%s", compare, color)
   }
   
+  if (is.null(meta_df)) {
+    color_choices <- c("batch", "class", "order")
+    meta_cols <- c("sample", "batch", "class", "order")
+  } else {
+    color_choices <- setdiff(names(meta_df), "sample")
+    meta_cols <- c("sample", color_choices)
+  }
+  
   specs <- expand.grid(
-    color_col = c("batch", "class", "order"),
+    color_col = color_choices,
     pca_compare = "filtered_cor_data",
     stringsAsFactors = FALSE
   )
@@ -1014,7 +1147,10 @@ make_all_pca_plots <- function(p, d) {
       after = compare_data$after,
       p = p,
       before_label = "Before",
-      after_label = "After"
+      after_label = "After",
+      meta_cols = meta_cols,
+      meta_df = meta_df,
+      sample_col = "sample"
     )
     pca_pairs[[cmp]]$compared_to <- compare_data$compared_to
   }
