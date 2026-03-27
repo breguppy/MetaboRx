@@ -33,7 +33,7 @@ QCcorrection:::report_text_withheld_columns(params$p, params$d)
 
 ### Raw Data Summary and Structural Checks
 ```{r}
-QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold)
+QCcorrection:::ui_basic_info(params$d$cleaned$df, params$d$cleaned$replacement_counts, params$d$cleaned$non_numeric_cols, params$d$cleaned$duplicate_mets, params$d$cleaned$blank_df, params$d$cleaned$below_blank_threshold_ex_ISTD)
 QCcorrection:::report_text_data_inspection()
 ```
 
