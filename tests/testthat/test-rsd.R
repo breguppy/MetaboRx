@@ -97,12 +97,13 @@ test_that("delta_rsd_stats works for long schema (class, Metabolite, RSD)", {
   # QC deltas: -20, -10, +10
   expect_equal(s$avg_delta_qc, mean(c(-20,-10,10)))
   expect_equal(s$med_delta_qc, stats::median(c(-20,-10,10)))
-  # Sample deltas averaged across non-QC classes per metabolite:
-  # M1: mean(20-40, 30-50) = mean(-20,-20) = -20
-  # M2: mean(5-10, 0-5)    = mean(-5,-5)   = -5
-  # M3: mean(NA-NA, 5-5)   = mean(NA,0)    = 0
-  expect_equal(s$avg_delta_sample, mean(c(-20,-5,0)))
-  expect_equal(s$med_delta_sample, stats::median(c(-20,-5,0)))
+  # Sample deltas are now computed at the non-QC class-metabolite level:
+  # A-M1 = -20, A-M2 = -5, A-M3 = NA
+  # B-M1 = -20, B-M2 = -5, B-M3 = 0
+  sample_deltas <- c(-20, -5, -20, -5, 0)
+  
+  expect_equal(s$avg_delta_sample, mean(sample_deltas))
+  expect_equal(s$med_delta_sample, stats::median(sample_deltas))
 })
 
 test_that("delta_rsd_stats errors on unknown schema", {
