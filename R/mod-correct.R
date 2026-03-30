@@ -511,12 +511,19 @@ mod_correct_server <- function(id, data, params) {
     })
     
     output$post_transform_rsd_compare <- renderUI({
-      d <- list(filtered_corrected = filtered_corrected_r(),
-                filtered           = filtered_r(),
-                transformed        = transformed_r())
-      ui_rsd_stats(compare_to = "transformed_data",
-                   list(remove_imputed = input$remove_imputed), 
-                   d)
+      req(transformed_r())
+      
+      d <- list(
+        filtered_corrected = filtered_corrected_r(),
+        filtered           = filtered_r(),
+        transformed        = transformed_r()
+      )
+      
+      ui_rsd_stats(
+        compare_to = "transformed_cor_data",
+        list(remove_imputed = input$remove_imputed),
+        d
+      )
     })
     
     output$download_tc_rsd_btn <- renderUI({
