@@ -345,8 +345,11 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   }
 
   combined <- dplyr::bind_rows(before_df, after_df)
-  x_limits <- range(combined$PC1, na.rm = TRUE)
-  y_limits <- range(combined$PC2, na.rm = TRUE)
+
+  pc1_range <- range(combined$PC1, na.rm = TRUE)
+  pc2_range <- range(combined$PC2, na.rm = TRUE)
+  max_abs <- max(abs(c(pc1_range, pc2_range)), na.rm = TRUE)
+  axis_limits <- c(-max_abs, max_abs)
 
   var_raw <- 100 * pca_pair$before$explained_variance$explained_variance[1:2]
   var_cor <- 100 * pca_pair$after$explained_variance$explained_variance[1:2]
@@ -380,32 +383,52 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   }
 
   use_gradient <- before_is_numeric && after_is_numeric
+  legend_ncol <- 1L
+  legend_rel_width <- 0.32
 
   if (use_gradient) {
     combined[[col]] <- as.numeric(combined[[col]])
     before_df[[col]] <- as.numeric(before_df[[col]])
     after_df[[col]] <- as.numeric(after_df[[col]])
 
-    order_range <- range(combined[[col]], na.rm = TRUE)
+    color_range <- range(combined[[col]], na.rm = TRUE)
+    legend_rel_width <- 0.28
 
     scale_color_pca <- function() {
       ggplot2::scale_color_viridis_c(
         option = "viridis",
-        limits = order_range,
-        name = col
+        limits = color_range,
+        name = col,
+        na.value = "grey80"
+      )
+    }
+
+    legend_guides <- function() {
+      ggplot2::guides(
+        color = ggplot2::guide_colorbar(title.position = "top"),
+        fill = "none",
+        size = "none",
+        shape = "none",
+        alpha = "none",
+        linetype = "none"
       )
     }
   } else {
-    lvls <- sort(unique(c(before_df[[col]], after_df[[col]])))
+    lvls <- sort(unique(as.character(c(before_df[[col]], after_df[[col]]))))
+
     if (length(lvls) > length(cbPalette)) {
       stop("Too many groups for palette.")
     }
 
     cols <- stats::setNames(cbPalette[seq_along(lvls)], lvls)
 
-    combined[[col]] <- factor(combined[[col]], levels = lvls)
-    before_df[[col]] <- factor(before_df[[col]], levels = lvls)
-    after_df[[col]] <- factor(after_df[[col]], levels = lvls)
+    before_df[[col]] <- factor(as.character(before_df[[col]]), levels = lvls)
+    after_df[[col]] <- factor(as.character(after_df[[col]]), levels = lvls)
+
+    if (length(lvls) > 12L) {
+      legend_ncol <- 2L
+      legend_rel_width <- 0.65
+    }
 
     scale_color_pca <- function() {
       ggplot2::scale_color_manual(
@@ -413,6 +436,21 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
         name = col,
         drop = FALSE,
         na.translate = FALSE
+      )
+    }
+
+    legend_guides <- function() {
+      ggplot2::guides(
+        color = ggplot2::guide_legend(
+          ncol = legend_ncol,
+          byrow = TRUE,
+          title.position = "top"
+        ),
+        fill = "none",
+        size = "none",
+        shape = "none",
+        alpha = "none",
+        linetype = "none"
       )
     }
   }
@@ -426,6 +464,12 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       legend.text = ggplot2::element_text(size = 10)
     )
 
+  panel_theme <- ggplot2::theme(
+    legend.position = "none",
+    panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
+    plot.margin = ggplot2::margin(10, 5, 10, 5)
+  )
+
   p1 <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2, alpha = 0.8) +
     ggplot2::labs(
@@ -433,15 +477,16 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       x = sprintf("PC1 (%.1f%%)", var_raw[1]),
       y = sprintf("PC2 (%.1f%%)", var_raw[2])
     ) +
-    ggplot2::xlim(x_limits) +
-    ggplot2::ylim(y_limits) +
     scale_color_pca() +
+    ggplot2::coord_fixed(
+      ratio = 1,
+      xlim = axis_limits,
+      ylim = axis_limits,
+      expand = TRUE,
+      clip = "on"
+    ) +
     big_font_theme +
-    ggplot2::theme(
-      legend.position = "none",
-      panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
-      plot.margin = ggplot2::margin(10, 5, 10, 5)
-    )
+    panel_theme
 
   p2 <- ggplot2::ggplot(after_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2, alpha = 0.8) +
@@ -450,41 +495,40 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       x = sprintf("PC1 (%.1f%%)", var_cor[1]),
       y = sprintf("PC2 (%.1f%%)", var_cor[2])
     ) +
-    ggplot2::xlim(x_limits) +
-    ggplot2::ylim(y_limits) +
     scale_color_pca() +
+    ggplot2::coord_fixed(
+      ratio = 1,
+      xlim = axis_limits,
+      ylim = axis_limits,
+      expand = TRUE,
+      clip = "on"
+    ) +
     big_font_theme +
-    ggplot2::theme(
-      legend.position = "none",
-      panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
-      plot.margin = ggplot2::margin(10, 5, 10, 5)
-    )
+    panel_theme
 
   p_leg <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
     ggplot2::geom_point(size = 2) +
     scale_color_pca() +
-    ggplot2::guides(
-      fill = "none",
-      size = "none",
-      shape = "none",
-      alpha = "none",
-      linetype = "none"
-    ) +
+    legend_guides() +
     big_font_theme +
     ggplot2::theme(
       legend.position = "right",
-      legend.box.margin = ggplot2::margin(0, 0, 0, 0)
+      legend.box.margin = ggplot2::margin(0, 0, 0, 0),
+      legend.margin = ggplot2::margin(0, 0, 0, 0),
+      legend.key.height = grid::unit(0.45, "cm"),
+      legend.key.width = grid::unit(0.45, "cm")
     )
 
   leg <- cowplot::get_legend(p_leg)
 
   comb <- cowplot::plot_grid(
-    p1, p2, leg,
+    p1,
+    p2,
+    leg,
     nrow = 1,
-    rel_widths = c(1, 1, 0.3),
-    labels = NULL,
-    align = "hv",
-    axis = "tblr"
+    rel_widths = c(1, 1, legend_rel_width),
+    align = "h",
+    axis = "tb"
   )
 
   cowplot::ggdraw() +
