@@ -99,10 +99,12 @@ export_figures <- function(p, d, out_dir = tempdir()) {
     
     for (i in seq_len(n)) {
       metab <- cols[i]
+      suppressWarnings({
       fig <- make_met_scatter(d, p, metab)
       safe <- gsub("[^A-Za-z0-9_\\-]+", "_", metab)
       path <- file.path(met_dir, sprintf("%s.%s", safe, fmt))
       met_paths <- c(met_paths, save_plot(path, fig, 5, 5))
+      })
       shiny::incProgress(1 / n, detail = paste("Saved:", safe))
     }
   })

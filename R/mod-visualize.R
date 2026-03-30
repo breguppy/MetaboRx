@@ -131,7 +131,9 @@ mod_visualize_server <- function(id, data, params) {
     #-- Metabolite scatter plot
     output$metab_scatter <- renderPlot({
       req(input$met_col)
-      make_met_scatter(d(), p(), input$met_col)
+      suppressWarnings({
+        print(make_met_scatter(d(), p(), input$met_col))
+      })
     }, res = 120)
     
     #-- RSD comparison plot
