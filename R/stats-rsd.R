@@ -1,38 +1,126 @@
-#' RSD functions
+#' RSD functions and helpers
 #'
+#' @keywords internal
+#' @noRd
+
+lab_levels <- c("Increased", "No Change", "Decreased")
+
+#' @keywords internal
+#' @noRd
+color_values <- c(
+  "Increased" = "#B22222",
+  "No Change" = "gray25",
+  "Decreased" = "#234F1E"
+)
+
+# ------------------------------------------------------------------------------
+# Core utilities
+# ------------------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+.get_rsd_data_after <- function(compare_to, p, d) {
+  if (compare_to == "filtered_cor_data") {
+    title <- "Post-correction Changes"
+    sheet_label <- "Corrected"
+    
+    if (isTRUE(p$remove_imputed)) {
+      df_after <- d$filtered_corrected$df_mv
+    } else {
+      df_after <- d$filtered_corrected$df_no_mv
+    }
+  } else {
+    title <- "Post-transformation Changes"
+    sheet_label <- "Transformed"
+    
+    if (isTRUE(p$remove_imputed)) {
+      df_after <- d$transformed$df_mv
+    } else {
+      df_after <- d$transformed$df_no_mv
+    }
+  }
+  
+  list(
+    df_before = d$filtered$df,
+    df_after = df_after,
+    title = title,
+    sheet_label = sheet_label
+  )
+}
+
+#' @keywords internal
+#' @noRd
+.rsd_change_label <- function(before, after) {
+  dplyr::case_when(
+    after > before ~ "Increased",
+    after < before ~ "Decreased",
+    TRUE ~ "No Change"
+  )
+}
+
+#' @keywords internal
+#' @noRd
+.rsd_pct_increase <- function(delta) {
+  d <- delta[!is.na(delta)]
+  if (length(d) == 0L) {
+    return(NA_real_)
+  }
+  100 * mean(d > 0)
+}
+
+#' @keywords internal
+#' @noRd
+.rsd_pct_decrease <- function(delta) {
+  d <- delta[!is.na(delta)]
+  if (length(d) == 0L) {
+    return(NA_real_)
+  }
+  100 * mean(d < 0)
+}
+
+# ------------------------------------------------------------------------------
+# Raw RSD calculators
+# ------------------------------------------------------------------------------
+
 #' @keywords internal
 #' @noRd
 metabolite_rsd <- function(df,
                            metadata_cols = c("sample", "batch", "class", "order")) {
   nm <- names(df)
   md_idx <- tolower(nm) %in% tolower(metadata_cols)
+  
   class_col <- nm[tolower(nm) == "class"]
-  if (!length(class_col))
+  if (!length(class_col)) {
     stop("Expected a 'class' column (any case).")
+  }
   class_col <- class_col[1]
+  
   metab_cols <- nm[!md_idx]
   is_num <- vapply(df[metab_cols], is.numeric, logical(1))
   metab_cols <- metab_cols[is_num]
-  if (!length(metab_cols))
-    stop("No numeric metabolite columns detected.")
   
-  # Separate QC and non-QC samples
+  if (!length(metab_cols)) {
+    stop("No numeric metabolite columns detected.")
+  }
+  
   qc_df <- df[df[[class_col]] == "QC", metab_cols, drop = FALSE]
   nonqc_df <- df[df[[class_col]] != "QC", metab_cols, drop = FALSE]
   
-  # RSD function ignoring NA
   rsd_fun <- function(x) {
     mu <- mean(x, na.rm = TRUE)
     sigma <- stats::sd(x, na.rm = TRUE)
-    if (mu == 0 || !is.finite(mu))
+    
+    if (!is.finite(mu) || mu == 0) {
       return(NA_real_)
-    return(100 * sigma / mu)
+    }
+    
+    100 * sigma / mu
   }
   
   data.frame(
     Metabolite = metab_cols,
-    RSD_QC     = vapply(qc_df, rsd_fun, numeric(1)),
-    RSD_NonQC  = vapply(nonqc_df, rsd_fun, numeric(1)),
+    RSD_QC = vapply(qc_df, rsd_fun, numeric(1)),
+    RSD_NonQC = vapply(nonqc_df, rsd_fun, numeric(1)),
     check.names = FALSE
   )
 }
@@ -41,94 +129,199 @@ metabolite_rsd <- function(df,
 #' @noRd
 class_metabolite_rsd <- function(df,
                                  metadata_cols = c("sample", "batch", "class", "order")) {
-  # Get metabolite columns
-  metab_cols <- setdiff(names(df), metadata_cols)
+  nm <- names(df)
+  class_col <- nm[tolower(nm) == "class"]
   
-  long_df <- df %>%
-    pivot_longer(
-      cols = all_of(metab_cols),
-      names_to = "Metabolite",
-      values_to = "Value"
-    )
+  if (!length(class_col)) {
+    stop("Expected a 'class' column (any case).")
+  }
+  class_col <- class_col[1]
   
-  # Group by class and metabolite and compute RSD
-  rsd_df <- long_df %>%
-    group_by(class, Metabolite) %>%
-    summarise(
+  meta_idx <- tolower(nm) %in% tolower(metadata_cols)
+  metab_cols <- nm[!meta_idx]
+  is_num <- vapply(df[metab_cols], is.numeric, logical(1))
+  metab_cols <- metab_cols[is_num]
+  
+  if (!length(metab_cols)) {
+    stop("No numeric metabolite columns detected.")
+  }
+  
+  long_df <- tidyr::pivot_longer(
+    data = df,
+    cols = dplyr::all_of(metab_cols),
+    names_to = "Metabolite",
+    values_to = "Value"
+  )
+  
+  long_df |>
+    dplyr::group_by(.data[[class_col]], Metabolite) |>
+    dplyr::summarise(
       Mean = mean(Value, na.rm = TRUE),
-      SD = sd(Value, na.rm = TRUE),
-      RSD = ifelse(Mean == 0, NA, SD / Mean * 100),
+      SD = stats::sd(Value, na.rm = TRUE),
+      RSD = dplyr::if_else(
+        is.na(Mean) | Mean == 0,
+        NA_real_,
+        100 * SD / Mean
+      ),
       .groups = "drop"
-    )
+    ) |>
+    dplyr::rename(class = dplyr::all_of(class_col))
+}
+
+# ------------------------------------------------------------------------------
+# Shared comparison builders
+# ------------------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+.compare_metabolite_rsd <- function(rsd_before, rsd_after) {
+  df <- dplyr::inner_join(
+    dplyr::rename(
+      rsd_before,
+      QC_before = RSD_QC,
+      Samples_before = RSD_NonQC
+    ),
+    dplyr::rename(
+      rsd_after,
+      QC_after = RSD_QC,
+      Samples_after = RSD_NonQC
+    ),
+    by = "Metabolite"
+  )
   
-  return(rsd_df)
+  dplyr::bind_rows(
+    df |>
+      dplyr::transmute(
+        analysis = "metabolite",
+        Type = "QC",
+        unit_id = Metabolite,
+        class = NA_character_,
+        Metabolite = Metabolite,
+        before = QC_before,
+        after = QC_after,
+        delta = QC_after - QC_before
+      ),
+    df |>
+      dplyr::transmute(
+        analysis = "metabolite",
+        Type = "Samples",
+        unit_id = Metabolite,
+        class = NA_character_,
+        Metabolite = Metabolite,
+        before = Samples_before,
+        after = Samples_after,
+        delta = Samples_after - Samples_before
+      )
+  ) |>
+    dplyr::mutate(
+      change = .rsd_change_label(before, after),
+      Type = factor(Type, levels = c("Samples", "QC")),
+      change = factor(change, levels = lab_levels)
+    )
 }
 
 #' @keywords internal
 #' @noRd
+.compare_class_metabolite_rsd <- function(rsd_before, rsd_after) {
+  dplyr::inner_join(
+    dplyr::rename(rsd_before, before = RSD),
+    dplyr::rename(rsd_after, after = RSD),
+    by = c("class", "Metabolite")
+  ) |>
+    dplyr::mutate(
+      analysis = "class_metabolite",
+      Type = ifelse(class == "QC", "QC", "Samples"),
+      unit_id = paste(class, Metabolite, sep = "::"),
+      delta = after - before,
+      change = .rsd_change_label(before, after),
+      Type = factor(Type, levels = c("Samples", "QC")),
+      change = factor(change, levels = lab_levels)
+    ) |>
+    dplyr::select(
+      analysis,
+      Type,
+      unit_id,
+      class,
+      Metabolite,
+      before,
+      after,
+      delta,
+      change
+    )
+}
+
+#' @keywords internal
+#' @noRd
+.summarize_rsd_comparison <- function(compare_df) {
+  compare_df |>
+    dplyr::group_by(Type) |>
+    dplyr::summarise(
+      avg_delta = mean(delta, na.rm = TRUE),
+      med_delta = stats::median(delta, na.rm = TRUE),
+      pct_increase = .rsd_pct_increase(delta),
+      pct_decrease = .rsd_pct_decrease(delta),
+      .groups = "drop"
+    )
+}
+
+#' @keywords internal
+#' @noRd
+.build_rsd_results <- function(df_before, df_after) {
+  rsd_before_met <- metabolite_rsd(df_before)
+  rsd_after_met <- metabolite_rsd(df_after)
+  
+  rsd_before_class <- class_metabolite_rsd(df_before)
+  rsd_after_class <- class_metabolite_rsd(df_after)
+  
+  compare_met <- .compare_metabolite_rsd(rsd_before_met, rsd_after_met)
+  compare_class <- .compare_class_metabolite_rsd(rsd_before_class, rsd_after_class)
+  
+  list(
+    metabolite = list(
+      before = rsd_before_met,
+      after = rsd_after_met,
+      compare = compare_met,
+      stats = .summarize_rsd_comparison(compare_met)
+    ),
+    class_metabolite = list(
+      before = rsd_before_class,
+      after = rsd_after_class,
+      compare = compare_class,
+      stats = .summarize_rsd_comparison(compare_class)
+    )
+  )
+}
+
+# ------------------------------------------------------------------------------
+# Backward-compatible summary function
+# ------------------------------------------------------------------------------
+
 #' @keywords internal
 #' @noRd
 delta_rsd_stats <- function(rsdBefore, rsdAfter) {
-  mean_na   <- function(x) mean(x, na.rm = TRUE)
-  median_na <- function(x) stats::median(x, na.rm = TRUE)
-  
-  pct_increase <- function(delta) {
-    d <- delta[!is.na(delta)]
-    if (length(d) == 0L) return(NA_real_)
-    100 * mean(d > 0)
-  }
-  
-  pct_decrease <- function(delta) {
-    d <- delta[!is.na(delta)]
-    if (length(d) == 0L) return(NA_real_)
-    100 * mean(d < 0)
-  }
-  
   if (all(c("Metabolite", "RSD_QC", "RSD_NonQC") %in% names(rsdBefore)) &&
       all(c("Metabolite", "RSD_QC", "RSD_NonQC") %in% names(rsdAfter))) {
-    
-    df <- dplyr::inner_join(
-      dplyr::rename(rsdBefore, RSD_QC_b = RSD_QC, RSD_NonQC_b = RSD_NonQC),
-      dplyr::rename(rsdAfter,  RSD_QC_a = RSD_QC, RSD_NonQC_a = RSD_NonQC),
-      by = "Metabolite"
-    )
-    
-    delta_qc <- df$RSD_QC_a    - df$RSD_QC_b
-    delta_s  <- df$RSD_NonQC_a - df$RSD_NonQC_b
-    
+    compare_df <- .compare_metabolite_rsd(rsdBefore, rsdAfter)
   } else if (all(c("class", "Metabolite", "RSD") %in% names(rsdBefore)) &&
              all(c("class", "Metabolite", "RSD") %in% names(rsdAfter))) {
-    
-    df <- dplyr::inner_join(
-      dplyr::rename(rsdBefore, RSD_b = RSD),
-      dplyr::rename(rsdAfter,  RSD_a = RSD),
-      by = c("class", "Metabolite")
-    ) |>
-      dplyr::mutate(delta = RSD_a - RSD_b)
-    
-    delta_qc <- df |>
-      dplyr::filter(class == "QC") |>
-      dplyr::pull(delta)
-    
-    # For samples: average delta across non-QC classes within metabolite (as you already do)
-    delta_s <- df |>
-      dplyr::filter(class != "QC") |>
-      dplyr::group_by(Metabolite) |>
-      dplyr::summarise(delta_s = mean(delta, na.rm = TRUE), .groups = "drop") |>
-      dplyr::pull(delta_s)
-    
+    compare_df <- .compare_class_metabolite_rsd(rsdBefore, rsdAfter)
   } else {
     stop("Unrecognized input schema for rsdBefore/rsdAfter.")
   }
   
+  stats_df <- .summarize_rsd_comparison(compare_df)
+  
+  qc_row <- stats_df[stats_df$Type == "QC", , drop = FALSE]
+  sample_row <- stats_df[stats_df$Type == "Samples", , drop = FALSE]
+  
   list(
-    avg_delta_qc          = mean_na(delta_qc),
-    med_delta_qc          = median_na(delta_qc),
-    avg_delta_sample      = mean_na(delta_s),
-    med_delta_sample      = median_na(delta_s),
-    pct_increase_qc       = pct_increase(delta_qc),
-    pct_decrease_qc       = pct_decrease(delta_qc),
-    pct_increase_sample   = pct_increase(delta_s),
-    pct_decrease_sample   = pct_decrease(delta_s)
+    avg_delta_qc = if (nrow(qc_row)) qc_row$avg_delta else NA_real_,
+    med_delta_qc = if (nrow(qc_row)) qc_row$med_delta else NA_real_,
+    avg_delta_sample = if (nrow(sample_row)) sample_row$avg_delta else NA_real_,
+    med_delta_sample = if (nrow(sample_row)) sample_row$med_delta else NA_real_,
+    pct_increase_qc = if (nrow(qc_row)) qc_row$pct_increase else NA_real_,
+    pct_decrease_qc = if (nrow(qc_row)) qc_row$pct_decrease else NA_real_,
+    pct_increase_sample = if (nrow(sample_row)) sample_row$pct_increase else NA_real_,
+    pct_decrease_sample = if (nrow(sample_row)) sample_row$pct_decrease else NA_real_
   )
 }

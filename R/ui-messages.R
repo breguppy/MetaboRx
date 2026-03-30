@@ -310,75 +310,85 @@ ui_unavailable_options <- function(df, metab_cols) {
   }
 }
 
+# ------------------------------------------------------------------------------
+# UI RSD summary table
+# ------------------------------------------------------------------------------
+
 ui_rsd_stats <- function(compare_to, p, d) {
-  df_before <- d$filtered$df
-  # Determine df_after based on rsd_compare selected by user.
-  if (compare_to == "filtered_cor_data") {
-    title <- "Post-correction Changes"
-    if (isTRUE(p$remove_imputed)) {
-      df_after <- d$filtered_corrected$df_mv
-    } else {
-      df_after <- d$filtered_corrected$df_no_mv
-    }
-  } else {
-    title <- "Post-transformation Changes"
-    if (isTRUE(p$remove_imputed)) {
-      df_after <- d$transformed$df_mv
-    } else {
-      df_after <- d$transformed$df_no_mv
-    }
-  }
+  rsd_data <- .get_rsd_data_after(compare_to, p, d)
+  rsd_results <- .build_rsd_results(rsd_data$df_before, rsd_data$df_after)
   
-  met_rsdBefore <- metabolite_rsd(df_before)
-  met_rsdAfter <- metabolite_rsd(df_after)
+  met_stats <- rsd_results$metabolite$stats
+  class_stats <- rsd_results$class_metabolite$stats
   
-  class_rsdBefore <- class_metabolite_rsd(df_before)
-  class_rsdAfter <- class_metabolite_rsd(df_after)
-  
-  rsd_met_stats <- delta_rsd_stats(met_rsdBefore, met_rsdAfter)
-  rsd_class_stats <- delta_rsd_stats(class_rsdBefore, class_rsdAfter)
+  met_qc <- met_stats[met_stats$Type == "QC", , drop = FALSE]
+  met_samples <- met_stats[met_stats$Type == "Samples", , drop = FALSE]
+  class_samples <- class_stats[class_stats$Type == "Samples", , drop = FALSE]
   
   df <- data.frame(
-    Metric = c("Median &Delta; QC RSD", 
-               "Median &Delta; Metabolite RSD",
-               "Median &Delta; Class-Metabolite RSD"),
-    Value  = c(rsd_met_stats$med_delta_qc,
-               rsd_met_stats$med_delta_sample,
-               rsd_class_stats$med_delta_sample)
+    Metric = c(
+      "Median &Delta; QC RSD",
+      "Median &Delta; Metabolite RSD",
+      "Median &Delta; Class-Metabolite RSD"
+    ),
+    Value = c(
+      if (nrow(met_qc)) met_qc$med_delta else NA_real_,
+      if (nrow(met_samples)) met_samples$med_delta else NA_real_,
+      if (nrow(class_samples)) class_samples$med_delta else NA_real_
+    ),
+    check.names = FALSE
   )
   
   df$Value <- sprintf("%.2f%%", df$Value)
   
   change_df <- data.frame(
-    s_type = c("QC RSD", 
-               "Metabolite RSD",
-               "Class-Metabolite RSD"),
-    increased  = c(rsd_met_stats$pct_increase_qc,
-                   rsd_met_stats$pct_increase_sample,
-                   rsd_class_stats$pct_increase_sample),
-    decreased  = c(rsd_met_stats$pct_decrease_qc,
-                   rsd_met_stats$pct_decrease_sample,
-                   rsd_class_stats$pct_decrease_sample)
+    s_type = c(
+      "QC RSD",
+      "Metabolite RSD",
+      "Class-Metabolite RSD"
+    ),
+    increased = c(
+      if (nrow(met_qc)) met_qc$pct_increase else NA_real_,
+      if (nrow(met_samples)) met_samples$pct_increase else NA_real_,
+      if (nrow(class_samples)) class_samples$pct_increase else NA_real_
+    ),
+    decreased = c(
+      if (nrow(met_qc)) met_qc$pct_decrease else NA_real_,
+      if (nrow(met_samples)) met_samples$pct_decrease else NA_real_,
+      if (nrow(class_samples)) class_samples$pct_decrease else NA_real_
+    ),
+    check.names = FALSE
   )
   
   change_df$increased <- sprintf("%.1f%%", change_df$increased)
   change_df$decreased <- sprintf("%.1f%%", change_df$decreased)
   
   htmltools::tagList(
-    
     htmltools::tags$table(
       style = "border-collapse: collapse; margin-top:10px;",
       htmltools::tags$thead(
         htmltools::tags$tr(
-          htmltools::tags$th("Performance Metric",  style="padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"),
-          htmltools::tags$th("Value",   style="padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;")
+          htmltools::tags$th(
+            "Performance Metric",
+            style = "padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"
+          ),
+          htmltools::tags$th(
+            "Value",
+            style = "padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;"
+          )
         )
       ),
       htmltools::tags$tbody(
         lapply(seq_len(nrow(df)), function(i) {
           htmltools::tags$tr(
-            htmltools::tags$td(HTML(df$Metric[i]), style="padding:4px 12px; text-align:left;"),
-            htmltools::tags$td(df$Value[i],  style="padding:4px 12px; text-align:right;")
+            htmltools::tags$td(
+              htmltools::HTML(df$Metric[i]),
+              style = "padding:4px 12px; text-align:left;"
+            ),
+            htmltools::tags$td(
+              df$Value[i],
+              style = "padding:4px 12px; text-align:right;"
+            )
           )
         })
       )
@@ -388,17 +398,35 @@ ui_rsd_stats <- function(compare_to, p, d) {
       style = "border-collapse: collapse; margin-top:10px;",
       htmltools::tags$thead(
         htmltools::tags$tr(
-          htmltools::tags$th(title,  style="padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"),
-          htmltools::tags$th("Increased",   style="padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;"),
-          htmltools::tags$th("Decreased",   style="padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;")
+          htmltools::tags$th(
+            rsd_data$title,
+            style = "padding:4px 12px; text-align:left; border-bottom:1px solid #ccc;"
+          ),
+          htmltools::tags$th(
+            "Increased",
+            style = "padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;"
+          ),
+          htmltools::tags$th(
+            "Decreased",
+            style = "padding:4px 12px; text-align:right; border-bottom:1px solid #ccc;"
+          )
         )
       ),
       htmltools::tags$tbody(
         lapply(seq_len(nrow(change_df)), function(i) {
           htmltools::tags$tr(
-            htmltools::tags$td(HTML(change_df$s_type[i]), style="padding:4px 12px; text-align:left;"),
-            htmltools::tags$td(change_df$increased[i],  style="padding:4px 12px; text-align:right;"),
-            htmltools::tags$td(change_df$decreased[i],  style="padding:4px 12px; text-align:right;")
+            htmltools::tags$td(
+              htmltools::HTML(change_df$s_type[i]),
+              style = "padding:4px 12px; text-align:left;"
+            ),
+            htmltools::tags$td(
+              change_df$increased[i],
+              style = "padding:4px 12px; text-align:right;"
+            ),
+            htmltools::tags$td(
+              change_df$decreased[i],
+              style = "padding:4px 12px; text-align:right;"
+            )
           )
         })
       )

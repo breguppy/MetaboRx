@@ -13,14 +13,18 @@ sanitize_figname <- function(name) {
 #' @keywords internal
 #' @noRd
 facet_label_map <- function(df) {
-  by_type <- df |> dplyr::group_split(Type) |> purrr::map( ~ {
-    pt <- pct_tbl(.x)
-    P <- function(k)
-      pt$percent[pt$change == k]
+  split_df <- split(df, df$Type, drop = TRUE)
+  
+  labs <- lapply(split_df, function(x) {
+    pt <- pct_tbl(x)
+    
+    P <- function(k) {
+      val <- pt$percent[pt$change == k]
+      if (length(val) == 0L) 0 else val
+    }
+    
     paste0(
-      "<b>",
-      unique(.x$Type),
-      "</b><br>",
+      "<b>", unique(as.character(x$Type)), "</b><br>",
       blk(
         color_values["Increased"],
         "Increased",
@@ -43,8 +47,9 @@ facet_label_map <- function(df) {
         "right"
       )
     )
-  }) |> unlist()
-  stats::setNames(by_type, unique(df$Type))
+  })
+  
+  unlist(labs, use.names = TRUE)
 }
 
 #' @keywords internal
