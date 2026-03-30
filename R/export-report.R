@@ -30,12 +30,23 @@ render_report <- function(
       pca_compare = p$pca_compare
     )
     
+    meta_df <- NULL
+    meta_cols <- c("sample", "batch", "class", "order")
+    
+    if (!is.null(d$cleaned) && !is.null(d$cleaned$meta_df)) {
+      meta_df <- d$cleaned$meta_df
+      meta_cols <- unique(c("sample", setdiff(names(meta_df), "sample")))
+    }
+    
     pca_pair <- compute_pca_pair(
       before = pca_compare_data$before,
       after = pca_compare_data$after,
       p = p,
       before_label = "Before",
-      after_label = "After"
+      after_label = "After",
+      meta_cols = meta_cols,
+      meta_df = meta_df,
+      sample_col = "sample"
     )
     
     pca_plot <- plot_pca_from_result(

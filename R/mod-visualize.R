@@ -80,7 +80,7 @@ mod_visualize_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        ui_pca_eval(ns),
+        uiOutput(ns("pca_options")),
         width = 400
       ),
       plotOutput(ns("pca_plot"), height = "530px", width = "1000px") %>% withSpinner(color = "#404040"),
@@ -131,7 +131,9 @@ mod_visualize_server <- function(id, data, params) {
     #-- Metabolite scatter plot
     output$metab_scatter <- renderPlot({
       req(input$met_col)
-      make_met_scatter(d(), p(), input$met_col)
+      suppressWarnings({
+        print(make_met_scatter(d(), p(), input$met_col))
+      })
     }, res = 120)
     
     #-- RSD comparison plot
@@ -149,6 +151,10 @@ mod_visualize_server <- function(id, data, params) {
       )
     })
     
+    #-- PCA options
+    output$pca_options <- renderUI({
+      ui_pca_eval(d()$cleaned$meta_df, ns = session$ns)
+    })
     #-- PCA comparison data for the selected compare mode
     pca_compare_data <- reactive({
       req(input$pca_compare)
@@ -160,18 +166,35 @@ mod_visualize_server <- function(id, data, params) {
     })
     
     #-- Compute PCA once and reuse for both PCA plots
+    
+    pca_meta_df <- reactive({
+      req(d(), d()$cleaned, d()$cleaned$meta_df)
+      d()$cleaned$meta_df
+    })
+    pca_meta_cols <- reactive({
+      req(pca_meta_df())
+      unique(c("sample", setdiff(names(pca_meta_df()), "sample")))
+    })
+    
     pca_pair_reactive <- reactive({
+      req(input$pca_compare)
+      
+      pca_p <- p()
+      pca_p$pca_compare <- input$pca_compare
+      
       cmp <- pca_compare_data()
       
       compute_pca_pair(
         before = cmp$before,
         after = cmp$after,
-        p = p(),
+        p = pca_p,
         before_label = "Before",
-        after_label = "After"
+        after_label = "After",
+        meta_cols = pca_meta_cols(),
+        meta_df = pca_meta_df(),
+        sample_col = "sample"
       )
     })
-    
     #-- PCA score plot
     output$pca_plot <- renderPlot({
       req(input$pca_compare, input$color_col)
