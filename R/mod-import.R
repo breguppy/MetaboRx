@@ -66,7 +66,7 @@ mod_import_ui <- function(id) {
         uiOutput(ns("ui_control_class_selector")),
         width = 400
       ),
-      uiOutput(ns("basic_info"))
+      uiOutput(ns("basic_info")) %>% withSpinner(color = "#404040")
     )),
     # 1.3 Filter Missing Values
     card(layout_sidebar(

@@ -394,7 +394,7 @@ export_xlsx <- function(p, d, file = NULL) {
     }
 
     # Appendix1. Metaboanalyst Ready
-    s6 <- .add_sheet("Appendix1. Metaboanalyst Ready")
+    s6 <- .add_sheet("Appendix1. MetaboAnalyst Ready")
     names(tf)[names(tf) == "sample"] <- "Sample Name"
     names(tf)[names(tf) == "class"]  <- "Group"
     tf$batch <- NULL
@@ -402,6 +402,36 @@ export_xlsx <- function(p, d, file = NULL) {
     openxlsx::writeData(wb, s6, x = tf)
     
     shiny::incProgress(1 / N, detail = "Saved: Metaboanalyst Ready")
+    
+    # Appendix2. MetaboAnalyst Meta tab (if extra metadata exists)
+    meta_df <- d$cleaned$meta_df
+    
+    if (!is.null(meta_df)) {
+      core_cols <- c("sample", "batch", "class", "order")
+      extra_cols <- setdiff(names(meta_df), core_cols)
+      
+      if (length(extra_cols) > 0) {
+        # Keep only rows present in Appendix1 (tf)
+        meta_out <- meta_df[meta_df$sample %in% tf$`Sample Name`, , drop = FALSE]
+        
+        # Optional: enforce same ordering as tf
+        meta_out <- meta_out[match(tf$`Sample Name`, meta_out$sample), , drop = FALSE]
+        
+        s7 <- .add_sheet("Appendix2. MetaboAnalyst Meta")
+        
+        # Rename to MetaboAnalyst convention
+        names(meta_out)[names(meta_out) == "sample"] <- "Sample Name"
+        names(meta_out)[names(meta_out) == "class"]  <- "Group"
+        
+        # Remove unused columns
+        meta_out$batch <- NULL
+        meta_out$order <- NULL
+        
+        openxlsx::writeData(wb, s7, x = meta_out)
+        
+        shiny::incProgress(1 / N, detail = "Saved: MetaboAnalyst Meta")
+      }
+    }
     
     if (!is.null(file)) {
       openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
