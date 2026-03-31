@@ -23,12 +23,13 @@ test_that("clean_data basic cleaning and outputs", {
   
   # structure
   expect_type(out, "list")
-  expect_named(out, c("df", "meta_df" ,"replacement_counts", "withheld_cols", "non_numeric_cols", "duplicate_mets", "blank_df", "below_blank_threshold", "below_blank_threshold_ex_ISTD"))
+  expect_named(out, c("df", "meta_df" ,"replacement_counts", "withheld_cols", "non_numeric_cols", "all_missing_zero_qc_cols", "duplicate_mets", "blank_df", "below_blank_threshold", "below_blank_threshold_ex_ISTD"))
   expect_equal(out$withheld_cols, "note")
+  expect_equal(out$all_missing_zero_qc_cols, "met3")
   
   # columns renamed, withheld removed, order applied
   expect_setequal(names(out$df),
-                  c("sample", "batch", "class", "order", "met1", "met2", "met3"))
+                  c("sample", "batch", "class", "order", "met1", "met2"))
   expect_true(is.unsorted(df$Injection))
   expect_equal(out$df$order, sort(out$df$order))
   
@@ -38,10 +39,9 @@ test_that("clean_data basic cleaning and outputs", {
   expect_identical(out$df$class[nrow(out$df)], "QC")
   
   # numeric coercion + zero→NA
-  expect_true(all(vapply(out$df[c("met1", "met2", "met3")], is.numeric, TRUE)))
+  expect_true(all(vapply(out$df[c("met1", "met2")], is.numeric, TRUE)))
   expect_true(any(is.na(out$df$met1)))
   expect_true(any(is.na(out$df$met2)))
-  expect_true(all(is.na(out$df$met3)))
   
   # replacement counts
   rc <- out$replacement_counts
@@ -51,9 +51,6 @@ test_that("clean_data basic cleaning and outputs", {
   # met2: one non-numeric ("foo"), one zero
   expect_equal(rc$non_numeric_replaced[rc$metabolite == "met2"], 1)
   expect_equal(rc$zero_replaced[rc$metabolite == "met2"], 1)
-  # met3: six zeros
-  expect_equal(rc$non_numeric_replaced[rc$metabolite == "met3"], 0)
-  expect_equal(rc$zero_replaced[rc$metabolite == "met3"], 6)
 })
 
 test_that("clean_data errors when first sample after sort is not QC", {
