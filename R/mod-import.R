@@ -223,7 +223,7 @@ mod_import_server <- function(id) {
     output$basic_info <- renderUI({
       cd <- cleaned_r()
       req(cd)
-      ui_basic_info(cd$df, cd$replacement_counts, cd$non_numeric_cols, cd$duplicate_mets, cd$blank_df, cd$below_blank_threshold_ex_ISTD)
+      ui_basic_info(cd)
     })
     output$ui_control_class_selector <- renderUI({
       cd <- cleaned_r()

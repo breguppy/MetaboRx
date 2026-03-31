@@ -117,12 +117,15 @@ warn_card <- function(title,
 }
 
 # Basic info for section 1.2 Select non-metabolite columns
-ui_basic_info <- function(df,
-                          replacement_counts,
-                          non_numeric_cols,
-                          duplicate_mets = NULL,
-                          blank_df = NULL,
-                          below_blank_threshold = NULL) {
+ui_basic_info <- function(cleaned) {
+  
+  df <- cleaned$df
+  replacement_counts <- cleaned$replacement_counts
+  non_numeric_cols <- cleaned$non_numeric_cols
+  all_missing_zero_qc_cols <- cleaned$all_missing_zero_qc_cols
+  duplicate_mets <- cleaned$duplicate_mets
+  blank_df <- cleaned$blank_df
+  below_blank_threshold <- cleaned$below_blank_threshold_ex_ISTD
   
   metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
   n_metab    <- length(metab_cols)
@@ -165,16 +168,45 @@ ui_basic_info <- function(df,
     )
   }
   
-  # ---------- Warning box 2: non-numeric columns ----------
+  # ---------- Warning box 2: removed metabolite columns ----------
   nonnum_card <- NULL
-  if (length(non_numeric_cols) > 0) {
+  
+  removed_non_numeric <- sort(unique(non_numeric_cols))
+  removed_all_zero_qc <- sort(unique(all_missing_zero_qc_cols))
+  
+  if (
+    length(removed_non_numeric) > 0 ||
+    length(removed_all_zero_qc) > 0
+  ) {
+    
+    section_tag <- function(title, values) {
+      if (length(values) == 0) return(NULL)
+      
+      tags$div(
+        tags$p(
+          style = "font-weight: 600; margin-top: 8px; margin-bottom: 4px;",
+          title
+        ),
+        tags$p(
+          style = "margin-bottom: 6px;",
+          paste(values, collapse = ", ")
+        )
+      )
+    }
+    
     nonnum_card <- warn_card(
-      title = "Non-numerical columns detected",
-      body  = "These columns contain all non-numeric values and will be removed prior to processing.",
-      body_tags = tags$p(
-        style = "font-weight: 600; margin-top: 8px;",
-        paste(sort(unique(non_numeric_cols)), collapse = ", ")
-      ),
+      title = "Removed metabolite columns",
+      body  = "The following metabolite columns were removed prior to processing:",
+      body_tags = tags$div(
+        section_tag(
+          "Non-numerical columns:",
+          removed_non_numeric
+        ),
+        section_tag(
+          "All values missing or zero for QC samples:",
+          removed_all_zero_qc
+        )
+      )
     )
   }
   

@@ -4,7 +4,8 @@
 #' 1) Standardizes required metadata column names
 #' 2) removes additional metadata columns from the cleaned data.frame and
 #'    saves them in `meta_df`
-#' 3) removes non-numerical columns and saves their names.
+#' 3) removes non-numerical columns and columns containing all missing values/0s
+#     for QCs and saves their names.
 #' 4) checks blank threshold and flags metabolites that do not have QC average
 #'    more than 3x blank average
 #' 5) counts non-numerical and exact zeros that are replaced as missing values
@@ -12,29 +13,16 @@
 #' 6) makes sure injection order starts and ends with a QC sample
 #' 7) finds duplicate metabolite columns
 #'
-#' @param df   A data frame containing metabolite columns of the raw data.
-#' @param sample User selected column name containing sample names
+#' @param df A data frame containing metabolite columns of the raw data.
+#' @param sample User selected column name containing sample names.
 #' @param batch User selected column name containing batch information.
-#'              If a batch column is not provided one will be made.
+#'   If a batch column is not provided one will be made.
 #' @param class User selected column name containing sample classification
-#'              groups.
+#'   groups.
 #' @param order User selected column name containing sample injection order.
-#' @param withheld_cols A list of user selected column names containing
-#'                      additional column names
+#' @param withheld_cols A vector of user selected additional metadata columns.
 #'
 #' @return list
-#'   A list with components:
-#'   - df: The cleaned data.frame.
-#'   - meta_df: data.frame containing all metadata.
-#'   - replacement_counts: List of non-numeric values and zero value counts.
-#'   - withheld_cols: List of additional metadata column names.
-#'   - non_numeric_cols: List of non-numerical column names removed from `df`.
-#'   - duplicate_mets: List of duplicate metabolite columns.
-#'   - blank_df: data.frame of blank samples and processing blank samples.
-#'   - below_blank_threshold: List of metabolites below blank threshold.
-#'   - below_blank_threshold_ex_ISTD: List of metabolites below blank threshold
-#'      excluding internal standards (ISTD/ITSD).
-#'
 #' @keywords internal
 #' @noRd
 clean_data <- function(df,
@@ -44,66 +32,73 @@ clean_data <- function(df,
                        order,
                        withheld_cols) {
   # 1. Standardize required metadata column names ------------------------------
-  # define batch column if necessary
   if (!(batch %in% colnames(df))) {
     df$batch <- "batch1"
   }
 
-  # Rename metadata columns
   names(df)[names(df) == sample] <- "sample"
   names(df)[names(df) == batch] <- "batch"
   names(df)[names(df) == class] <- "class"
   names(df)[names(df) == order] <- "order"
 
-  # make class/order consistent
   df$class <- as.character(df$class)
   df$order <- as.numeric(df$order)
 
-  # make sure data is in injection order
   df <- df[order(df$order), , drop = FALSE]
 
-  # Normalize class QC label
   class_chr <- trimws(as.character(df$class))
   class_chr[is.na(class_chr) | class_chr == ""] <- "QC"
-
   qc_idx_norm <- tolower(class_chr) %in% c("qc")
   class_chr[qc_idx_norm] <- "QC"
-
   df$class <- class_chr
 
   # 2. remove additional metadata columns and save them ------------------------
-  # create metadata data.frame
-  meta_columns <- c("sample", "batch", "class", "order", withheld_cols)
+  meta_columns <- intersect(c("sample", "batch", "class", "order", withheld_cols), names(df))
   meta_df <- df[, meta_columns, drop = FALSE]
 
-  # remove additional metadata columns
   df <- df[, setdiff(names(df), withheld_cols), drop = FALSE]
 
-  # 3. remove non-numerical columns and save names -----------------------------
-  # get names of non-numeric columns that are not required metadata columns
+  # 3. remove invalid metabolite columns and save names ------------------------
+  metab_candidates <- setdiff(names(df), c("sample", "batch", "class", "order"))
+
   non_numeric_cols <- names(df)[vapply(df, function(col) {
     vals <- col[!is.na(col)]
     all(is.na(suppressWarnings(as.numeric(vals))))
   }, logical(1L))]
   non_numeric_cols <- setdiff(non_numeric_cols, c("sample", "batch", "class", "order"))
 
-  # remove them from df
-  df <- df[, !(names(df) %in% non_numeric_cols), drop = FALSE]
+  metab_numeric <- setdiff(metab_candidates, non_numeric_cols)
 
-  # 4 check metabolites for blank threshold ------------------------------------
-  # Get list of metabolite columns
+  is_all_missing_or_zero <- function(x) {
+    x_num <- suppressWarnings(as.numeric(x))
+    all(is.na(x_num) | x_num == 0)
+  }
+
+  qc_idx_for_filter <- trimws(as.character(df$class)) == "QC"
+
+  all_missing_zero_qc_cols <- character(0)
+  if (length(metab_numeric) > 0L && any(qc_idx_for_filter)) {
+    all_missing_zero_qc_cols <- metab_numeric[
+      vapply(
+        df[qc_idx_for_filter, metab_numeric, drop = FALSE],
+        is_all_missing_or_zero,
+        logical(1L)
+      )
+    ]
+  }
+
+  df <- df[, !(names(df) %in% c(non_numeric_cols, all_missing_zero_qc_cols)), drop = FALSE]
+
   metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
 
-  # Remove HP rows BEFORE building blank_df
+  # 4. check metabolites for blank threshold ----------------------------------
   is_hp <- toupper(trimws(df$class)) == "HP"
   if (any(is_hp, na.rm = TRUE)) {
     df <- df[!is_hp, , drop = FALSE]
   }
 
-  # keep df in injection order after HP removal
   df <- df[order(df$order), , drop = FALSE]
 
-  # Define blank-like rows and remove them df and save them
   blank_like_labels <- c("blank", "pb", "processing blank")
   class_chr <- trimws(as.character(df$class))
   is_blank_like <- tolower(class_chr) %in% blank_like_labels
@@ -115,8 +110,6 @@ clean_data <- function(df,
   if (any(is_blank_like, na.rm = TRUE)) {
     blank_df <- df[is_blank_like, , drop = FALSE]
     df <- df[!is_blank_like, , drop = FALSE]
-
-    # keep df in injection order after blank/PB removal
     df <- df[order(df$order), , drop = FALSE]
 
     qc_idx <- trimws(as.character(df$class)) == "QC"
@@ -124,7 +117,7 @@ clean_data <- function(df,
       stop("No QC samples remain after removing blanks/PBs; cannot compute blank threshold.")
     }
 
-    blank_means <- vapply(blank_df[, metab, drop = FALSE], function(x) {
+    blank_means <- vapply(blank_df[, metab, drop = FALSE], FUN = function(x) {
       mean(suppressWarnings(as.numeric(x)), na.rm = TRUE)
     }, numeric(1L))
 
@@ -132,17 +125,15 @@ clean_data <- function(df,
       mean(suppressWarnings(as.numeric(x)), na.rm = TRUE)
     }, numeric(1L))
 
-    # flag metabolites where QC mean < 3 * blank/PB mean
-    eligible <- is.finite(blank_means) &
-      !is.na(blank_means) & (blank_means > 0)
-    below_blank_threshold <- names(qc_means)[eligible &
-      (qc_means < (3 * blank_means))]
+    eligible <- is.finite(blank_means) & !is.na(blank_means) & (blank_means > 0)
+    below_blank_threshold <- names(qc_means)[eligible & (qc_means < (3 * blank_means))]
   }
 
-  # Exclude ISTD / ITSD metabolites from threshold flag
-  below_blank_threshold_ex_ISTD <- below_blank_threshold[!grepl("ISTD|ITSD", below_blank_threshold, ignore.case = TRUE)]
+  below_blank_threshold_ex_ISTD <- below_blank_threshold[
+    !grepl("ISTD|ITSD", below_blank_threshold, ignore.case = TRUE)
+  ]
 
-  # 5 Count non-numerical and zeros replaced with NA ---------------------------
+  # 5. Count non-numerical and zeros replaced with NA --------------------------
   repl <- tibble::tibble(
     metabolite = metab,
     non_numeric_replaced = 0L,
@@ -164,7 +155,7 @@ clean_data <- function(df,
     repl$zero_replaced[i] <- cnt2
   }
 
-  # 6 Make sure data starts and ends with a QC ---------------------------------
+  # 6. Make sure data starts and ends with a QC --------------------------------
   if (nrow(df) == 0L) {
     stop("No non-blank/non-HP rows remain after preprocessing.")
   }
@@ -175,7 +166,7 @@ clean_data <- function(df,
     stop("Data sorted by injection order must end with a QC sample.")
   }
 
-  # 7 Find equal columns -------------------------------------------------------
+  # 7. Find equal columns ------------------------------------------------------
   duplicate_mets <- find_equal_metabolite_cols(df, metab, tolerance = 1e-3)
 
   return(
@@ -185,6 +176,7 @@ clean_data <- function(df,
       replacement_counts = repl,
       withheld_cols = withheld_cols,
       non_numeric_cols = non_numeric_cols,
+      all_missing_zero_qc_cols = all_missing_zero_qc_cols,
       duplicate_mets = duplicate_mets,
       blank_df = blank_df,
       below_blank_threshold = below_blank_threshold,
@@ -192,7 +184,6 @@ clean_data <- function(df,
     )
   )
 }
-
 #' Find (nearly) equal columns ignoring NAs
 #'
 #' @param df   A data frame containing metabolite columns.
