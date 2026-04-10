@@ -329,12 +329,119 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
 #' @keywords internal
 #' @noRd
 ui_correction_method <- function(df, ns = identity) {
+  stopifnot(is.data.frame(df))
+  
+  required_cols <- c("class", "batch", "order")
+  missing_cols <- setdiff(required_cols, names(df))
+  if (length(missing_cols) > 0L) {
+    stop(
+      sprintf(
+        "df is missing required column(s): %s",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+  }
+  
+  `%||%` <- function(x, y) {
+    if (is.null(x)) y else x
+  }
+  
   qc_per_batch <- df %>%
     dplyr::group_by(batch) %>%
-    dplyr::summarise(qc_in_batch = sum(class == "QC", na.rm = TRUE), .groups = "drop")
+    dplyr::summarise(
+      qc_in_batch = sum(class == "QC", na.rm = TRUE),
+      .groups = "drop"
+    )
   
   num_batches <- dplyr::n_distinct(df$batch)
-  total_qcs   <- sum(df$class == "QC", na.rm = TRUE)
+  total_qcs <- sum(df$class == "QC", na.rm = TRUE)
+  
+  # Compute QC spacing from injection order
+  qc_gap_stats <- NULL
+  ord <- df$order
+  is_qc <- df$class == "QC"
+  
+  keep <- !is.na(ord) & !is.na(is_qc)
+  ord <- ord[keep]
+  is_qc <- is_qc[keep]
+  
+  if (!is.numeric(ord)) {
+    ord_num <- suppressWarnings(as.numeric(ord))
+    if (!all(is.na(ord_num))) {
+      ord <- ord_num
+    }
+  }
+  
+  if (is.numeric(ord) && sum(is_qc, na.rm = TRUE) >= 2L) {
+    qc_orders <- sort(ord[is_qc])
+    gaps <- diff(qc_orders)
+    
+    if (length(gaps) > 0L) {
+      qc_gap_stats <- list(
+        min_gap = min(gaps, na.rm = TRUE),
+        median_gap = stats::median(gaps, na.rm = TRUE),
+        max_gap = max(gaps, na.rm = TRUE)
+      )
+    }
+  }
+  
+  median_gap <- qc_gap_stats$median_gap %||% NA_real_
+  max_gap <- qc_gap_stats$max_gap %||% NA_real_
+  has_spacing <- !is.null(qc_gap_stats) &&
+    is.finite(median_gap) &&
+    is.finite(max_gap)
+  
+  # QC-count eligibility
+  allow_lc <- total_qcs >= 1L
+  allow_ll <- total_qcs >= 3L
+  allow_loess <- total_qcs >= 5L
+  allow_rf <- total_qcs >= 9L
+  
+  # Spacing support
+  supports_loess <- has_spacing &&
+    median_gap <= 10 &&
+    max_gap <= 15
+  
+  supports_rf <- has_spacing &&
+    median_gap <= 9 &&
+    max_gap <= 10
+  
+  # Build the displayed choices using QC count only
+  choices <- list()
+  
+  if (allow_lc) {
+    choices[["Local constant"]] <- "LC"
+  }
+  if (allow_ll) {
+    choices[["Local linear"]] <- "LL"
+  }
+  if (allow_loess) {
+    choices[["Local polynomial"]] <- "LOESS"
+  }
+  if (allow_rf) {
+    choices[["Random forest"]] <- "RF"
+  }
+  
+  # Recommended selection
+  # Logic:
+  # 1. If RF is allowed and spacing supports it -> RF
+  # 2. Else if LOESS is allowed and spacing supports it -> LOESS
+  # 3. Else if LL is allowed -> LL
+  # 4. Else -> LC
+  selected <- if (allow_rf && supports_rf) {
+    "RF"
+  } else if (allow_loess && supports_loess) {
+    "LOESS"
+  } else if (allow_ll) {
+    "LL"
+  } else {
+    "LC"
+  }
+  
+  # Safety check in case something changes later
+  if (!selected %in% unname(unlist(choices))) {
+    selected <- unname(unlist(choices))[1]
+  }
   
   label_with_info <- shiny::tagList(
     shiny::span("Correction Regression Model"),
@@ -348,64 +455,17 @@ ui_correction_method <- function(df, ns = identity) {
       report_text_correction_descriptions(),
       title = "What do these methods mean?",
       placement = "right",
-      options = list(container = "body", customClass = "popover-responsive")
+      options = list(
+        container = "body",
+        customClass = "popover-responsive"
+      )
     )
   )
   
-  # ---- Base choices depend ONLY on total number of QCs ----
-  base_choices <- NULL
-  base_selected <- NULL
-  
-  if (total_qcs <= 4) {
-    base_choices <- list(
-      "Local constant" = "LC",
-      "Local linear"   = "LL"
-    )
-    base_selected <- "LL"
-  } else if (total_qcs <= 8) {
-    base_choices <- list(
-      "Local constant"   = "LC",
-      "Local linear"     = "LL",
-      "Local polynomial" = "LOESS"
-    )
-    base_selected <- "LL"
-  } else if (total_qcs <= 15) {
-    base_choices <- list(
-      "Local constant"   = "LC",
-      "Local linear"     = "LL",
-      "Local polynomial" = "LOESS",
-      "Random forest"    = "RF"
-    )
-    base_selected <- "LOESS"
-  } else {
-    base_choices <- list(
-      "Local constant"   = "LC",
-      "Local linear"     = "LL",
-      "Local polynomial" = "LOESS",
-      "Random forest"    = "RF"
-    )
-    base_selected <- "RF"
-  }
-  
-  # ---- Keep the existing batch-wise option logic unchanged ----
-  choices <- base_choices
-  selected <- base_selected
-  
-  #if (num_batches > 1 && !any(qc_per_batch$qc_in_batch < 5)) {
-    #choices <- c(
-      #choices,
-      #list(
-        #"Batchwise random forest"              = "BW_RF",
-        #"Batchwise local polynomial fit (LOESS)" = "BW_LOESS"
-      #)
-    #)
-    # keep selected as the base-selected method
-  #}
-  
   shiny::radioButtons(
-    inputId  = ns("corMethod"),
-    label    = label_with_info,
-    choices  = choices,
+    inputId = ns("corMethod"),
+    label = label_with_info,
+    choices = choices,
     selected = selected
   )
 }

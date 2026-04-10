@@ -63,6 +63,182 @@ ui_qc_missing_warning <- function(df) {
   
 }
 
+# ui_how_to_correct <- function(df,
+#                               qc_label = "QC",
+#                               class_col = "class",
+#                               order_col = "order") {
+#   stopifnot(is.data.frame(df))
+#   stopifnot(class_col %in% names(df))
+#   
+#   total_qcs <- sum(df[[class_col]] == qc_label, na.rm = TRUE)
+#   
+#   # Compute QC spacing (assumes order_col exists and is usable at this point)
+#   qc_gap_stats <- NULL
+#   if (order_col %in% names(df)) {
+#     ord <- df[[order_col]]
+#     is_qc <- df[[class_col]] == qc_label
+#     
+#     keep <- !is.na(ord) & !is.na(is_qc)
+#     ord <- ord[keep]
+#     is_qc <- is_qc[keep]
+#     
+#     if (!is.numeric(ord)) {
+#       ord_num <- suppressWarnings(as.numeric(ord))
+#       if (!all(is.na(ord_num))) ord <- ord_num
+#     }
+#     
+#     if (is.numeric(ord) && sum(is_qc) >= 2L) {
+#       qc_orders <- sort(ord[is_qc])
+#       gaps <- diff(qc_orders)
+#       qc_gap_stats <- list(
+#         max_gap = max(gaps, na.rm = TRUE),
+#         median_gap = stats::median(gaps, na.rm = TRUE)
+#       )
+#     }
+#   }
+#   
+#   gap_line <- if (!is.null(qc_gap_stats)) {
+#     sprintf(
+#       "QC spacing (injection order): median gap = %s, max gap = %s",
+#       format(qc_gap_stats$median_gap, digits = 3),
+#       format(qc_gap_stats$max_gap, digits = 3)
+#     )
+#   } else {
+#     "QC spacing (injection order): unavailable (need ≥2 QCs with valid order)"
+#   }
+#   
+#   summary_bits <- htmltools::tagList(
+#     htmltools::tags$div(
+#       class = "small text-muted",
+#       sprintf("Total QCs detected: %d", total_qcs)
+#     ),
+#     htmltools::tags$div(
+#       class = "small text-muted",
+#       gap_line
+#     )
+#   )
+#   
+#   # Helper to render conditional warning text
+#   warn_span <- function(show, text) {
+#     if (!isTRUE(show)) return(NULL)
+#     htmltools::tags$span(
+#       icon("exclamation-triangle", class = "text-danger-emphasis"),
+#       htmltools::tags$span(style = "margin-left: 6px;", text),
+#       style = "display:block; margin-top:4px;"
+#     )
+#   }
+#   
+#   # Decide overfit-risk flags (data-driven when possible)
+#   max_gap <- qc_gap_stats$max_gap %||% NA_real_
+#   
+#   # LOESS polynomial warning triggers
+#   loess2_warn_low_qc <- total_qcs < 9
+#   loess2_warn_gap <- is.finite(max_gap) && max_gap > 15
+#   
+#   # RF warning triggers (more conservative)
+#   rf_warn_low_qc <- total_qcs < 12
+#   rf_warn_gap <- is.finite(max_gap) && max_gap > 10
+#   
+#   # Base choices always available
+#   items <- list(
+#     htmltools::tags$li(
+#       htmltools::tags$strong("Local constant: "),
+#       "Use when the QC drift trend is flat, dominated by noise, or shows no consistent pattern."
+#     ),
+#     htmltools::tags$li(
+#       htmltools::tags$strong("Local linear: "),
+#       "Use when the QC drift trend is a gradual increase or decrease (approximately monotone)."
+#     )
+#   )
+#   
+#   # Add local polynomial when allowed
+#   if (total_qcs >= 5 && total_qcs <= 8) {
+#     items <- c(items, list(
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+#         "Use when the QC drift trend is a smooth curve (nonlinear but smooth).",
+#         warn_span(
+#           show = loess2_warn_low_qc || loess2_warn_gap,
+#           text = paste(
+#             "Higher overfit risk with sparse QCs.",
+#             if (loess2_warn_low_qc) "With <9 QCs, polynomial fits can be unstable." else "",
+#             if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15).", format(max_gap, digits = 3)) else "",
+#             "If you see oscillations or worse non-QC variability, prefer local linear."
+#           )
+#         )
+#       )
+#     ))
+#   }
+#   
+#   # Add polynomial + RF when allowed
+#   if (total_qcs > 8 && total_qcs <= 15) {
+#     items <- c(items, list(
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+#         "Use when drift is smooth and curved. Prefer local linear if drift is mostly linear.",
+#         warn_span(
+#           show = loess2_warn_gap,
+#           text = paste(
+#             if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15), which can make local polynomial unstable.", format(max_gap, digits = 3)) else "",
+#             "If the correction curve looks too wiggly, use local linear."
+#           )
+#         )
+#       ),
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Random forest (QC-RFSC): "),
+#         "Use when drift is irregular, has local disruptions, or shows abrupt changes that a smooth curve cannot capture.",
+#         warn_span(
+#           show = rf_warn_low_qc || rf_warn_gap,
+#           text = paste(
+#             "Random forest is high-flexibility and can overfit with limited QC support.",
+#             if (rf_warn_low_qc) "With <12 QCs, overfit risk is elevated." else "",
+#             if (rf_warn_gap) sprintf("Your max QC gap is %s (>10).", format(max_gap, digits = 3)) else "",
+#             "Prefer Local polynomial unless local polynomial fails to reduce QC drift/RSD."
+#           )
+#         )
+#       )
+#     ))
+#   }
+#   
+#   if (total_qcs > 15) {
+#     items <- c(items, list(
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Local polynomial (QC-RLSC): "),
+#         "Use when drift is smooth and curved.",
+#         warn_span(
+#           show = loess2_warn_gap,
+#           text = if (loess2_warn_gap) {
+#             sprintf("Your max QC gap is %s (>15). Large gaps can make local polynomial less reliable between QC anchors.", format(max_gap, digits = 3))
+#           } else {
+#             NULL
+#           }
+#         )
+#       ),
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Random forest (QC-RFSC): "),
+#         "Use when drift is irregular or has abrupt changes. Often a good option when QC frequency is high.",
+#         warn_span(
+#           show = rf_warn_gap,
+#           text = if (rf_warn_gap) {
+#             sprintf("Your max QC gap is %s (>10). Wide QC spacing increases RF overfit risk.", format(max_gap, digits = 3))
+#           } else {
+#             NULL
+#           }
+#         )
+#       ),
+#       htmltools::tags$li(
+#         htmltools::tags$strong("Rule of thumb: "),
+#         "If both local polynomial and random forest are available, try both and compare RSD reduction, potential extreme values, QC drift, PCA after correction."
+#       )
+#     ))
+#   }
+#   
+#   htmltools::tagList(
+#     summary_bits,
+#     htmltools::tags$ul(items)
+#   )
+# }
+
 ui_how_to_correct <- function(df,
                               qc_label = "QC",
                               class_col = "class",
@@ -70,9 +246,13 @@ ui_how_to_correct <- function(df,
   stopifnot(is.data.frame(df))
   stopifnot(class_col %in% names(df))
   
+  `%||%` <- function(x, y) {
+    if (is.null(x)) y else x
+  }
+  
   total_qcs <- sum(df[[class_col]] == qc_label, na.rm = TRUE)
   
-  # Compute QC spacing (assumes order_col exists and is usable at this point)
+  # Compute QC spacing using injection order
   qc_gap_stats <- NULL
   if (order_col %in% names(df)) {
     ord <- df[[order_col]]
@@ -84,15 +264,18 @@ ui_how_to_correct <- function(df,
     
     if (!is.numeric(ord)) {
       ord_num <- suppressWarnings(as.numeric(ord))
-      if (!all(is.na(ord_num))) ord <- ord_num
+      if (!all(is.na(ord_num))) {
+        ord <- ord_num
+      }
     }
     
     if (is.numeric(ord) && sum(is_qc) >= 2L) {
       qc_orders <- sort(ord[is_qc])
       gaps <- diff(qc_orders)
       qc_gap_stats <- list(
-        max_gap = max(gaps, na.rm = TRUE),
-        median_gap = stats::median(gaps, na.rm = TRUE)
+        min_gap = min(gaps, na.rm = TRUE),
+        median_gap = stats::median(gaps, na.rm = TRUE),
+        max_gap = max(gaps, na.rm = TRUE)
       )
     }
   }
@@ -104,7 +287,7 @@ ui_how_to_correct <- function(df,
       format(qc_gap_stats$max_gap, digits = 3)
     )
   } else {
-    "QC spacing (injection order): unavailable (need ≥2 QCs with valid order)"
+    "QC spacing (injection order): unavailable (need \u22652 QCs with valid order)"
   }
   
   summary_bits <- htmltools::tagList(
@@ -118,124 +301,174 @@ ui_how_to_correct <- function(df,
     )
   )
   
-  # Helper to render conditional warning text
   warn_span <- function(show, text) {
-    if (!isTRUE(show)) return(NULL)
+    if (!isTRUE(show)) {
+      return(NULL)
+    }
+    
     htmltools::tags$span(
-      icon("exclamation-triangle", class = "text-danger-emphasis"),
+      shiny::icon("exclamation-triangle", class = "text-danger-emphasis"),
       htmltools::tags$span(style = "margin-left: 6px;", text),
       style = "display:block; margin-top:4px;"
     )
   }
   
-  # Decide overfit-risk flags (data-driven when possible)
+  has_spacing <- !is.null(qc_gap_stats)
+  median_gap <- qc_gap_stats$median_gap %||% NA_real_
   max_gap <- qc_gap_stats$max_gap %||% NA_real_
   
-  # LOESS polynomial warning triggers
-  loess2_warn_low_qc <- total_qcs < 9
-  loess2_warn_gap <- is.finite(max_gap) && max_gap > 15
+  # Spacing categories
+  # Random forest gets its own stricter threshold:
+  # median gap must be <= 9, and max gap must be reasonably controlled.
+  spacing_dense_rf <- has_spacing &&
+    is.finite(median_gap) && is.finite(max_gap) &&
+    median_gap <= 9 && max_gap <= 10
   
-  # RF warning triggers (more conservative)
-  rf_warn_low_qc <- total_qcs < 12
-  rf_warn_gap <- is.finite(max_gap) && max_gap > 10
+  spacing_reasonable_poly <- has_spacing &&
+    is.finite(median_gap) && is.finite(max_gap) &&
+    median_gap <= 10 && max_gap <= 15
   
-  # Base choices always available
-  items <- list(
-    htmltools::tags$li(
-      htmltools::tags$strong("Local constant: "),
-      "Use when the QC drift trend is flat, dominated by noise, or shows no consistent pattern."
-    ),
-    htmltools::tags$li(
-      htmltools::tags$strong("Local linear: "),
-      "Use when the QC drift trend is a gradual increase or decrease (approximately monotone)."
+  spacing_sparse <- has_spacing &&
+    is.finite(max_gap) &&
+    max_gap > 15
+  
+  # Method eligibility based on QC count only
+  allow_local_constant <- total_qcs >= 1
+  allow_local_linear <- total_qcs >= 3
+  allow_local_polynomial <- total_qcs >= 5
+  allow_random_forest <- total_qcs >= 9
+  
+  recommendation <- NULL
+  rationale <- NULL
+  
+  if (total_qcs < 3) {
+    recommendation <- "Local constant"
+    rationale <- paste(
+      "Very limited QC support. Use the least flexible method.",
+      "Higher-flexibility methods should not be used at this QC count."
+    )
+  } else if (total_qcs <= 4) {
+    if (spacing_sparse) {
+      recommendation <- "Local constant"
+      rationale <- paste(
+        "Few QCs and wide spacing between them.",
+        "Use the most conservative method."
+      )
+    } else {
+      recommendation <- "Local linear"
+      rationale <- paste(
+        "Few QCs, but enough support for a modestly flexible fit.",
+        "Local linear is the highest-supported method in this range."
+      )
+    }
+  } else if (total_qcs <= 8) {
+    if (spacing_reasonable_poly) {
+      recommendation <- "Local polynomial (QC-RLSC)"
+      rationale <- paste(
+        "Moderate QC count with acceptable spacing.",
+        "A moderately flexible smoother is supported."
+      )
+    } else {
+      recommendation <- "Local linear"
+      rationale <- paste(
+        "Moderate QC count, but spacing is not tight enough for local polynomial.",
+        "Prefer the more stable option."
+      )
+    }
+  } else {
+    if (spacing_dense_rf) {
+      recommendation <- "Random forest (QC-RFSC)"
+      rationale <- paste(
+        "QC count is high enough and median QC spacing is tight enough to support the highest-flexibility method."
+      )
+    } else if (spacing_reasonable_poly) {
+      recommendation <- "Local polynomial (QC-RLSC)"
+      rationale <- paste(
+        "QC support is good, but not strong enough for random forest.",
+        "Use the intermediate-flexibility method."
+      )
+    } else {
+      recommendation <- "Local linear"
+      rationale <- paste(
+        "Although QC count is adequate, spacing is too wide for more flexible methods.",
+        "Prefer the more stable choice."
+      )
+    }
+  }
+  
+  rec_block <- htmltools::tags$div(
+    style = "margin-top: 10px; margin-bottom: 10px;",
+    htmltools::tags$strong("Recommended method: "),
+    recommendation,
+    htmltools::tags$div(
+      class = "small text-muted",
+      style = "margin-top: 4px;",
+      rationale
     )
   )
   
-  # Add local polynomial when allowed
-  if (total_qcs >= 5 && total_qcs <= 8) {
+  items <- list()
+  
+  if (allow_local_constant) {
     items <- c(items, list(
       htmltools::tags$li(
-        htmltools::tags$strong("Local polynomial (QC-RLSC): "),
-        "Use when the QC drift trend is a smooth curve (nonlinear but smooth).",
-        warn_span(
-          show = loess2_warn_low_qc || loess2_warn_gap,
-          text = paste(
-            "Higher overfit risk with sparse QCs.",
-            if (loess2_warn_low_qc) "With <9 QCs, polynomial fits can be unstable." else "",
-            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15).", format(max_gap, digits = 3)) else "",
-            "If you see oscillations or worse non-QC variability, prefer local linear."
-          )
-        )
+        htmltools::tags$strong("Local constant: "),
+        "Best when QC support is very limited or QCs are widely spaced. Least flexible, most conservative option."
       )
     ))
   }
   
-  # Add polynomial + RF when allowed
-  if (total_qcs > 8 && total_qcs <= 15) {
+  if (allow_local_linear) {
     items <- c(items, list(
       htmltools::tags$li(
-        htmltools::tags$strong("Local polynomial (QC-RLSC): "),
-        "Use when drift is smooth and curved. Prefer local linear if drift is mostly linear.",
-        warn_span(
-          show = loess2_warn_gap,
-          text = paste(
-            if (loess2_warn_gap) sprintf("Your max QC gap is %s (>15), which can make local polynomial unstable.", format(max_gap, digits = 3)) else "",
-            "If the correction curve looks too wiggly, use local linear."
-          )
-        )
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Random forest (QC-RFSC): "),
-        "Use when drift is irregular, has local disruptions, or shows abrupt changes that a smooth curve cannot capture.",
-        warn_span(
-          show = rf_warn_low_qc || rf_warn_gap,
-          text = paste(
-            "Random forest is high-flexibility and can overfit with limited QC support.",
-            if (rf_warn_low_qc) "With <12 QCs, overfit risk is elevated." else "",
-            if (rf_warn_gap) sprintf("Your max QC gap is %s (>10).", format(max_gap, digits = 3)) else "",
-            "Prefer Local polynomial unless local polynomial fails to reduce QC drift/RSD."
-          )
-        )
+        htmltools::tags$strong("Local linear: "),
+        "Best when there are a small to moderate number of QCs. More flexible than local constant, but still relatively stable."
       )
     ))
   }
   
-  if (total_qcs > 15) {
+  if (allow_local_polynomial) {
     items <- c(items, list(
       htmltools::tags$li(
         htmltools::tags$strong("Local polynomial (QC-RLSC): "),
-        "Use when drift is smooth and curved.",
-        warn_span(
-          show = loess2_warn_gap,
-          text = if (loess2_warn_gap) {
-            sprintf("Your max QC gap is %s (>15). Large gaps can make local polynomial less reliable between QC anchors.", format(max_gap, digits = 3))
-          } else {
-            NULL
-          }
-        )
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Random forest (QC-RFSC): "),
-        "Use when drift is irregular or has abrupt changes. Often a good option when QC frequency is high.",
-        warn_span(
-          show = rf_warn_gap,
-          text = if (rf_warn_gap) {
-            sprintf("Your max QC gap is %s (>10). Wide QC spacing increases RF overfit risk.", format(max_gap, digits = 3))
-          } else {
-            NULL
-          }
-        )
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Rule of thumb: "),
-        "If both local polynomial and random forest are available, try both and compare RSD reduction, potential extreme values, QC drift, PCA after correction."
+        "Best when QC count is moderate to high and spacing is reasonably tight. Intermediate flexibility."
       )
     ))
   }
+  
+  if (allow_random_forest) {
+    items <- c(items, list(
+      htmltools::tags$li(
+        htmltools::tags$strong("Random forest (QC-RFSC): "),
+        "Best when QC count is high and QC spacing is sufficiently dense. Highest flexibility and highest QC support requirement."
+      )
+    ))
+  }
+  
+  caution_block <- htmltools::tags$div(
+    style = "margin-top: 8px;",
+    warn_span(
+      show = total_qcs < 5,
+      text = "Flexible methods are not recommended here because the number of QCs is low."
+    ),
+    warn_span(
+      show = allow_random_forest && !spacing_dense_rf,
+      text = "Random forest is available by QC count, but current QC spacing does not strongly support it."
+    ),
+    warn_span(
+      show = spacing_sparse,
+      text = sprintf(
+        "Wide QC spacing detected (max gap = %s). Prefer more stable methods.",
+        format(max_gap, digits = 3)
+      )
+    )
+  )
   
   htmltools::tagList(
     summary_bits,
-    htmltools::tags$ul(items)
+    rec_block,
+    htmltools::tags$ul(items),
+    caution_block
   )
 }
 
