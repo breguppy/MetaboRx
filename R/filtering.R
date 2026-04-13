@@ -179,3 +179,116 @@ filter_by_qc_rsd <- function(raw_df,
     )
   )
 }
+
+#' Identify metabolites with >= 2-fold difference between sample and QC averages
+#'
+#' Returns the metabolite column names where the average across all non-QC rows
+#' is at least `fold_threshold` times different from the average across QC rows.
+#'
+#' Fold-difference is computed symmetrically as:
+#'   max(sample_mean / qc_mean, qc_mean / sample_mean)
+#'
+#' @param df data.frame
+#'   Input data frame containing metadata columns and metabolite columns.
+#' @param metab_cols character or NULL, optional
+#'   Metabolite column names. If NULL, uses all columns except
+#'   `"sample"`, `"batch"`, `"class"`, and `"order"`.
+#' @param class_col character, default "class"
+#'   Name of the class column.
+#' @param qc_label character, default "QC"
+#'   Label used to identify QC rows.
+#' @param fold_threshold numeric, default 2
+#'   Minimum symmetric fold-difference required for a metabolite to be returned.
+#' @param na_rm logical, default TRUE
+#'   Whether to remove missing values when computing means.
+#' @param pseudocount numeric, default 1e-8
+#'   Small value added to means before division to avoid divide-by-zero.
+#'
+#' @return character
+#'   Vector of metabolite column names meeting the fold-difference threshold.
+#'
+#' @examples
+#' flagged_metabs <- get_metabs_2fold_vs_qc(df)
+#'
+#' @noRd
+get_metabs_2fold_vs_qc <- function(
+    df,
+    metab_cols = NULL,
+    class_col = "class",
+    qc_label = "QC",
+    fold_threshold = 2,
+    na_rm = TRUE,
+    pseudocount = 1e-8
+) {
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data.frame.")
+  }
+  
+  if (!class_col %in% names(df)) {
+    stop(sprintf("`df` must contain a '%s' column.", class_col))
+  }
+  
+  if (!is.numeric(fold_threshold) || length(fold_threshold) != 1L || fold_threshold < 1) {
+    stop("`fold_threshold` must be a single numeric value >= 1.")
+  }
+  
+  if (!is.numeric(pseudocount) || length(pseudocount) != 1L || pseudocount < 0) {
+    stop("`pseudocount` must be a single numeric value >= 0.")
+  }
+  
+  if (is.null(metab_cols)) {
+    meta_cols <- c("sample", "batch", "class", "order")
+    metab_cols <- setdiff(names(df), meta_cols)
+  }
+  
+  if (length(metab_cols) == 0L) {
+    stop("No metabolite columns were found.")
+  }
+  
+  missing_metabs <- setdiff(metab_cols, names(df))
+  if (length(missing_metabs) > 0L) {
+    stop(
+      sprintf(
+        "These `metab_cols` are not in `df`: %s",
+        paste(missing_metabs, collapse = ", ")
+      )
+    )
+  }
+  
+  is_qc <- df[[class_col]] == qc_label
+  is_sample <- !is.na(df[[class_col]]) & df[[class_col]] != qc_label
+  
+  if (!any(is_qc)) {
+    stop(sprintf("No rows found where `%s == \"%s\"`.", class_col, qc_label))
+  }
+  
+  if (!any(is_sample)) {
+    stop(sprintf("No sample rows found where `%s != \"%s\"`.", class_col, qc_label))
+  }
+  
+  sample_df <- df[is_sample, metab_cols, drop = FALSE]
+  qc_df <- df[is_qc, metab_cols, drop = FALSE]
+  
+  non_numeric <- metab_cols[!vapply(sample_df, is.numeric, logical(1L))]
+  if (length(non_numeric) > 0L) {
+    stop(
+      sprintf(
+        "All metabolite columns must be numeric. Non-numeric columns: %s",
+        paste(non_numeric, collapse = ", ")
+      )
+    )
+  }
+  
+  sample_means <- colMeans(sample_df, na.rm = na_rm)
+  qc_means <- colMeans(qc_df, na.rm = na_rm)
+  
+  sample_means_adj <- sample_means + pseudocount
+  qc_means_adj <- qc_means + pseudocount
+  
+  fold_diff <- pmax(
+    sample_means_adj / qc_means_adj,
+    qc_means_adj / sample_means_adj
+  )
+  
+  names(fold_diff)[fold_diff >= fold_threshold]
+}

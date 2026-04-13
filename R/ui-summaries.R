@@ -486,34 +486,71 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     removed <- filtered_corrected_result$removed_metabolites_no_mv
     df <- filtered_corrected_result$df_no_mv
   }
+  
+  flagged <- get_metabs_2fold_vs_qc(df)
+  
   n_removed <- length(removed)
   
   # get ISTD/ITSD metabolites
-  is_istd <- grepl("ISTD|ITSD", removed, ignore.case = FALSE)
+  is_istd <- grepl("ISTD|ITSD", removed, ignore.case = TRUE)
   istd_names <- removed[is_istd]
   n_istd <- length(istd_names)
   
-  met_cols <- setdiff(names(df), c('sample','batch','class','order'))
+  met_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
   total <- n_removed + length(met_cols)
   
-  pct_below <- round((length(met_cols) / total) * 100, digits = 1)
-  # optional warning banner
+  pct_below <- if (total > 0) {
+    round((length(met_cols) / total) * 100, digits = 1)
+  } else {
+    NA_real_
+  }
+  
+  # optional warning banner for internal standards failing RSD filter
   warning_ui <- NULL
   if (n_istd > 0) {
     warning_ui <- tags$div(
       class = "alert alert-danger",
       style = "margin-bottom: 10px;",
-      tags$strong(paste0(n_istd, " internal standard(s) with QC RSD above ", rsd_cutoff, "%: ")),
+      tags$strong(
+        paste0(
+          n_istd,
+          " internal standard(s) with QC RSD above ",
+          rsd_cutoff,
+          "%:"
+        )
+      ),
       tags$ul(
         lapply(istd_names, tags$li)
       )
     )
   }
   
-  if (post_cor_filter == FALSE) {
+  # optional warning banner for metabolites not within 2-fold of QC
+  flagged_ui <- NULL
+  if (!is.null(flagged) && length(flagged) > 0) {
+    flagged_ui <- tags$div(
+      class = "alert alert-warning",
+      style = "margin-bottom: 10px;",
+      tags$strong(
+        paste0(
+          length(flagged),
+          " metabolite(s) are not within 2-fold of QC samples:"
+        )
+      ),
+      tags$ul(
+        lapply(flagged, tags$li)
+      )
+    )
+  }
+  
+  if (isFALSE(post_cor_filter)) {
     ui <- list(
       warning_ui,
-      metric_card(paste0("Metabolites with QC RSD at or below ", rsd_cutoff, "%"), paste0(pct_below, "%")),
+      flagged_ui,
+      metric_card(
+        paste0("Metabolites with QC RSD at or below ", rsd_cutoff, "%"),
+        paste0(pct_below, "%")
+      ),
       tags$span(
         style = "color: darkorange; font-weight: bold;",
         paste0(
@@ -531,6 +568,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   } else {
     ui <- list(
       warning_ui,
+      flagged_ui,
       tags$span(
         style = "color: darkgreen; font-weight: bold;",
         "Metabolites are not filtered by QC RSD."
