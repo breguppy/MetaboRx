@@ -352,7 +352,7 @@ export_xlsx <- function(p, d, file = NULL) {
           "analysis, these statistical analyses are shown for your",
           "convenience and quick appraisal of the data. For publication,",
           "data should be analyzed according to the standards of",
-          "your field, including with the help of a statistician when needed."
+          "your field, including the help of a statistician when needed."
         ),
         startCol = 1,
         startRow = r
