@@ -1,4 +1,4 @@
-#' Hotelling T^2 on pooled non-QC samples with dual z-scores (2D PCA space)
+#' Hotelling T^2 on pooled non-QC samples with global z-score candidate flags
 #'
 #' This function:
 #' 1) extracts metabolite columns,
@@ -8,11 +8,13 @@
 #'    space) for ALL samples (QC and non-QC) with complete data, using the
 #'    non-QC PCA model,
 #' 5) flags outlier samples based on a chi-square cutoff (df = 2),
-#' 6) for outlier samples, computes:
+#' 6) computes:
 #'    - global z-scores (pooled non-QC scaling),
 #'    - class-based z-scores (within each non-QC class),
-#' 7) flags metabolite values where both |global z| and |class z|
-#'    exceed thresholds,
+#' 7) builds a candidate outlier table using:
+#'    - |global z| >= outlier_sample_z_threshold for samples outside the ellipse,
+#'    - |global z| >= inlier_sample_z_threshold for all other non-QC samples,
+#'    - QC samples excluded from the candidate table,
 #' 8) optionally returns a PCA score plot (PC1 vs PC2) with a 95% Hotelling-like
 #'    ellipse drawn on pooled non-QC scores, and
 #' 9) returns PC loadings for PC1 and PC2.
@@ -35,10 +37,12 @@
 #'   Whether to apply log2(x + offset) to metabolite columns. Default TRUE.
 #' @param log_offset numeric
 #'   Constant added before log-transform to avoid log(0). Default 1.
-#' @param z_threshold numeric
-#'   Absolute threshold for the global z-score. Default 3.
-#' @param class_z_threshold numeric
-#'   Absolute threshold for the class-based z-score. Default equal to z_threshold.
+#' @param outlier_sample_z_threshold numeric
+#'   Absolute global z-score threshold for samples outside the Hotelling ellipse.
+#'   Default 3.
+#' @param inlier_sample_z_threshold numeric
+#'   Absolute global z-score threshold for non-QC samples inside the Hotelling
+#'   ellipse. Default 5.
 #' @param min_complete integer
 #'   Minimum number of complete non-QC rows required for PCA / covariance
 #'   estimation. Default 3.
@@ -62,7 +66,8 @@
 #'             with complete data (QC and non-QC; NA otherwise)
 #'       * is_outlier_sample: TRUE if sample outside (1 - alpha) ellipse
 #'       * used_in_fit: TRUE if row used to fit the PCA / covariance (non-QC)
-#'   - extreme_values: long-format data.frame of flagged metabolite values
+#'   - extreme_values: long-format data.frame of candidate metabolite values
+#'       flagged using global z-score rules
 #'   - z_global: wide data.frame of pooled non-QC z-scores
 #'   - z_class: wide data.frame of within-class z-scores
 #'   - pca_plot: ggplot object with PC1 vs PC2 and a 95% ellipse (or NULL)
@@ -75,19 +80,19 @@
 detect_hotelling_nonqc_dual_z <- function(
     df,
     p,
-    meta_cols         = c("sample", "batch", "class", "order"),
-    class_col         = "class",
-    qc_label          = "QC",
-    alpha             = 0.05,
-    log_transform     = TRUE,
-    log_offset        = 1,
-    z_threshold       = 3,
-    class_z_threshold = z_threshold,
-    min_complete      = 3L,
-    drop_constant     = TRUE,
-    const_tol         = 1e-12,
-    ridge_factor      = 1e-6,
-    make_pca_plot     = TRUE
+    meta_cols                  = c("sample", "batch", "class", "order"),
+    class_col                  = "class",
+    qc_label                   = "QC",
+    alpha                      = 0.05,
+    log_transform              = TRUE,
+    log_offset                 = 1,
+    outlier_sample_z_threshold = 3,
+    inlier_sample_z_threshold  = 5,
+    min_complete               = 3L,
+    drop_constant              = TRUE,
+    const_tol                  = 1e-12,
+    ridge_factor               = 1e-6,
+    make_pca_plot              = TRUE
 ) {
   missing_meta <- setdiff(meta_cols, names(df))
   if (length(missing_meta) > 0L) {
@@ -173,6 +178,9 @@ detect_hotelling_nonqc_dual_z <- function(
   
   pca <- NULL
   scores_fit <- NULL
+  scores_all <- NULL
+  center_scores <- NULL
+  cov_scores_reg <- NULL
   pc_loadings <- NULL
   
   if (length(idx_fit) >= 3L && ncol(X_scaled_all) >= 2L) {
@@ -241,61 +249,89 @@ detect_hotelling_nonqc_dual_z <- function(
     Z_class[idx_cls, ] <- Z_cls
   }
   
-  outlier_idx <- which(is_outlier_sample)
+  # Candidate metabolite values:
+  # - outlier non-QC samples use threshold 3
+  # - inlier non-QC samples use threshold 5
+  # - QC samples excluded
+  candidate_sample_mask <- nonqc_mask & !is.na(T2)
   
-  if (length(outlier_idx) > 0L) {
-    Zg <- Z_global[outlier_idx, , drop = FALSE]
-    Zc <- Z_class[outlier_idx, , drop = FALSE]
+  candidate_threshold_by_row <- rep(NA_real_, n)
+  candidate_threshold_by_row[candidate_sample_mask & is_outlier_sample] <- outlier_sample_z_threshold
+  candidate_threshold_by_row[candidate_sample_mask & !is_outlier_sample] <- inlier_sample_z_threshold
+  
+  candidate_idx <- which(!is.na(candidate_threshold_by_row))
+  
+  if (length(candidate_idx) > 0L) {
+    Zg_candidate <- Z_global[candidate_idx, , drop = FALSE]
+    row_thresholds <- matrix(
+      candidate_threshold_by_row[candidate_idx],
+      nrow = length(candidate_idx),
+      ncol = ncol(Zg_candidate)
+    )
     
-    mask <- !is.na(Zg) & !is.na(Zc) &
-      (abs(Zg) >= z_threshold) &
-      (abs(Zc) >= class_z_threshold)
-    
+    mask <- !is.na(Zg_candidate) & (abs(Zg_candidate) >= row_thresholds)
     idx <- which(mask, arr.ind = TRUE)
     
     if (nrow(idx) > 0L) {
-      row_ids_global <- outlier_idx[idx[, "row"]]
+      row_ids_global <- candidate_idx[idx[, "row"]]
       col_ids <- idx[, "col"]
       metabolite_names <- met_cols[col_ids]
       
       extreme_values <- data.frame(
         df[row_ids_global, meta_cols, drop = FALSE],
-        metabolite       = metabolite_names,
-        value_raw        = X_raw[cbind(row_ids_global, col_ids)],
-        value_log        = X_log[cbind(row_ids_global, col_ids)],
-        z_global         = Z_global[cbind(row_ids_global, col_ids)],
-        abs_z_global     = abs(Z_global[cbind(row_ids_global, col_ids)]),
-        z_class          = Z_class[cbind(row_ids_global, col_ids)],
-        abs_z_class      = abs(Z_class[cbind(row_ids_global, col_ids)]),
-        T2               = T2[row_ids_global],
-        stringsAsFactors = FALSE
+        metabolite         = metabolite_names,
+        value_raw          = X_raw[cbind(row_ids_global, col_ids)],
+        value_log          = X_log[cbind(row_ids_global, col_ids)],
+        z_global           = Z_global[cbind(row_ids_global, col_ids)],
+        abs_z_global       = abs(Z_global[cbind(row_ids_global, col_ids)]),
+        z_class            = Z_class[cbind(row_ids_global, col_ids)],
+        abs_z_class        = abs(Z_class[cbind(row_ids_global, col_ids)]),
+        T2                 = T2[row_ids_global],
+        is_outlier_sample  = is_outlier_sample[row_ids_global],
+        z_threshold_used   = candidate_threshold_by_row[row_ids_global],
+        stringsAsFactors   = FALSE
       )
+      
+      extreme_values <- extreme_values[
+        order(
+          -extreme_values$is_outlier_sample,
+          -extreme_values$abs_z_global,
+          -extreme_values$T2
+        ),
+        ,
+        drop = FALSE
+      ]
+      rownames(extreme_values) <- NULL
     } else {
       extreme_values <- data.frame(
         df[0, meta_cols, drop = FALSE],
-        metabolite       = character(0),
-        value_raw        = numeric(0),
-        value_log        = numeric(0),
-        z_global         = numeric(0),
-        abs_z_global     = numeric(0),
-        z_class          = numeric(0),
-        abs_z_class      = numeric(0),
-        T2               = numeric(0),
-        stringsAsFactors = FALSE
+        metabolite         = character(0),
+        value_raw          = numeric(0),
+        value_log          = numeric(0),
+        z_global           = numeric(0),
+        abs_z_global       = numeric(0),
+        z_class            = numeric(0),
+        abs_z_class        = numeric(0),
+        T2                 = numeric(0),
+        is_outlier_sample  = logical(0),
+        z_threshold_used   = numeric(0),
+        stringsAsFactors   = FALSE
       )
     }
   } else {
     extreme_values <- data.frame(
       df[0, meta_cols, drop = FALSE],
-      metabolite       = character(0),
-      value_raw        = numeric(0),
-      value_log        = numeric(0),
-      z_global         = numeric(0),
-      abs_z_global     = numeric(0),
-      z_class          = numeric(0),
-      abs_z_class      = numeric(0),
-      T2               = numeric(0),
-      stringsAsFactors = FALSE
+      metabolite         = character(0),
+      value_raw          = numeric(0),
+      value_log          = numeric(0),
+      z_global           = numeric(0),
+      abs_z_global       = numeric(0),
+      z_class            = numeric(0),
+      abs_z_class        = numeric(0),
+      T2                 = numeric(0),
+      is_outlier_sample  = logical(0),
+      z_threshold_used   = numeric(0),
+      stringsAsFactors   = FALSE
     )
   }
   
@@ -318,7 +354,6 @@ detect_hotelling_nonqc_dual_z <- function(
     check.names = FALSE
   )
   
-  # 13. PCA plot with exact 2D Hotelling T^2 ellipse ------------------------
   pca_plot <- NULL
   
   big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
@@ -354,7 +389,6 @@ detect_hotelling_nonqc_dual_z <- function(
     unit_circle <- rbind(cos(theta), sin(theta))
     
     transform <- eig$vectors %*% diag(sqrt(eig$values * cutoff), nrow = 2L)
-    
     pts <- sweep(transform %*% unit_circle, 1L, center, FUN = "+")
     
     data.frame(
@@ -368,14 +402,13 @@ detect_hotelling_nonqc_dual_z <- function(
     if (!requireNamespace("ggplot2", quietly = TRUE)) {
       warning("Package 'ggplot2' is required for PCA plotting but is not installed.")
     } else {
-      # Build PC1/PC2 scores for all rows (NA for rows without complete retained data)
       PC_mat <- matrix(NA_real_, nrow = n, ncol = 2L)
       colnames(PC_mat) <- c("PC1", "PC2")
       
       complete_all_retained <- stats::complete.cases(X_log)
       idx_all <- which(complete_all_retained)
       
-      if (exists("scores_all")) {
+      if (!is.null(scores_all)) {
         PC_mat[idx_all, ] <- scores_all
       }
       
@@ -397,7 +430,6 @@ detect_hotelling_nonqc_dual_z <- function(
         levels = c("QC", "Non-QC inlier", "Outside ellipse")
       )
       
-      # Use the exact same center/covariance/cutoff as the T2 calculation
       ellipse_df <- .make_hotelling_ellipse(
         center = center_scores,
         cov_mat = cov_scores_reg,
@@ -443,20 +475,20 @@ detect_hotelling_nonqc_dual_z <- function(
     pca_plot       = pca_plot,
     pc_loadings    = pc_loadings,
     params         = list(
-      alpha = alpha,
-      cutoff = cutoff,
-      z_threshold = z_threshold,
-      class_z_threshold = class_z_threshold,
-      log_transform = log_transform,
-      log_offset = log_offset,
-      p = ncol(X_scaled_all),
-      class_col = class_col,
-      qc_label = qc_label,
-      min_complete = min_complete,
-      drop_constant = drop_constant,
-      const_tol = const_tol,
-      ridge_factor = ridge_factor,
-      retained_metabolites = met_cols
+      alpha                      = alpha,
+      cutoff                     = cutoff,
+      outlier_sample_z_threshold = outlier_sample_z_threshold,
+      inlier_sample_z_threshold  = inlier_sample_z_threshold,
+      log_transform              = log_transform,
+      log_offset                 = log_offset,
+      p                          = ncol(X_scaled_all),
+      class_col                  = class_col,
+      qc_label                   = qc_label,
+      min_complete               = min_complete,
+      drop_constant              = drop_constant,
+      const_tol                  = const_tol,
+      ridge_factor               = ridge_factor,
+      retained_metabolites       = met_cols
     )
   )
 }

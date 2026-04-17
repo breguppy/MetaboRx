@@ -91,6 +91,7 @@
 transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD = TRUE) {
   df_mv <- filtered_corrected$df_mv
   df_no_mv <- filtered_corrected$df_no_mv
+  
   meta_cols <- c("sample", "batch", "class", "order")
   metab_cols_mv <- setdiff(names(df_mv), meta_cols)
   metab_cols_no_mv <- setdiff(names(df_no_mv), meta_cols)
@@ -99,57 +100,57 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
   istd_names_mv <- metab_cols_mv[grepl("ISTD|ITSD", metab_cols_mv, ignore.case = FALSE)]
   istd_names_no_mv <- metab_cols_no_mv[grepl("ISTD|ITSD", metab_cols_no_mv, ignore.case = FALSE)]
   
-  
   withheld_cols_mv <- withheld_cols
   withheld_cols_no_mv <- withheld_cols
   
-  # Exclude ISTDs from *TRN* calculation when requested
+  # Exclude ISTDs from TRN calculation when requested
   if (isTRUE(ex_ISTD)) {
-    withheld_cols_mv    <- unique(c(withheld_cols_mv, istd_names_mv))
+    withheld_cols_mv <- unique(c(withheld_cols_mv, istd_names_mv))
     withheld_cols_no_mv <- unique(c(withheld_cols_no_mv, istd_names_no_mv))
   }
   
-  # Columns to transform (non-withheld)
-  metab_cols_mv_trn    <- setdiff(metab_cols_mv, withheld_cols_mv)
+  # Columns to transform
+  metab_cols_mv_trn <- setdiff(metab_cols_mv, withheld_cols_mv)
   metab_cols_no_mv_trn <- setdiff(metab_cols_no_mv, withheld_cols_no_mv)
   
-  # Keep full data in outputs (including withheld metabolite cols), but only
-  # operate on the selected columns.
-  transformed_df_mv    <- df_mv
+  transformed_df_mv <- df_mv
   transformed_df_no_mv <- df_no_mv
+  
+  equal_weight_df_mv <- transformed_df_mv
+  equal_weight_df_no_mv <- transformed_df_no_mv
   
   if (transform == "none") {
     transform_str <- "After correction, no scaling or transformations have been applied."
+    
   } else if (transform == "ISTD_norm") {
     transform_str <- paste(
       "After correction, all metabolite levels are normalized to the average of",
       "the internal standards within that sample."
     )
-    # For ISTD normalization, we normalize NON-ISTD metabolite columns by the
-    # row-wise mean of ISTD columns. Withheld columns are *not* normalized.
-    # Note: if ex_ISTD=TRUE, ISTD columns are excluded from being normalized (desired).
-    metab_cols_mv_norm    <- setdiff(metab_cols_mv, withheld_cols_mv)
+    
+    metab_cols_mv_norm <- setdiff(metab_cols_mv, withheld_cols_mv)
     metab_cols_no_mv_norm <- setdiff(metab_cols_no_mv, withheld_cols_no_mv)
     
-    # Ensure we are not normalizing ISTD columns themselves
-    metab_cols_mv_norm    <- setdiff(metab_cols_mv_norm, istd_names_mv)
+    # Never normalize ISTD columns themselves
+    metab_cols_mv_norm <- setdiff(metab_cols_mv_norm, istd_names_mv)
     metab_cols_no_mv_norm <- setdiff(metab_cols_no_mv_norm, istd_names_no_mv)
     
     transformed_df_mv <- .istd_norm(
       transformed_df_mv,
       metab_cols = metab_cols_mv_norm,
-      istd_cols  = istd_names_mv,
-      min_istd   = 1L,
-      na_action  = "leave"
+      istd_cols = istd_names_mv,
+      min_istd = 1L,
+      na_action = "leave"
     )
     
     transformed_df_no_mv <- .istd_norm(
       transformed_df_no_mv,
       metab_cols = metab_cols_no_mv_norm,
-      istd_cols  = istd_names_no_mv,
-      min_istd   = 1L,
-      na_action  = "leave"
+      istd_cols = istd_names_no_mv,
+      min_istd = 1L,
+      na_action = "leave"
     )
+    
   } else if (transform == "TRN") {
     transform_str <- paste(
       "After correction, metabolite level values are ratiometrically normalized",
@@ -164,19 +165,138 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
       "individual sample. Because arbitrary units for a given metabolite",
       "quantitatively scale across samples, levels of a given metabolite may be",
       "quantitatively compared across samples. Because unit scaling is different",
-      "for each metabolite, different metabolites within in a sample cannot be",
+      "for each metabolite, different metabolites within a sample cannot be",
       "quantitatively compared. However, because differences in arbitrary unit",
       "scaling between samples cancel out by division, within-sample metabolite",
       "ratios can be quantitatively compared across samples."
     )
-    transformed_df_mv <- .total_ratio_norm(transformed_df_mv, metab_cols_mv_trn)
-    transformed_df_no_mv <- .total_ratio_norm(transformed_df_no_mv, metab_cols_no_mv_trn)
+    
+    # Equal-weight only TRN-included metabolites using NON-QC samples
+    equal_weight_df_mv <- equally_weight_metabolites(
+      df = transformed_df_mv,
+      metab_cols = metab_cols_mv_trn,
+      class_col = "class",
+      qc_label = "QC",
+      target_mean = 1000,
+      na_rm = TRUE
+    )
+    
+    equal_weight_df_no_mv <- equally_weight_metabolites(
+      df = transformed_df_no_mv,
+      metab_cols = metab_cols_no_mv_trn,
+      class_col = "class",
+      qc_label = "QC",
+      target_mean = 1000,
+      na_rm = TRUE
+    )
+    
+    # Remove ISTD columns from the returned equal-weight dfs
+    equal_weight_df_mv <- equal_weight_df_mv[, setdiff(names(equal_weight_df_mv), istd_names_mv), drop = FALSE]
+    equal_weight_df_no_mv <- equal_weight_df_no_mv[, setdiff(names(equal_weight_df_no_mv), istd_names_no_mv), drop = FALSE]
+    
+    # Apply TRN only to TRN-included metabolite columns
+    transformed_df_mv <- .total_ratio_norm(equal_weight_df_mv, metab_cols_mv_trn)
+    transformed_df_no_mv <- .total_ratio_norm(equal_weight_df_no_mv, metab_cols_no_mv_trn)
   }
+  
   return(list(
     df_mv = transformed_df_mv,
     df_no_mv = transformed_df_no_mv,
+    equal_weight_df_mv = equal_weight_df_mv,
+    equal_weight_df_no_mv = equal_weight_df_no_mv,
     str = transform_str,
     withheld_cols_mv = withheld_cols_mv,
     withheld_cols_no_mv = withheld_cols_no_mv
   ))
+}
+
+#' Equally weight metabolites using NON-QC samples
+#'
+#' Scales each metabolite column so that the mean across NON-QC samples
+#' equals `target_mean` (default = 1000).
+#'
+#' @param df A data.frame containing a class column.
+#' @param metab_cols Character vector of metabolite columns to scale.
+#' @param class_col Name of class column.
+#' @param qc_label Value in `class_col` identifying QC samples.
+#' @param target_mean Desired mean across NON-QC samples.
+#' @param na_rm Logical; whether to ignore NA values when computing means.
+#'
+#' @return A data.frame with scaled metabolite columns.
+#'
+#' @keywords internal
+#' @noRd
+equally_weight_metabolites <- function(df,
+                                       metab_cols,
+                                       class_col = "class",
+                                       qc_label = "QC",
+                                       target_mean = 1000,
+                                       na_rm = TRUE) {
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data.frame.")
+  }
+  
+  if (!class_col %in% names(df)) {
+    stop(sprintf("`df` must contain a '%s' column.", class_col))
+  }
+  
+  missing_cols <- setdiff(metab_cols, names(df))
+  if (length(missing_cols) > 0L) {
+    stop(sprintf(
+      "Columns not found in `df`: %s",
+      paste(missing_cols, collapse = ", ")
+    ))
+  }
+  
+  if (length(metab_cols) == 0L) {
+    return(df)
+  }
+  
+  non_qc_idx <- !is.na(df[[class_col]]) & df[[class_col]] != qc_label
+  
+  if (!any(non_qc_idx)) {
+    stop("No non-QC samples found; cannot compute equal-weight scaling.")
+  }
+  
+  metab_data <- as.data.frame(df[, metab_cols, drop = FALSE])
+  
+  # Force numeric once, up front
+  metab_data[] <- lapply(metab_data, function(x) {
+    if (is.numeric(x)) x else suppressWarnings(as.numeric(x))
+  })
+  
+  # Means computed ONLY on non-QC rows
+  mean_fun <- if (isTRUE(na_rm)) {
+    function(x) mean(x, na.rm = TRUE)
+  } else {
+    function(x) mean(x, na.rm = FALSE)
+  }
+  
+  col_means <- vapply(
+    metab_data[non_qc_idx, , drop = FALSE],
+    mean_fun,
+    numeric(1L)
+  )
+  
+  bad_cols <- names(col_means)[is.na(col_means) | abs(col_means) < .Machine$double.eps]
+  if (length(bad_cols) > 0L) {
+    stop(sprintf(
+      "The following columns have mean ~0 or NA in non-QC samples and cannot be scaled: %s",
+      paste(bad_cols, collapse = ", ")
+    ))
+  }
+  
+  scale_factors <- target_mean / col_means
+  
+  # Vectorized column-wise multiplication
+  scaled_data <- sweep(
+    as.matrix(metab_data),
+    MARGIN = 2,
+    STATS = scale_factors,
+    FUN = "*"
+  )
+  
+  df[, metab_cols] <- scaled_data
+  
+  return(df)
 }
