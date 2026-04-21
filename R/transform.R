@@ -300,3 +300,58 @@ equally_weight_metabolites <- function(df,
   
   return(df)
 }
+
+#' PQN normalization method:
+#' from the pmp packages.
+#' Scaling factors are the sample median ratio to QC samples
+#' @noRd
+pqn_norm <- function(df, 
+                     metab_cols,
+                     class_col = "class",
+                     qc_label = "QC",
+                     na_rm = TRUE) {
+  
+  # Should add options for normalizing to QCs or to all samples as a reference
+  if (!requireNamespace("pmp", quietly = TRUE))
+    stop("Install 'pmp' to use PQN Normalization.", call. = FALSE)
+
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data.frame.")
+  }
+  
+  if (!"class" %in% names(df)) {
+    stop(sprintf("`df` must contain a '%s' column.", "class"))
+  }
+  
+  missing_cols <- setdiff(metab_cols, names(df))
+  if (length(missing_cols) > 0L) {
+    stop(sprintf(
+      "Columns not found in `df`: %s",
+      paste(missing_cols, collapse = ", ")
+    ))
+  }
+  
+  if (length(metab_cols) == 0L) {
+    return(df)
+  }
+  
+  # make dataframe into the matrix pqn_normalization needs:
+  meta_info <- df[ ,c("sample", "batch", "class", "order")]
+  
+  row.names(df) <- df$sample
+  classes <- df$class
+  df$sample <- NULL
+  df$batch <- NULL
+  df$class <- NULL
+  df$order <- NULL
+  
+  pqn_data <- pmp::pqn_normalisation(df=df,classes = classes, qc_label = "all", ref_method = "median")
+
+  pqn_data <- as.data.frame(t(pqn_data))
+  pqn_data$sample <- row.names(pqn_data)
+
+  merged_df <- merge(meta_info, pqn_data, by = "sample", all = TRUE)
+  
+  
+  return(merged_df)
+}
