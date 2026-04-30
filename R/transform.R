@@ -197,6 +197,33 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
     # Apply TRN only to TRN-included metabolite columns
     transformed_df_mv <- .total_ratio_norm(equal_weight_df_mv, metab_cols_mv_trn)
     transformed_df_no_mv <- .total_ratio_norm(equal_weight_df_no_mv, metab_cols_no_mv_trn)
+  } else if (transform == "PQN") {
+    transform_str <- paste(
+      "This tab shows normalized metabolite level values using probabilistic ",
+      "quotient normalization (PQN). PQN is a sample-based normalization method ",
+      "computed in 3 steps:(1) Each metabolite is divided by the median value ",
+      "of that metabolite across all samples. (2) For each sample, the median ",
+      "of these quotients is computed as an estimate of the sample’s most ",
+      "probable dilution factor. (3) Post-QC-corrected metabolite intensities ",
+      "are divided by this sample-specific median quotient. This normalization ",
+      "rescales each sample by its median fold difference relative to a reference ",
+      "spectrum, correcting for global dilution or concentration differences ",
+      "while preserving relative biological differences in individual ",
+      "metabolites. Data remain in arbitrary units. Because arbitary units for ",
+      "a given metabolite quantitatively scale across samples, levels of a given ",
+      "metabolite may be quantiatively compared across samples. Because unit ",
+      "scaling is different for each metabolite, different metabolites within ",
+      "in a sample cannot be quantitatively compared. However, because ",
+      "differences in arbitrary unit scaling between samples cancel out by ",
+      "divsion, within-sample metabolite ratios can be quantitatively compared ",
+      "across samples."
+    )
+    keep_cols_mv <- setdiff(names(transformed_df_mv), withheld_cols_mv)
+    keep_cols_no_mv <- setdiff(names(transformed_df_no_mv), withheld_cols_no_mv)
+    transformed_df_mv <- pqn_norm(df = transformed_df_mv[ ,keep_cols_mv], 
+                                  metab_cols = setdiff(metab_cols_mv, withheld_cols_mv))
+    transformed_df_no_mv <- pqn_norm(df = transformed_df_no_mv[, keep_cols_no_mv],
+                                      metab_cols =setdiff(metab_cols_no_mv, withheld_cols_no_mv))
   }
   
   return(list(
@@ -398,7 +425,6 @@ pqn_norm <- function(df,
     ref_method = "median"
   )
   )
-  
   
   pqn_data <- as.data.frame(t(pqn_data), check.names = FALSE)
   pqn_data$sample <- rownames(pqn_data)
