@@ -527,11 +527,13 @@ ui_post_cor_transform <- function(df, metab_cols, ns = identity) {
     list(
       "Internal Standard Normalization" = "ISTD_norm",
       "Total Ratiometrically Normalized (TRN)" = "TRN",
+      "Probabilistic Quotient Normalization (PQN)" = "PQN",
       "None" = "none"
     )
   } else {
     list(
       "Total Ratiometric Normalization (TRN)" = "TRN",
+      "Probabilistic Quotient Normalization (PQN)" = "PQN",
       "None" = "none"
     )
   }

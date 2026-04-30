@@ -197,6 +197,33 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
     # Apply TRN only to TRN-included metabolite columns
     transformed_df_mv <- .total_ratio_norm(equal_weight_df_mv, metab_cols_mv_trn)
     transformed_df_no_mv <- .total_ratio_norm(equal_weight_df_no_mv, metab_cols_no_mv_trn)
+  } else if (transform == "PQN") {
+    transform_str <- paste(
+      "This tab shows normalized metabolite level values using probabilistic ",
+      "quotient normalization (PQN). PQN is a sample-based normalization method ",
+      "computed in 3 steps:(1) Each metabolite is divided by the median value ",
+      "of that metabolite across all samples. (2) For each sample, the median ",
+      "of these quotients is computed as an estimate of the sample’s most ",
+      "probable dilution factor. (3) Post-QC-corrected metabolite intensities ",
+      "are divided by this sample-specific median quotient. This normalization ",
+      "rescales each sample by its median fold difference relative to a reference ",
+      "spectrum, correcting for global dilution or concentration differences ",
+      "while preserving relative biological differences in individual ",
+      "metabolites. Data remain in arbitrary units. Because arbitary units for ",
+      "a given metabolite quantitatively scale across samples, levels of a given ",
+      "metabolite may be quantiatively compared across samples. Because unit ",
+      "scaling is different for each metabolite, different metabolites within ",
+      "in a sample cannot be quantitatively compared. However, because ",
+      "differences in arbitrary unit scaling between samples cancel out by ",
+      "divsion, within-sample metabolite ratios can be quantitatively compared ",
+      "across samples."
+    )
+    keep_cols_mv <- setdiff(names(transformed_df_mv), withheld_cols_mv)
+    keep_cols_no_mv <- setdiff(names(transformed_df_no_mv), withheld_cols_no_mv)
+    transformed_df_mv <- pqn_norm(df = transformed_df_mv[ ,keep_cols_mv], 
+                                  metab_cols = setdiff(metab_cols_mv, withheld_cols_mv))
+    transformed_df_no_mv <- pqn_norm(df = transformed_df_no_mv[, keep_cols_no_mv],
+                                      metab_cols =setdiff(metab_cols_no_mv, withheld_cols_no_mv))
   }
   
   return(list(
@@ -299,4 +326,133 @@ equally_weight_metabolites <- function(df,
   df[, metab_cols] <- scaled_data
   
   return(df)
+}
+#' PQN normalization method
+#'
+#' Uses `pmp::pqn_normalisation()` on non-QC samples only.
+#' `pmp::pqn_normalisation()` expects metabolites/features in rows and samples
+#' in columns, so the metabolite matrix is transposed before normalization and
+#' transposed back afterward.
+#'
+#' Scaling factors are computed as each sample's median ratio to the
+#' metabolite-wise median across non-QC samples.
+#'
+#' @param df A data.frame containing metadata columns and metabolite columns.
+#' @param metab_cols Character vector of metabolite column names.
+#' @param class_col Name of the class column.
+#' @param qc_label Label identifying QC samples.
+#' @param na_rm Currently unused; included for API compatibility.
+#'
+#' @return A data.frame with the same columns and row order as `df`.
+#'
+#' @noRd
+pqn_norm <- function(df,
+                     metab_cols,
+                     class_col = "class",
+                     qc_label = "QC",
+                     na_rm = TRUE) {
+  if (!requireNamespace("pmp", quietly = TRUE)) {
+    stop("Install 'pmp' to use PQN normalization.", call. = FALSE)
+  }
+  
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data.frame.", call. = FALSE)
+  }
+  
+  required_meta_cols <- c("sample", "batch", class_col, "order")
+  missing_meta_cols <- setdiff(required_meta_cols, names(df))
+  
+  if (length(missing_meta_cols) > 0L) {
+    stop(
+      sprintf(
+        "`df` must contain these metadata columns: %s",
+        paste(missing_meta_cols, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  
+  missing_metab_cols <- setdiff(metab_cols, names(df))
+  
+  if (length(missing_metab_cols) > 0L) {
+    stop(
+      sprintf(
+        "Columns not found in `df`: %s",
+        paste(missing_metab_cols, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  
+  if (length(metab_cols) == 0L) {
+    return(df)
+  }
+  
+  original_col_order <- names(df)
+  original_row_order <- seq_len(nrow(df))
+  
+  work_df <- df
+  work_df$.original_row_order <- original_row_order
+  
+  is_qc <- work_df[[class_col]] == qc_label
+  is_qc[is.na(is_qc)] <- FALSE
+  
+  qc_df <- work_df[is_qc, , drop = FALSE]
+  non_qc_df <- work_df[!is_qc, , drop = FALSE]
+  
+  if (nrow(non_qc_df) == 0L) {
+    warning("No non-QC samples found. Returning `df` unchanged.", call. = FALSE)
+    return(df)
+  }
+  
+  if (anyDuplicated(non_qc_df$sample)) {
+    sample_names <- make.unique(as.character(non_qc_df$sample))
+  } else {
+    sample_names <- as.character(non_qc_df$sample)
+  }
+  
+  pqn_input <- t(as.matrix(non_qc_df[, metab_cols, drop = FALSE]))
+  rownames(pqn_input) <- metab_cols
+  colnames(pqn_input) <- sample_names
+  
+  classes <- rep("sample", ncol(pqn_input))
+  
+  suppressWarnings(
+    pqn_data <- pmp::pqn_normalisation(
+    df = pqn_input,
+    classes = classes,
+    qc_label = "all",
+    ref_method = "median"
+  )
+  )
+  
+  pqn_data <- as.data.frame(t(pqn_data), check.names = FALSE)
+  pqn_data$sample <- rownames(pqn_data)
+  
+  non_qc_meta <- non_qc_df[, setdiff(names(work_df), metab_cols), drop = FALSE]
+  non_qc_meta$.pqn_sample_name <- sample_names
+  
+  normalized_non_qc_df <- merge(
+    non_qc_meta,
+    pqn_data,
+    by.x = ".pqn_sample_name",
+    by.y = "sample",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  
+  normalized_non_qc_df$.pqn_sample_name <- NULL
+  
+  combined_df <- rbind(
+    normalized_non_qc_df[, names(work_df), drop = FALSE],
+    qc_df[, names(work_df), drop = FALSE]
+  )
+  
+  combined_df <- combined_df[order(combined_df$.original_row_order), , drop = FALSE]
+  combined_df$.original_row_order <- NULL
+  
+  combined_df <- combined_df[, original_col_order, drop = FALSE]
+  rownames(combined_df) <- NULL
+  
+  combined_df
 }
