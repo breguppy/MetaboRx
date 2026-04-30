@@ -508,7 +508,7 @@ ui_post_cor_filter <- function(ns) {
     conditionalPanel(
       condition = sprintf("!input['%s']", ns("post_cor_filter")),
       tooltip(
-        sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 20),
+        sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 30),
         "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
         placement = "right"
       )
