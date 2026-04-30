@@ -300,58 +300,133 @@ equally_weight_metabolites <- function(df,
   
   return(df)
 }
-
-#' PQN normalization method:
-#' from the pmp packages.
-#' Scaling factors are the sample median ratio to QC samples
+#' PQN normalization method
+#'
+#' Uses `pmp::pqn_normalisation()` on non-QC samples only.
+#' `pmp::pqn_normalisation()` expects metabolites/features in rows and samples
+#' in columns, so the metabolite matrix is transposed before normalization and
+#' transposed back afterward.
+#'
+#' Scaling factors are computed as each sample's median ratio to the
+#' metabolite-wise median across non-QC samples.
+#'
+#' @param df A data.frame containing metadata columns and metabolite columns.
+#' @param metab_cols Character vector of metabolite column names.
+#' @param class_col Name of the class column.
+#' @param qc_label Label identifying QC samples.
+#' @param na_rm Currently unused; included for API compatibility.
+#'
+#' @return A data.frame with the same columns and row order as `df`.
+#'
 #' @noRd
-pqn_norm <- function(df, 
+pqn_norm <- function(df,
                      metab_cols,
                      class_col = "class",
                      qc_label = "QC",
                      na_rm = TRUE) {
+  if (!requireNamespace("pmp", quietly = TRUE)) {
+    stop("Install 'pmp' to use PQN normalization.", call. = FALSE)
+  }
   
-  # Should add options for normalizing to QCs or to all samples as a reference
-  if (!requireNamespace("pmp", quietly = TRUE))
-    stop("Install 'pmp' to use PQN Normalization.", call. = FALSE)
-
   if (!is.data.frame(df)) {
-    stop("`df` must be a data.frame.")
+    stop("`df` must be a data.frame.", call. = FALSE)
   }
   
-  if (!"class" %in% names(df)) {
-    stop(sprintf("`df` must contain a '%s' column.", "class"))
+  required_meta_cols <- c("sample", "batch", class_col, "order")
+  missing_meta_cols <- setdiff(required_meta_cols, names(df))
+  
+  if (length(missing_meta_cols) > 0L) {
+    stop(
+      sprintf(
+        "`df` must contain these metadata columns: %s",
+        paste(missing_meta_cols, collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   
-  missing_cols <- setdiff(metab_cols, names(df))
-  if (length(missing_cols) > 0L) {
-    stop(sprintf(
-      "Columns not found in `df`: %s",
-      paste(missing_cols, collapse = ", ")
-    ))
+  missing_metab_cols <- setdiff(metab_cols, names(df))
+  
+  if (length(missing_metab_cols) > 0L) {
+    stop(
+      sprintf(
+        "Columns not found in `df`: %s",
+        paste(missing_metab_cols, collapse = ", ")
+      ),
+      call. = FALSE
+    )
   }
   
   if (length(metab_cols) == 0L) {
     return(df)
   }
   
-  # make dataframe into the matrix pqn_normalization needs:
-  meta_info <- df[ ,c("sample", "batch", "class", "order")]
+  original_col_order <- names(df)
+  original_row_order <- seq_len(nrow(df))
   
-  row.names(df) <- df$sample
-  classes <- df$class
-  df$sample <- NULL
-  df$batch <- NULL
-  df$class <- NULL
-  df$order <- NULL
+  work_df <- df
+  work_df$.original_row_order <- original_row_order
   
-  pqn_data <- pmp::pqn_normalisation(df=df,classes = classes, qc_label = "all", ref_method = "median")
-
-  pqn_data <- as.data.frame(t(pqn_data))
-  pqn_data$sample <- row.names(pqn_data)
-
-  merged_df <- merge(meta_info, pqn_data, by = "sample", all = TRUE)
+  is_qc <- work_df[[class_col]] == qc_label
+  is_qc[is.na(is_qc)] <- FALSE
+  
+  qc_df <- work_df[is_qc, , drop = FALSE]
+  non_qc_df <- work_df[!is_qc, , drop = FALSE]
+  
+  if (nrow(non_qc_df) == 0L) {
+    warning("No non-QC samples found. Returning `df` unchanged.", call. = FALSE)
+    return(df)
+  }
+  
+  if (anyDuplicated(non_qc_df$sample)) {
+    sample_names <- make.unique(as.character(non_qc_df$sample))
+  } else {
+    sample_names <- as.character(non_qc_df$sample)
+  }
+  
+  pqn_input <- t(as.matrix(non_qc_df[, metab_cols, drop = FALSE]))
+  rownames(pqn_input) <- metab_cols
+  colnames(pqn_input) <- sample_names
+  
+  classes <- rep("sample", ncol(pqn_input))
+  
+  suppressWarnings(
+    pqn_data <- pmp::pqn_normalisation(
+    df = pqn_input,
+    classes = classes,
+    qc_label = "all",
+    ref_method = "median"
+  )
+  )
   
   
-  return(merged_df)
+  pqn_data <- as.data.frame(t(pqn_data), check.names = FALSE)
+  pqn_data$sample <- rownames(pqn_data)
+  
+  non_qc_meta <- non_qc_df[, setdiff(names(work_df), metab_cols), drop = FALSE]
+  non_qc_meta$.pqn_sample_name <- sample_names
+  
+  normalized_non_qc_df <- merge(
+    non_qc_meta,
+    pqn_data,
+    by.x = ".pqn_sample_name",
+    by.y = "sample",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  
+  normalized_non_qc_df$.pqn_sample_name <- NULL
+  
+  combined_df <- rbind(
+    normalized_non_qc_df[, names(work_df), drop = FALSE],
+    qc_df[, names(work_df), drop = FALSE]
+  )
+  
+  combined_df <- combined_df[order(combined_df$.original_row_order), , drop = FALSE]
+  combined_df$.original_row_order <- NULL
+  
+  combined_df <- combined_df[, original_col_order, drop = FALSE]
+  rownames(combined_df) <- NULL
+  
+  combined_df
 }
