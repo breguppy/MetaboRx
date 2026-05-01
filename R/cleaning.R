@@ -31,6 +31,10 @@ clean_data <- function(df,
                        class,
                        order,
                        withheld_cols) {
+  # find any duplicate column names
+  col_names <- names(df)
+  duplicate_col_names <- unique(col_names[duplicated(col_names)])
+  
   # 1. Standardize required metadata column names ------------------------------
   if (!(batch %in% colnames(df))) {
     df$batch <- "batch1"
@@ -178,6 +182,7 @@ clean_data <- function(df,
       non_numeric_cols = non_numeric_cols,
       all_missing_zero_qc_cols = all_missing_zero_qc_cols,
       duplicate_mets = duplicate_mets,
+      duplicate_col_names = duplicate_col_names,
       blank_df = blank_df,
       below_blank_threshold = below_blank_threshold,
       below_blank_threshold_ex_ISTD = below_blank_threshold_ex_ISTD

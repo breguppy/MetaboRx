@@ -124,6 +124,7 @@ ui_basic_info <- function(cleaned) {
   non_numeric_cols <- cleaned$non_numeric_cols
   all_missing_zero_qc_cols <- cleaned$all_missing_zero_qc_cols
   duplicate_mets <- cleaned$duplicate_mets
+  duplicate_col_names <- cleaned$duplicate_col_names
   blank_df <- cleaned$blank_df
   below_blank_threshold <- cleaned$below_blank_threshold_ex_ISTD
   
@@ -210,6 +211,20 @@ ui_basic_info <- function(cleaned) {
     )
   }
   
+  # ---------- Warning box 2.5: duplicate column names ----------
+  duplicate_columns <- NULL
+  if (!is.null(duplicate_col_names) && length(duplicate_col_names) > 0) {
+    
+    duplicate_columns <- warn_card(
+      title = "Duplicate column names",
+      body  = "The follow column names appear more than once in your dataset",
+      body_tags = tags$ul(
+        style = "margin-bottom: 0;",
+        lapply(sort(duplicate_col_names), tags$li)
+      )
+    )
+  }
+  
   # ---------- Warning box 3: duplicate metabolites ----------
   duplicate_card <- NULL
   if (!is.null(duplicate_mets) && nrow(duplicate_mets) > 0) {
@@ -287,6 +302,7 @@ ui_basic_info <- function(cleaned) {
   tagList(
     replaced_card,
     nonnum_card,
+    duplicate_columns,
     duplicate_card,
     blank_card,
     
