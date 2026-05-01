@@ -217,7 +217,7 @@ ui_basic_info <- function(cleaned) {
     
     duplicate_columns <- warn_card(
       title = "Duplicate column names",
-      body  = "The follow column names appear more than once in your dataset",
+      body  = "The follow column names appear more than once in your dataset. We have appended '_1', '_2', etc. to subsequent duplicates.",
       body_tags = tags$ul(
         style = "margin-bottom: 0;",
         lapply(sort(duplicate_col_names), tags$li)

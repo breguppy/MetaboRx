@@ -33,8 +33,11 @@ clean_data <- function(df,
                        withheld_cols) {
   # find any duplicate column names
   col_names <- names(df)
-  duplicate_col_names <- unique(col_names[duplicated(col_names)])
   
+  duplicate_col_names <- unique(col_names[duplicated(col_names)])
+  if(length(duplicate_col_names) > 0){
+    df <- repair_duplicate_column_names(df)
+  }
   # 1. Standardize required metadata column names ------------------------------
   if (!(batch %in% colnames(df))) {
     df$batch <- "batch1"
@@ -245,4 +248,58 @@ find_equal_metabolite_cols <- function(df, cols = NULL, ...) {
   }
 
   do.call(rbind, results[keep])
+}
+
+#' Repair duplicated column names safely
+#'
+#' Keeps the first occurrence of each duplicated column name unchanged and
+#' appends "_1", "_2", etc. to subsequent duplicates. Generated names are
+#' guaranteed not to collide with existing column names.
+#'
+#' @param df A data frame.
+#'
+#' @return A data frame with unique column names.
+#'
+#' @keywords internal
+#' @noRd
+repair_duplicate_column_names <- function(df) {
+  col_names <- names(df)
+  
+  if (length(col_names) == 0L) {
+    return(df)
+  }
+  
+  repaired_names <- character(length(col_names))
+  used_names <- character(0)
+  duplicate_counts <- integer(0)
+  names(duplicate_counts) <- character(0)
+  
+  for (i in seq_along(col_names)) {
+    current_name <- col_names[[i]]
+    
+    if (!current_name %in% names(duplicate_counts)) {
+      duplicate_counts[[current_name]] <- 0L
+    }
+    
+    if (!current_name %in% used_names) {
+      repaired_names[[i]] <- current_name
+      used_names <- c(used_names, current_name)
+      next
+    }
+    
+    repeat {
+      duplicate_counts[[current_name]] <- duplicate_counts[[current_name]] + 1L
+      candidate_name <- paste0(current_name, "_", duplicate_counts[[current_name]])
+      
+      if (!candidate_name %in% used_names && !candidate_name %in% col_names) {
+        repaired_names[[i]] <- candidate_name
+        used_names <- c(used_names, candidate_name)
+        break
+      }
+    }
+  }
+  
+  names(df) <- repaired_names
+  
+  df
 }
