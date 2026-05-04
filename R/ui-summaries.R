@@ -554,7 +554,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     df <- filtered_corrected_result$df_no_mv
   }
   
-  flagged <- get_metabs_2fold_vs_qc(df)
+  flagged <- filtered_corrected_result$flagged_mets
   
   n_removed <- length(removed)
   
@@ -601,7 +601,9 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
       tags$strong(
         paste0(
           length(flagged),
-          " metabolite(s) are not within 2-fold of QC samples:"
+          " metabolite(s) where the sample average differs from the QC average by at least ",
+          filtered_corrected_result$percent_threshold,
+          "%."
         )
       ),
       tags$ul(

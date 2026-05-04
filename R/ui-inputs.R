@@ -534,12 +534,50 @@ ui_correction_method <- function(df, ns = identity) {
 #' @noRd
 ui_post_cor_filter <- function(ns) {
   shiny::tagList(
+    htmltools::tags$h5("Sample Distance From QC Filtering"),
+    
     tooltip(
-      checkboxInput(ns("remove_imputed"), "Remove imputed values after correction", FALSE),
-      "Check this box if you want to the corrected data to have the same missing values as the raw data.", 
+      shiny::sliderInput(
+        inputId = ns("qc_average_pct_threshold"),
+        label = "Minimum % distance from QC average",
+        min = 0,
+        max = 200,
+        value = 50,
+        step = 5,
+        post = "%"
+      ),
+      "Metabolites are flagged when the average non-QC sample intensity differs from the average QC intensity by at least the selected percentage threshold.",
       placement = "right"
     ),
+    
+    tooltip(
+      shiny::checkboxInput(
+        inputId = ns("remove_qc_average_pct_filter"),
+        label = "Remove metabolites far from QC average",
+        value = FALSE
+      ),
+      "Removes metabolites where the average non-QC sample intensity differs from the average QC intensity by at least the selected percentage.",
+      placement = "right"
+    ),
+    
+    shiny::tags$hr(),
+    
+    htmltools::tags$h5("Imputed Values"),
+    
+    tooltip(
+      shiny::checkboxInput(
+        inputId = ns("remove_imputed"),
+        label = "Remove imputed values after correction",
+        value = FALSE
+      ),
+      "Check this box if you want the corrected data to have the same missing values as the raw data.",
+      placement = "right"
+    ),
+    
+    shiny::tags$hr(),
+    
     htmltools::tags$h5("QC RSD Filtering"),
+    
     shiny::tags$div(
       style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
       shiny::tags$strong("RSD calculation"),
@@ -553,20 +591,35 @@ ui_post_cor_filter <- function(ns) {
         report_text_rsd_cal(),
         title = "RSD% calculation",
         placement = "auto",
-        options = list(container = "body",
-                       customClass = "popover-responsive") 
+        options = list(
+          container = "body",
+          customClass = "popover-responsive"
+        )
       )
     ),
+    
     tooltip(
-      checkboxInput(ns("post_cor_filter"), "Don't filter metabolites based on QC RSD%", FALSE),
-      "Check this box if you don't want any metabolites removed post-correction.", 
+      shiny::checkboxInput(
+        inputId = ns("post_cor_filter"),
+        label = "Don't filter metabolites based on QC RSD%",
+        value = FALSE
+      ),
+      "Check this box if you don't want any metabolites removed post-correction.",
       placement = "right"
     ),
-    conditionalPanel(
+    
+    shiny::conditionalPanel(
       condition = sprintf("!input['%s']", ns("post_cor_filter")),
       tooltip(
-        sliderInput(ns("rsd_filter"),"Metabolite RSD% threshold for QC samples", 0, 100, 30),
-        "Metabolites with QC RSD% above this value will be removed from the corrected data.", 
+        shiny::sliderInput(
+          inputId = ns("rsd_filter"),
+          label = "Metabolite RSD% threshold for QC samples",
+          min = 0,
+          max = 100,
+          value = 30,
+          step = 5
+        ),
+        "Metabolites with QC RSD% above this value will be removed from the corrected data.",
         placement = "right"
       )
     )

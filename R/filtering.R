@@ -372,13 +372,16 @@ filter_by_qc_rsd <- function(raw_df,
   )
 }
 
-#' Identify metabolites with >= 2-fold difference between sample and QC averages
+#' Identify metabolites with sample average far from QC average
 #'
-#' Returns the metabolite column names where the average across all non-QC rows
-#' is at least `fold_threshold` times different from the average across QC rows.
+#' Returns metabolite column names where the average across all non-QC rows
+#' differs from the average across QC rows by at least `percent_threshold`
+#' percent of the QC average.
 #'
-#' Fold-difference is computed symmetrically as:
-#'   max(sample_mean / qc_mean, qc_mean / sample_mean)
+#' Percent distance is computed as:
+#'   abs(sample_mean - qc_mean) / abs(qc_mean) * 100
+#'
+#' A pseudocount is added to the denominator to avoid division by zero.
 #'
 #' @param df data.frame
 #'   Input data frame containing metadata columns and metabolite columns.
@@ -389,28 +392,44 @@ filter_by_qc_rsd <- function(raw_df,
 #'   Name of the class column.
 #' @param qc_label character, default "QC"
 #'   Label used to identify QC rows.
-#' @param fold_threshold numeric, default 2
-#'   Minimum symmetric fold-difference required for a metabolite to be returned.
+#' @param percent_threshold numeric, default 100
+#'   Minimum percent distance from the QC average required for a metabolite to be
+#'   returned. A value of 100 means the sample average differs from the QC
+#'   average by at least 100 percent of the QC average.
 #' @param na_rm logical, default TRUE
-#'   Whether to remove missing values when computing means.
+#'   Whether to remove missing values when computing averages.
 #' @param pseudocount numeric, default 1e-8
-#'   Small value added to means before division to avoid divide-by-zero.
+#'   Small value added to the absolute QC average denominator to avoid
+#'   divide-by-zero.
+#' @param return_stats logical, default FALSE
+#'   If TRUE, returns a data.frame with the sample average, QC average, and
+#'   percent distance for all metabolites. If FALSE, returns only flagged
+#'   metabolite names.
 #'
-#' @return character
-#'   Vector of metabolite column names meeting the fold-difference threshold.
+#' @return character or data.frame
+#'   If `return_stats = FALSE`, returns a character vector of flagged metabolite
+#'   names. If `return_stats = TRUE`, returns a data.frame with one row per
+#'   metabolite.
 #'
 #' @examples
-#' flagged_metabs <- get_metabs_2fold_vs_qc(df)
+#' flagged_metabs <- get_metabs_pct_diff_vs_qc_average(df)
+#'
+#' stats <- get_metabs_pct_diff_vs_qc_average(
+#'   df,
+#'   percent_threshold = 75,
+#'   return_stats = TRUE
+#' )
 #'
 #' @noRd
-get_metabs_2fold_vs_qc <- function(
+get_metabs_pct_diff_vs_qc_average <- function(
     df,
     metab_cols = NULL,
     class_col = "class",
     qc_label = "QC",
-    fold_threshold = 2,
+    percent_threshold = 100,
     na_rm = TRUE,
-    pseudocount = 1e-8
+    pseudocount = 1e-8,
+    return_stats = FALSE
 ) {
   if (!is.data.frame(df)) {
     stop("`df` must be a data.frame.")
@@ -420,12 +439,30 @@ get_metabs_2fold_vs_qc <- function(
     stop(sprintf("`df` must contain a '%s' column.", class_col))
   }
   
-  if (!is.numeric(fold_threshold) || length(fold_threshold) != 1L || fold_threshold < 1) {
-    stop("`fold_threshold` must be a single numeric value >= 1.")
+  if (
+    !is.numeric(percent_threshold) ||
+    length(percent_threshold) != 1L ||
+    is.na(percent_threshold) ||
+    percent_threshold < 0
+  ) {
+    stop("`percent_threshold` must be a single numeric value >= 0.")
   }
   
-  if (!is.numeric(pseudocount) || length(pseudocount) != 1L || pseudocount < 0) {
+  if (
+    !is.numeric(pseudocount) ||
+    length(pseudocount) != 1L ||
+    is.na(pseudocount) ||
+    pseudocount < 0
+  ) {
     stop("`pseudocount` must be a single numeric value >= 0.")
+  }
+  
+  if (!is.logical(na_rm) || length(na_rm) != 1L || is.na(na_rm)) {
+    stop("`na_rm` must be TRUE or FALSE.")
+  }
+  
+  if (!is.logical(return_stats) || length(return_stats) != 1L || is.na(return_stats)) {
+    stop("`return_stats` must be TRUE or FALSE.")
   }
   
   if (is.null(metab_cols)) {
@@ -438,6 +475,7 @@ get_metabs_2fold_vs_qc <- function(
   }
   
   missing_metabs <- setdiff(metab_cols, names(df))
+  
   if (length(missing_metabs) > 0L) {
     stop(
       sprintf(
@@ -447,7 +485,20 @@ get_metabs_2fold_vs_qc <- function(
     )
   }
   
-  is_qc <- df[[class_col]] == qc_label
+  metab_df <- df[, metab_cols, drop = FALSE]
+  
+  non_numeric <- metab_cols[!vapply(metab_df, is.numeric, logical(1L))]
+  
+  if (length(non_numeric) > 0L) {
+    stop(
+      sprintf(
+        "All metabolite columns must be numeric. Non-numeric columns: %s",
+        paste(non_numeric, collapse = ", ")
+      )
+    )
+  }
+  
+  is_qc <- !is.na(df[[class_col]]) & df[[class_col]] == qc_label
   is_sample <- !is.na(df[[class_col]]) & df[[class_col]] != qc_label
   
   if (!any(is_qc)) {
@@ -461,26 +512,139 @@ get_metabs_2fold_vs_qc <- function(
   sample_df <- df[is_sample, metab_cols, drop = FALSE]
   qc_df <- df[is_qc, metab_cols, drop = FALSE]
   
-  non_numeric <- metab_cols[!vapply(sample_df, is.numeric, logical(1L))]
-  if (length(non_numeric) > 0L) {
-    stop(
-      sprintf(
-        "All metabolite columns must be numeric. Non-numeric columns: %s",
-        paste(non_numeric, collapse = ", ")
+  sample_means <- colMeans(sample_df, na.rm = na_rm)
+  qc_means <- colMeans(qc_df, na.rm = na_rm)
+  
+  denominator <- abs(qc_means) + pseudocount
+  
+  percent_distance <- abs(sample_means - qc_means) / denominator * 100
+  
+  flagged <- percent_distance >= percent_threshold
+  
+  if (isTRUE(return_stats)) {
+    return(
+      data.frame(
+        metabolite = metab_cols,
+        sample_mean = unname(sample_means),
+        qc_mean = unname(qc_means),
+        percent_distance_from_qc_average = unname(percent_distance),
+        flagged = unname(flagged),
+        stringsAsFactors = FALSE,
+        row.names = NULL
       )
     )
   }
   
-  sample_means <- colMeans(sample_df, na.rm = na_rm)
-  qc_means <- colMeans(qc_df, na.rm = na_rm)
+  names(percent_distance)[flagged]
+}
+
+
+#' Remove metabolites with sample average far from QC average
+#'
+#' Removes metabolite columns flagged by
+#' `get_metabs_pct_diff_vs_qc_average()`. A metabolite is removed when the
+#' average intensity across non-QC samples differs from the average QC intensity
+#' by at least `percent_threshold` percent of the QC average.
+#'
+#' @param df data.frame
+#'   Input data frame containing metadata columns and metabolite columns.
+#' @param metab_cols character or NULL, optional
+#'   Metabolite column names. If NULL, uses all columns except
+#'   `"sample"`, `"batch"`, `"class"`, and `"order"`.
+#' @param class_col character, default "class"
+#'   Name of the class column.
+#' @param qc_label character, default "QC"
+#'   Label used to identify QC rows.
+#' @param percent_threshold numeric, default 100
+#'   Minimum percent difference from the QC average required for removal.
+#' @param na_rm logical, default TRUE
+#'   Whether to remove missing values when computing averages.
+#' @param pseudocount numeric, default 1e-8
+#'   Small value added to the absolute QC average denominator to avoid
+#'   divide-by-zero.
+#' @param return_result logical, default FALSE
+#'   If TRUE, returns a list containing the filtered data frame, removed
+#'   metabolite names, retained metabolite names, and metric table.
+#'   If FALSE, returns only the filtered data frame.
+#'
+#' @return data.frame or list
+#'   If `return_result = FALSE`, returns the filtered data frame.
+#'   If `return_result = TRUE`, returns a list with:
+#'   \describe{
+#'     \item{df}{Filtered data frame.}
+#'     \item{removed_metabolites}{Metabolite columns removed.}
+#'     \item{retained_metabolites}{Metabolite columns retained.}
+#'     \item{stats}{Metric table returned by `get_metabs_pct_diff_vs_qc_average()`.}
+#'   }
+#'
+#' @examples
+#' filtered_df <- remove_metabs_pct_diff_vs_qc_average(df)
+#'
+#' result <- remove_metabs_pct_diff_vs_qc_average(
+#'   df,
+#'   percent_threshold = 100,
+#'   return_result = TRUE
+#' )
+#'
+#' @noRd
+remove_metabs_pct_diff_vs_qc_average <- function(
+    df,
+    metab_cols = NULL,
+    class_col = "class",
+    qc_label = "QC",
+    percent_threshold = 100,
+    na_rm = TRUE,
+    pseudocount = 1e-8,
+    return_result = FALSE
+) {
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data.frame.")
+  }
   
-  sample_means_adj <- sample_means + pseudocount
-  qc_means_adj <- qc_means + pseudocount
+  if (is.null(metab_cols)) {
+    meta_cols <- c("sample", "batch", "class", "order")
+    metab_cols <- setdiff(names(df), meta_cols)
+  }
   
-  fold_diff <- pmax(
-    sample_means_adj / qc_means_adj,
-    qc_means_adj / sample_means_adj
+  if (length(metab_cols) == 0L) {
+    stop("No metabolite columns were found.")
+  }
+  
+  missing_metabs <- setdiff(metab_cols, names(df))
+  
+  if (length(missing_metabs) > 0L) {
+    stop(
+      sprintf(
+        "These `metab_cols` are not in `df`: %s",
+        paste(missing_metabs, collapse = ", ")
+      )
+    )
+  }
+  
+  stats <- get_metabs_pct_diff_vs_qc_average(
+    df = df,
+    metab_cols = metab_cols,
+    class_col = class_col,
+    qc_label = qc_label,
+    percent_threshold = percent_threshold,
+    na_rm = na_rm,
+    pseudocount = pseudocount,
+    return_stats = TRUE
   )
   
-  names(fold_diff)[fold_diff >= fold_threshold]
+  removed_metabolites <- stats$metabolite[stats$flagged]
+  retained_metabolites <- setdiff(metab_cols, removed_metabolites)
+  
+  filtered_df <- df[, setdiff(names(df), removed_metabolites), drop = FALSE]
+  
+  if (!isTRUE(return_result)) {
+    return(filtered_df)
+  }
+  
+  list(
+    df = filtered_df,
+    removed_metabolites = removed_metabolites,
+    retained_metabolites = retained_metabolites,
+    stats = stats
+  )
 }
