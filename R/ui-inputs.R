@@ -158,7 +158,64 @@ ui_control_class_selector <- function(df, ns) {
 }
 
 
-#----------- 1.3 Filter Missing Values
+#----------- 1.3 Raw Data Filtering
+#' slider for blank threshold and checkbox to optionally filter metabolites 
+#' that fail the threshold.
+#' @keywords internal
+#' @noRd
+ui_blank_threshold_controls <- function(ns = identity,
+                                        threshold = 3,
+                                        remove_default = FALSE) {
+  shiny::tagList(
+    shiny::tags$div(
+      style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+      shiny::tags$strong("Blank Threshold Filter"),
+      bslib::popover(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-link p-0",
+          style = "text-decoration:none;",
+          shiny::icon("circle-info")
+        ),
+        shiny::tags$div(
+          shiny::tags$p(
+            "For each metabolite, the average QC intensity is compared with the average blank or processing blank intensity."
+          ),
+          shiny::tags$p(
+            "A metabolite fails when its QC average is less than the selected multiplier times the blank average."
+          ),
+          shiny::tags$p(
+            "Failed metabolites can be flagged only, or removed before missing-value filtering."
+          )
+        ),
+        title = "Why filter metabolites based on blanks?",
+        placement = "auto",
+        options = list(
+          container = "body",
+          customClass = "popover-responsive"
+        )
+      )
+    ),
+    
+    shiny::sliderInput(
+      inputId = ns("blank_threshold"),
+      label = "Blank threshold multiplier",
+      min = 1,
+      max = 20,
+      value = threshold,
+      step = 1
+    ),
+    
+    shiny::checkboxInput(
+      inputId = ns("remove_blank_threshold_cols"),
+      label = "Remove metabolites that fail blank threshold",
+      value = remove_default
+    ),
+    
+    shiny::tags$hr()
+  )
+}
+
 #' missing value filter slider
 #' @keywords internal
 #' @noRd

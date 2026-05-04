@@ -1,3 +1,195 @@
+#' Detect metabolites below a blank/QC threshold
+#'
+#' Identifies metabolites where the QC mean is less than a user-defined multiple
+#' of the blank or processing blank mean. Blank means must be finite and greater
+#' than zero to be eligible for threshold comparison.
+#'
+#' @param df A cleaned non-blank data frame containing metadata columns and
+#'   metabolite columns.
+#' @param blank_df A data frame containing blank or processing blank rows.
+#' @param metab_cols Character vector of metabolite column names to evaluate.
+#' @param class_col Name of the sample class column.
+#' @param qc_label Label used to identify QC samples.
+#' @param threshold Numeric multiplier applied to blank means. A metabolite fails
+#'   when `qc_mean < threshold * blank_mean`.
+#' @param internal_standard_pattern Regex pattern used to identify internal
+#'   standard columns.
+#'
+#' @return A list containing blank means, QC means, failed metabolites, failed
+#'   metabolites excluding internal standards, and a summary table.
+#'
+#' @keywords internal
+#' @noRd
+detect_blank_threshold <- function(df,
+                                   blank_df,
+                                   metab_cols,
+                                   class_col = "class",
+                                   qc_label = "QC",
+                                   threshold = 3,
+                                   internal_standard_pattern = "ISTD|ITSD") {
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data frame.")
+  }
+  
+  if (!is.data.frame(blank_df)) {
+    stop("`blank_df` must be a data frame.")
+  }
+  
+  if (!class_col %in% names(df)) {
+    stop("`class_col` must exist in `df`.")
+  }
+  
+  if (!is.numeric(threshold) || length(threshold) != 1L || is.na(threshold) || threshold <= 0) {
+    stop("`threshold` must be a single positive numeric value.")
+  }
+  
+  metab_cols <- intersect(metab_cols, names(df))
+  metab_cols <- intersect(metab_cols, names(blank_df))
+  
+  if (length(metab_cols) == 0L) {
+    return(
+      list(
+        blank_means = numeric(0),
+        qc_means = numeric(0),
+        below_blank_threshold = character(0),
+        below_blank_threshold_ex_ISTD = character(0),
+        threshold_table = data.frame()
+      )
+    )
+  }
+  
+  if (nrow(blank_df) == 0L) {
+    return(
+      list(
+        blank_means = stats::setNames(rep(NA_real_, length(metab_cols)), metab_cols),
+        qc_means = stats::setNames(rep(NA_real_, length(metab_cols)), metab_cols),
+        below_blank_threshold = character(0),
+        below_blank_threshold_ex_ISTD = character(0),
+        threshold_table = data.frame(
+          metabolite = metab_cols,
+          blank_mean = NA_real_,
+          qc_mean = NA_real_,
+          threshold_value = NA_real_,
+          eligible = FALSE,
+          below_blank_threshold = FALSE,
+          internal_standard = grepl(
+            internal_standard_pattern,
+            metab_cols,
+            ignore.case = TRUE
+          ),
+          stringsAsFactors = FALSE
+        )
+      )
+    )
+  }
+  
+  qc_idx <- trimws(as.character(df[[class_col]])) == qc_label
+  
+  if (!any(qc_idx, na.rm = TRUE)) {
+    stop("No QC samples found; cannot compute blank threshold.")
+  }
+  
+  blank_means <- vapply(
+    blank_df[, metab_cols, drop = FALSE],
+    FUN = function(x) {
+      mean(suppressWarnings(as.numeric(x)), na.rm = TRUE)
+    },
+    FUN.VALUE = numeric(1L)
+  )
+  
+  qc_means <- vapply(
+    df[qc_idx, metab_cols, drop = FALSE],
+    FUN = function(x) {
+      mean(suppressWarnings(as.numeric(x)), na.rm = TRUE)
+    },
+    FUN.VALUE = numeric(1L)
+  )
+  
+  eligible <- is.finite(blank_means) &
+    !is.na(blank_means) &
+    blank_means > 0
+  
+  threshold_value <- threshold * blank_means
+  
+  failed <- eligible & qc_means < threshold_value
+  failed[is.na(failed)] <- FALSE
+  
+  below_blank_threshold <- names(qc_means)[failed]
+  
+  internal_standard <- grepl(
+    internal_standard_pattern,
+    names(qc_means),
+    ignore.case = TRUE
+  )
+  
+  below_blank_threshold_ex_ISTD <- below_blank_threshold[
+    !grepl(
+      internal_standard_pattern,
+      below_blank_threshold,
+      ignore.case = TRUE
+    )
+  ]
+  
+  threshold_table <- data.frame(
+    metabolite = names(qc_means),
+    blank_mean = unname(blank_means),
+    qc_mean = unname(qc_means),
+    threshold_value = unname(threshold_value),
+    eligible = unname(eligible),
+    below_blank_threshold = unname(failed),
+    internal_standard = unname(internal_standard),
+    stringsAsFactors = FALSE
+  )
+  
+  list(
+    blank_means = blank_means,
+    qc_means = qc_means,
+    below_blank_threshold = below_blank_threshold,
+    below_blank_threshold_ex_ISTD = below_blank_threshold_ex_ISTD,
+    threshold_table = threshold_table
+  )
+}
+
+#' Remove metabolites that fail blank threshold detection
+#'
+#' Removes failed metabolite columns from a data frame. By default, internal
+#' standards are protected from removal.
+#'
+#' @param df A data frame.
+#' @param failed_cols Character vector of failed metabolite columns.
+#' @param protect_internal_standards Logical. If TRUE, columns matching
+#'   `internal_standard_pattern` are not removed.
+#' @param internal_standard_pattern Regex pattern used to identify internal
+#'   standards.
+#'
+#' @return A list containing the filtered data frame and removed column names.
+#'
+#' @keywords internal
+#' @noRd
+apply_blank_threshold_filter <- function(df,
+                                         failed_cols,
+                                         protect_internal_standards = TRUE,
+                                         internal_standard_pattern = "ISTD|ITSD") {
+  if (!is.data.frame(df)) {
+    stop("`df` must be a data frame.")
+  }
+  
+  failed_cols <- intersect(failed_cols, names(df))
+  
+  if (protect_internal_standards) {
+    failed_cols <- failed_cols[
+      !grepl(internal_standard_pattern, failed_cols, ignore.case = TRUE)
+    ]
+  }
+  
+  filtered_df <- df[, !names(df) %in% failed_cols, drop = FALSE]
+  
+  list(
+    df = filtered_df,
+    removed_blank_threshold_cols = failed_cols
+  )
+}
+
 #' Metabolite/value filtering functions
 #'
 #' @keywords internal

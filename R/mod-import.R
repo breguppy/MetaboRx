@@ -68,35 +68,51 @@ mod_import_ui <- function(id) {
       ),
       uiOutput(ns("basic_info")) %>% withSpinner(color = "#404040")
     )),
-    # 1.3 Filter Missing Values
-    card(layout_sidebar(
-      sidebar = ui_sidebar_block(
-        title = "1.3 Filter Missing Values",
-        shiny::tags$div(
-          style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
-          shiny::tags$strong("Missing Value Filter"),
-          bslib::popover(
-            shiny::tags$button(
-              type = "button",
-              class = "btn btn-link p-0",
-              style = "text-decoration:none;",
-              shiny::icon("circle-info")
-            ),
-            report_text_mv_filter(),
-            title = "Why filter metabolites bases on missing values?",
-            placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
-          )
+    # 1.3 Raw data filtering
+    card(
+      layout_sidebar(
+        sidebar = ui_sidebar_block(
+          title = "1.3 Raw Data Filtering",
+          
+          shiny::uiOutput(ns("blank_threshold_controls")),
+          
+          shiny::tags$div(
+            style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
+            shiny::tags$strong("Missing Value Filter"),
+            bslib::popover(
+              shiny::tags$button(
+                type = "button",
+                class = "btn btn-link p-0",
+                style = "text-decoration:none;",
+                shiny::icon("circle-info")
+              ),
+              report_text_mv_filter(),
+              title = "Why filter metabolites based on missing values?",
+              placement = "auto",
+              options = list(
+                container = "body",
+                customClass = "popover-responsive"
+              )
+            )
+          ),
+          
+          shiny::uiOutput(ns("mv_filter_slider")),
+          width = 400
         ),
-        uiOutput(ns("mv_filter_slider")),
-        width = 400
-      ),
-        fluidRow(
-          column(8, uiOutput(ns("filter_info"))),
-          column(4, uiOutput(ns("download_mv_btn")))
+        
+        shiny::fluidRow(
+          shiny::column(
+            8,
+            shiny::uiOutput(ns("blank_threshold_info")),
+            shiny::uiOutput(ns("filter_info"))
+          ),
+          shiny::column(
+            4,
+            shiny::uiOutput(ns("download_mv_btn"))
+          )
         )
-    )),
+      )
+    ),
     # Next: Choose Correction Settings
     card(
       uiOutput(ns("next_correction_ui"))
@@ -217,12 +233,16 @@ mod_import_server <- function(id) {
       req(length(unique(
         c(sel$sample, sel$batch, sel$class, sel$order)
       )) == 4)
-      clean_data(df, sel$sample, sel$batch, sel$class, sel$order, withheld)
+      clean_data(df = df,
+                 sample = sel$sample,
+                 batch = sel$batch,
+                 class = sel$class, 
+                 order = sel$order, 
+                 withheld_cols = withheld)
     }) %>% bindCache(reactiveVal(NULL)(), selections_r(), withheld_r())
     
     output$basic_info <- renderUI({
-      cd <- cleaned_r()
-      req(cd)
+      cd <- req(cleaned_r())
       ui_basic_info(cd)
     })
     output$ui_control_class_selector <- renderUI({
@@ -231,25 +251,137 @@ mod_import_server <- function(id) {
       ui_control_class_selector(cd$df, ns = session$ns)
     })
     
-    #---------- 1.3 Filter Missing Values server
-    # requires cleaned data 
-    output$mv_filter_slider <- renderUI({
+    #---------- 1.3 Raw Data filtering server
+    
+    # Show blank threshold controls only when blanks/PBs exist.
+    output$blank_threshold_controls <- shiny::renderUI({
+      cd <- req(cleaned_r())
+      
+      blank_df <- cd$blank_df
+      has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
+      
+      if (!has_blanks) {
+        return(NULL)
+      }
+      
+      ui_blank_threshold_controls(
+        ns = session$ns,
+        threshold = input$blank_threshold %||% 3,
+        remove_default = isTRUE(input$remove_blank_threshold_cols)
+      )
+    })
+    
+    # Existing missing-value slider.
+    output$mv_filter_slider <- shiny::renderUI({
       req(cleaned_r())
       ui_filter_slider(ns = session$ns)
     })
     
-    filtered_r <- reactive({
+    # Dynamic blank-threshold detection.
+    blank_threshold_result_r <- shiny::reactive({
       cd <- req(cleaned_r())
-      filter_by_missing(cd$df, setdiff(names(cd$df), c("sample", "batch", "class", "order")), input$mv_cutoff)
+      
+      blank_df <- cd$blank_df
+      has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
+      
+      if (!has_blanks) {
+        return(NULL)
+      }
+      
+      metab_cols <- setdiff(
+        names(cd$df),
+        c("sample", "batch", "class", "order")
+      )
+      
+      detect_blank_threshold(
+        df = cd$df,
+        blank_df = blank_df,
+        metab_cols = metab_cols,
+        class_col = "class",
+        qc_label = "QC",
+        threshold = input$blank_threshold %||% 3,
+        internal_standard_pattern = "ISTD|ITSD"
+      )
     })
     
-    output$filter_info <- renderUI({
+    # Combined raw-data filtering:
+    # 1) optionally remove metabolites below blank threshold
+    # 2) then apply missing-value filter
+    filtered_r <- shiny::reactive({
+      cd <- req(cleaned_r())
+      
+      df_for_filtering <- cd$df
+      blank_threshold_result <- blank_threshold_result_r()
+      
+      removed_blank_threshold_cols <- character(0)
+      
+      if (
+        !is.null(blank_threshold_result) &&
+        isTRUE(input$remove_blank_threshold_cols)
+      ) {
+        blank_filter_result <- apply_blank_threshold_filter(
+          df = df_for_filtering,
+          failed_cols = blank_threshold_result$below_blank_threshold,
+          protect_internal_standards = TRUE,
+          internal_standard_pattern = "ISTD|ITSD"
+        )
+        
+        df_for_filtering <- blank_filter_result$df
+        removed_blank_threshold_cols <- blank_filter_result$removed_blank_threshold_cols
+      }
+      
+      metab_cols <- setdiff(
+        names(df_for_filtering),
+        c("sample", "batch", "class", "order")
+      )
+      
+      mv_filter_result <- filter_by_missing(
+        df_for_filtering,
+        metab_cols,
+        input$mv_cutoff
+      )
+      
+      mv_filter_result$blank_threshold_result <- blank_threshold_result
+      mv_filter_result$removed_blank_threshold_cols <- removed_blank_threshold_cols
+      mv_filter_result$blank_threshold <- input$blank_threshold %||% 3
+      mv_filter_result$remove_blank_threshold_cols <- isTRUE(input$remove_blank_threshold_cols)
+      
+      mv_filter_result
+    })
+    
+    # Warning card above missing-value filter info.
+    output$blank_threshold_info <- shiny::renderUI({
+      cd <- req(cleaned_r())
+      
+      blank_df <- cd$blank_df
+      has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
+      
+      if (!has_blanks) {
+        return(NULL)
+      }
+      
+      fd <- req(filtered_r())
+      
+      ui_blank_threshold_info(
+        blank_threshold_result = fd$blank_threshold_result,
+        blank_df = blank_df,
+        threshold = fd$blank_threshold,
+        remove_blank_threshold_cols = fd$remove_blank_threshold_cols,
+        removed_blank_threshold_cols = fd$removed_blank_threshold_cols
+      )
+    })
+    
+    # Existing missing-value filter info.
+    output$filter_info <- shiny::renderUI({
       fd <- filtered_r()
       req(fd)
-      ui_filter_info(fd$mv_removed_cols,
-                     input$mv_cutoff,
-                     fd$qc_missing_mets,
-                     fd$class_metab_all_missing)
+      
+      ui_filter_info(
+        fd$mv_removed_cols,
+        input$mv_cutoff,
+        fd$qc_missing_mets,
+        fd$class_metab_all_missing
+      )
     })
     
     output$download_mv_btn <- renderUI({
