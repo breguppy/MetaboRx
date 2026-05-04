@@ -283,19 +283,54 @@ mod_correct_server <- function(id, data, params) {
       df_filtered  <- filtered_r()$df
       df_corrected <- corrected_r()$df
       
-      post_all       <- isTRUE(input$post_cor_filter)          
-      remove_imputed <- isTRUE(input$remove_imputed)           
-      rsd_cutoff     <- input$rsd_filter %||% Inf              
+      pct_threshold <- input$qc_average_pct_threshold %||% 100
+      pct_threshold <- as.numeric(pct_threshold)
+      
+      if (
+        length(pct_threshold) != 1L ||
+        is.na(pct_threshold) ||
+        pct_threshold < 0
+      ) {
+        pct_threshold <- 100
+      }
+      
+      removed_metabolites <- character(0)
+      
+      flagged_mets <- get_metabs_pct_diff_vs_qc_average(
+        df = df_corrected,
+        percent_threshold = pct_threshold
+      )
+      
+      if (isTRUE(input$remove_qc_average_pct_filter)) {
+        average_diff_results <- remove_metabs_pct_diff_vs_qc_average(
+          df = df_corrected,
+          percent_threshold = pct_threshold,
+          return_result = TRUE
+        )
+        
+        df_corrected <- average_diff_results$df
+        removed_metabolites <- average_diff_results$removed_metabolites
+      }
+      
+      post_all       <- isTRUE(input$post_cor_filter)
+      remove_imputed <- isTRUE(input$remove_imputed)
+      rsd_cutoff     <- input$rsd_filter %||% Inf
       
       cutoff_to_use <- if (post_all) Inf else rsd_cutoff
       
-      filter_by_qc_rsd(
-        df_filtered,
-        df_corrected,
-        cutoff_to_use,
-        remove_imputed,
-        c("sample", "batch", "class", "order")
+      filtered_cor_results <- filter_by_qc_rsd(
+        raw_df = df_filtered,
+        corrected_df = df_corrected,
+        rsd_cutoff = cutoff_to_use,
+        remove_imputed = remove_imputed,
+        metadata_cols = c("sample", "batch", "class", "order")
       )
+      
+      filtered_cor_results$percent_threshold <- pct_threshold
+      filtered_cor_results$flagged_mets <- flagged_mets
+      filtered_cor_results$removed_mets_pct_diff <- removed_metabolites
+      
+      filtered_cor_results
     })
     
     output$post_cor_filter_info <- renderUI({
