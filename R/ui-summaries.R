@@ -211,7 +211,7 @@ ui_basic_info <- function(cleaned) {
     )
   }
   
-  # ---------- Warning box 2.5: duplicate column names ----------
+  # ---------- Warning box 3: duplicate column names ----------
   duplicate_columns <- NULL
   if (!is.null(duplicate_col_names) && length(duplicate_col_names) > 0) {
     
@@ -225,7 +225,7 @@ ui_basic_info <- function(cleaned) {
     )
   }
   
-  # ---------- Warning box 3: duplicate metabolites ----------
+  # ---------- Warning box 4: duplicate metabolites ----------
   duplicate_card <- NULL
   if (!is.null(duplicate_mets) && nrow(duplicate_mets) > 0) {
     
@@ -255,47 +255,6 @@ ui_basic_info <- function(cleaned) {
       body_tags = dup_badges,
     )
   }
-  
-  # ---------- Warning box 4: blank samples + blank-threshold metabolites ----------
-  blank_card <- NULL
-  n_blanks <- if (!is.null(blank_df) && nrow(blank_df) > 0) nrow(blank_df) else 0L
-  
-  if (n_blanks > 0) {
-    below_blank_threshold <- unique(stats::na.omit(as.character(below_blank_threshold)))
-    
-    blank_body <- sprintf(
-      "%d blank/processing blank sample(s) detected and excluded from processing.",
-      n_blanks
-    )
-    
-    blank_tags <- if (length(below_blank_threshold) > 0) {
-      tags$div(
-        tags$p(
-          style = "font-weight: 600; margin-top: 8px; margin-bottom: 6px;",
-          sprintf("%d Metabolites failing the 3× blank-average threshold for QC samples (excluding internal standards):",
-                  length(below_blank_threshold)
-          )
-        ),
-        tags$ul(
-          style = "margin-bottom: 0;",
-          lapply(sort(below_blank_threshold), tags$li)
-        )
-      )
-    } else {
-      tags$p(
-        style = "font-weight: 600; margin-top: 8px; margin-bottom: 0;",
-        "All metabolites have QC average above 3 times the average of blanks."
-      )
-    }
-    
-    blank_card <- warn_card(
-      title = "Blank samples detected",
-      body  = blank_body,
-      body_tags = blank_tags
-    )
-  }
-  
-  
   # ---------------------------------------------------
   # MAIN UI SECTION
   # ---------------------------------------------------
@@ -304,7 +263,6 @@ ui_basic_info <- function(cleaned) {
     nonnum_card,
     duplicate_columns,
     duplicate_card,
-    blank_card,
     
     tags$div(
       style = "display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px;",
@@ -355,7 +313,100 @@ ui_basic_info <- function(cleaned) {
   )
 }
 
-
+#' Blank threshold filtering info card
+#'
+#' @param blank_threshold_result Result from detect_blank_threshold().
+#' @param blank_df Data frame containing blank or processing blank samples.
+#' @param threshold Numeric blank threshold multiplier.
+#' @param remove_blank_threshold_cols Logical indicating whether failed columns
+#'   are removed.
+#' @param removed_blank_threshold_cols Character vector of removed metabolite
+#'   columns.
+#'
+#' @return A Shiny tag object or NULL.
+#'
+#' @keywords internal
+#' @noRd
+ui_blank_threshold_info <- function(blank_threshold_result,
+                                    blank_df,
+                                    threshold,
+                                    remove_blank_threshold_cols = FALSE,
+                                    removed_blank_threshold_cols = character(0)) {
+  n_blanks <- if (!is.null(blank_df) && nrow(blank_df) > 0L) {
+    nrow(blank_df)
+  } else {
+    0L
+  }
+  
+  if (n_blanks == 0L || is.null(blank_threshold_result)) {
+    return(NULL)
+  }
+  
+  below_blank_threshold <- unique(stats::na.omit(
+    as.character(blank_threshold_result$below_blank_threshold_ex_ISTD)
+  ))
+  
+  blank_body <- sprintf(
+    "%d blank/processing blank sample(s) detected and excluded from downstream processing.",
+    n_blanks
+  )
+  
+  threshold_status <- if (length(below_blank_threshold) > 0L) {
+    shiny::tags$div(
+      shiny::tags$p(
+        style = "font-weight: 600; margin-top: 8px; margin-bottom: 6px;",
+        sprintf(
+          "%d metabolite(s) failed the %.1fx blank-average threshold for QC samples, excluding internal standards:",
+          length(below_blank_threshold),
+          threshold
+        )
+      ),
+      shiny::tags$ul(
+        style = "margin-bottom: 0;",
+        lapply(sort(below_blank_threshold), shiny::tags$li)
+      )
+    )
+  } else {
+    shiny::tags$p(
+      style = "font-weight: 600; margin-top: 8px; margin-bottom: 0;",
+      sprintf(
+        "All metabolites have QC average above %.1f times the average of blanks.",
+        threshold
+      )
+    )
+  }
+  
+  removal_status <- if (isTRUE(remove_blank_threshold_cols)) {
+    if (length(removed_blank_threshold_cols) > 0L) {
+      shiny::tags$p(
+        style = "margin-top: 8px; margin-bottom: 0;",
+        sprintf(
+          "%d metabolite column(s) were removed before missing-value filtering.",
+          length(removed_blank_threshold_cols)
+        )
+      )
+    } else {
+      shiny::tags$p(
+        style = "margin-top: 8px; margin-bottom: 0;",
+        "Blank-threshold removal is enabled, but no metabolite columns were removed."
+      )
+    }
+  } else {
+    shiny::tags$p(
+      style = "margin-top: 8px; margin-bottom: 0;",
+      "Blank-threshold removal is disabled. Failed metabolites are flagged but retained."
+    )
+  }
+  
+  warn_card(
+    title = "Blank threshold filtering",
+    body = blank_body,
+    body_tags = shiny::tags$div(
+      threshold_status,
+      removal_status
+    )
+  )
+}
 
 # Filter info for section 1.4 Filter Raw Data
 ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_all_missing) {
