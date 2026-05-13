@@ -806,12 +806,17 @@ ui_rsd_eval <- function(ns) {
 #' @noRd
 ui_pca_eval <- function(meta_df, ns){
   color_options <- setdiff(names(meta_df), "sample")
+  shape_options <- setdiff(names(meta_df), c("sample", "order"))
   
   # optional prioritization
   priority <- c("batch", "class", "order")
   color_options <- c(
     intersect(priority, color_options),
     setdiff(color_options, priority)
+  )
+  shape_options <- c(
+    intersect(c("batch", "class"), shape_options),
+    setdiff(shape_options, c("batch", "class"))
   )
   
   tagList(
@@ -829,6 +834,12 @@ ui_pca_eval <- function(meta_df, ns){
       "Color PCA by", 
       choices = stats::setNames(color_options, color_options),
       selected = color_options[1]
+    ),
+    radioButtons(
+      ns("shape_col"), 
+      "Sample shape defined by", 
+      choices = stats::setNames(shape_options, shape_options),
+      selected = shape_options[1]
     )
   )
 }

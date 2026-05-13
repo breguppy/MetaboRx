@@ -376,7 +376,8 @@ compute_pca_pair <- function(
 #' Build PCA score plot from precomputed PCA results
 #'
 #' @param p list
-#'   Parameter list.
+#'   Parameter list. Uses `p$color_col` for point colors and optionally
+#'   `p$shape_col` for point shapes.
 #' @param pca_pair list
 #'   Output from \code{compute_pca_pair()}.
 #' @param compared_to character
@@ -389,24 +390,25 @@ compute_pca_pair <- function(
 plot_pca_from_result <- function(p, pca_pair, compared_to) {
   before_df <- pca_pair$before$scores
   after_df <- pca_pair$after$scores
-
+  
   if (!all(c("PC1", "PC2") %in% names(before_df))) {
     stop("PCA scores do not contain PC1 and PC2 for the before dataset.")
   }
+  
   if (!all(c("PC1", "PC2") %in% names(after_df))) {
     stop("PCA scores do not contain PC1 and PC2 for the after dataset.")
   }
-
+  
   combined <- dplyr::bind_rows(before_df, after_df)
-
+  
   pc1_range <- range(combined$PC1, na.rm = TRUE)
   pc2_range <- range(combined$PC2, na.rm = TRUE)
   max_abs <- max(abs(c(pc1_range, pc2_range)), na.rm = TRUE)
   axis_limits <- c(-max_abs, max_abs)
-
+  
   var_raw <- 100 * pca_pair$before$explained_variance$explained_variance[1:2]
   var_cor <- 100 * pca_pair$after$explained_variance$explained_variance[1:2]
-
+  
   cbPalette <- c(
     "#F3C300", "#875692", "#ee7733", "#A1CAF1", "#BE0032",
     "#C2B280", "#555555", "#008856", "#E68FAC", "#0067A5",
@@ -414,39 +416,57 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     "#882D17", "#8DB600", "#654522", "#E25822", "#2B3D26",
     "#bbbbbb", "#000000", "#33bbee", "#ccddaa", "#225555"
   )
-
+  
+  pca_shapes <- c(
+    16, 17, 15, 3, 7, 8, 18, 1, 2, 0, 5, 6,
+    9, 10, 11, 12, 13, 14, 4, 19, 20, 21, 22, 23, 24, 25
+  )
+  
   col <- p$color_col %||% "class"
-
+  shape_col <- p$shape_col %||% "none"
+  
+  use_shape <- !is.null(shape_col) &&
+    length(shape_col) == 1L &&
+    !is.na(shape_col) &&
+    nzchar(shape_col) &&
+    !identical(shape_col, "none")
+  
   if (!col %in% names(before_df) || !col %in% names(after_df)) {
     stop(sprintf("Column '%s' not found in PCA score data.", col))
   }
-
+  
+  if (isTRUE(use_shape)) {
+    if (!shape_col %in% names(before_df) || !shape_col %in% names(after_df)) {
+      stop(sprintf("Shape column '%s' not found in PCA score data.", shape_col))
+    }
+  }
+  
   is_numeric_like <- function(x) {
     is.numeric(x) || is.integer(x)
   }
-
+  
   before_is_numeric <- is_numeric_like(before_df[[col]])
   after_is_numeric <- is_numeric_like(after_df[[col]])
-
+  
   if (before_is_numeric != after_is_numeric) {
     stop(sprintf(
       "Column '%s' is not of the same type in before/after PCA score data.",
       col
     ))
   }
-
+  
   use_gradient <- before_is_numeric && after_is_numeric
   legend_ncol <- 1L
   legend_rel_width <- 0.32
-
+  
   if (use_gradient) {
     combined[[col]] <- as.numeric(combined[[col]])
     before_df[[col]] <- as.numeric(before_df[[col]])
     after_df[[col]] <- as.numeric(after_df[[col]])
-
+    
     color_range <- range(combined[[col]], na.rm = TRUE)
-    legend_rel_width <- 0.28
-
+    legend_rel_width <- 0.32
+    
     scale_color_pca <- function() {
       ggplot2::scale_color_viridis_c(
         option = "viridis",
@@ -455,34 +475,23 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
         na.value = "grey80"
       )
     }
-
-    legend_guides <- function() {
-      ggplot2::guides(
-        color = ggplot2::guide_colorbar(title.position = "top"),
-        fill = "none",
-        size = "none",
-        shape = "none",
-        alpha = "none",
-        linetype = "none"
-      )
-    }
   } else {
     lvls <- sort(unique(as.character(c(before_df[[col]], after_df[[col]]))))
-
+    
     if (length(lvls) > length(cbPalette)) {
       stop("Too many groups for palette.")
     }
-
+    
     cols <- stats::setNames(cbPalette[seq_along(lvls)], lvls)
-
+    
     before_df[[col]] <- factor(as.character(before_df[[col]]), levels = lvls)
     after_df[[col]] <- factor(as.character(after_df[[col]]), levels = lvls)
-
+    
     if (length(lvls) > 12L) {
       legend_ncol <- 2L
       legend_rel_width <- 0.65
     }
-
+    
     scale_color_pca <- function() {
       ggplot2::scale_color_manual(
         values = cols,
@@ -491,14 +500,121 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
         na.translate = FALSE
       )
     }
-
-    legend_guides <- function() {
-      ggplot2::guides(
-        color = ggplot2::guide_legend(
-          ncol = legend_ncol,
-          byrow = TRUE,
-          title.position = "top"
+  }
+  
+  shape_aes_col <- ".pca_shape_group"
+  shape_legend_ncol <- 1L
+  
+  if (isTRUE(use_shape)) {
+    before_shape_is_numeric <- is_numeric_like(before_df[[shape_col]])
+    after_shape_is_numeric <- is_numeric_like(after_df[[shape_col]])
+    
+    if (before_shape_is_numeric != after_shape_is_numeric) {
+      stop(sprintf(
+        "Shape column '%s' is not of the same type in before/after PCA score data.",
+        shape_col
+      ))
+    }
+    
+    if (before_shape_is_numeric && after_shape_is_numeric) {
+      shape_lvls <- sort(unique(as.numeric(c(
+        before_df[[shape_col]],
+        after_df[[shape_col]]
+      ))))
+      shape_lvls <- as.character(shape_lvls)
+    } else {
+      shape_lvls <- sort(unique(as.character(c(
+        before_df[[shape_col]],
+        after_df[[shape_col]]
+      ))))
+    }
+    
+    shape_lvls <- shape_lvls[!is.na(shape_lvls)]
+    
+    if (length(shape_lvls) == 0L) {
+      stop(sprintf("Shape column '%s' contains no non-missing values.", shape_col))
+    }
+    
+    if (length(shape_lvls) > length(pca_shapes)) {
+      stop(sprintf(
+        paste(
+          "Too many groups for point shapes in column '%s'.",
+          "Found %d groups, but only %d shapes are available."
         ),
+        shape_col,
+        length(shape_lvls),
+        length(pca_shapes)
+      ))
+    }
+    
+    shape_values <- stats::setNames(pca_shapes[seq_along(shape_lvls)], shape_lvls)
+    
+    before_df[[shape_aes_col]] <- factor(
+      as.character(before_df[[shape_col]]),
+      levels = shape_lvls
+    )
+    
+    after_df[[shape_aes_col]] <- factor(
+      as.character(after_df[[shape_col]]),
+      levels = shape_lvls
+    )
+    
+    if (length(shape_lvls) > 8L) {
+      shape_legend_ncol <- 2L
+      legend_rel_width <- max(legend_rel_width, 0.55)
+    } else {
+      legend_rel_width <- max(legend_rel_width, 0.38)
+    }
+    
+    scale_shape_pca <- function() {
+      ggplot2::scale_shape_manual(
+        values = shape_values,
+        name = shape_col,
+        drop = FALSE,
+        na.translate = FALSE
+      )
+    }
+  } else {
+    scale_shape_pca <- function() {
+      NULL
+    }
+  }
+  
+  legend_guides <- function() {
+    if (isTRUE(use_shape)) {
+      ggplot2::guides(
+        color = if (use_gradient) {
+          ggplot2::guide_colorbar(title.position = "top")
+        } else {
+          ggplot2::guide_legend(
+            ncol = legend_ncol,
+            byrow = TRUE,
+            title.position = "top",
+            override.aes = list(size = 3)
+          )
+        },
+        shape = ggplot2::guide_legend(
+          ncol = shape_legend_ncol,
+          byrow = TRUE,
+          title.position = "top",
+          override.aes = list(size = 3)
+        ),
+        fill = "none",
+        size = "none",
+        alpha = "none",
+        linetype = "none"
+      )
+    } else {
+      ggplot2::guides(
+        color = if (use_gradient) {
+          ggplot2::guide_colorbar(title.position = "top")
+        } else {
+          ggplot2::guide_legend(
+            ncol = legend_ncol,
+            byrow = TRUE,
+            title.position = "top"
+          )
+        },
         fill = "none",
         size = "none",
         shape = "none",
@@ -507,7 +623,24 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       )
     }
   }
-
+  
+  point_mapping <- if (isTRUE(use_shape)) {
+    ggplot2::aes(
+      x = .data$PC1,
+      y = .data$PC2,
+      color = .data[[col]],
+      shape = .data[[shape_aes_col]]
+    )
+  } else {
+    ggplot2::aes(
+      x = .data$PC1,
+      y = .data$PC2,
+      color = .data[[col]]
+    )
+  }
+  
+  point_size <- if (isTRUE(use_shape)) 2.5 else 2
+  
   big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
@@ -516,21 +649,22 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       legend.title = ggplot2::element_text(size = 12, face = "bold"),
       legend.text = ggplot2::element_text(size = 10)
     )
-
+  
   panel_theme <- ggplot2::theme(
     legend.position = "none",
     panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 1),
     plot.margin = ggplot2::margin(10, 5, 10, 5)
   )
-
-  p1 <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
-    ggplot2::geom_point(size = 2, alpha = 0.8) +
+  
+  p1 <- ggplot2::ggplot(before_df, point_mapping) +
+    ggplot2::geom_point(size = point_size, alpha = 0.8) +
     ggplot2::labs(
       title = "Before",
       x = sprintf("PC1 (%.1f%%)", var_raw[1]),
       y = sprintf("PC2 (%.1f%%)", var_raw[2])
     ) +
     scale_color_pca() +
+    scale_shape_pca() +
     ggplot2::coord_fixed(
       ratio = 1,
       xlim = axis_limits,
@@ -540,15 +674,16 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     ) +
     big_font_theme +
     panel_theme
-
-  p2 <- ggplot2::ggplot(after_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
-    ggplot2::geom_point(size = 2, alpha = 0.8) +
+  
+  p2 <- ggplot2::ggplot(after_df, point_mapping) +
+    ggplot2::geom_point(size = point_size, alpha = 0.8) +
     ggplot2::labs(
       title = "After",
       x = sprintf("PC1 (%.1f%%)", var_cor[1]),
       y = sprintf("PC2 (%.1f%%)", var_cor[2])
     ) +
     scale_color_pca() +
+    scale_shape_pca() +
     ggplot2::coord_fixed(
       ratio = 1,
       xlim = axis_limits,
@@ -558,22 +693,24 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     ) +
     big_font_theme +
     panel_theme
-
-  p_leg <- ggplot2::ggplot(before_df, ggplot2::aes(PC1, PC2, color = .data[[col]])) +
-    ggplot2::geom_point(size = 2) +
+  
+  p_leg <- ggplot2::ggplot(before_df, point_mapping) +
+    ggplot2::geom_point(size = point_size) +
     scale_color_pca() +
+    scale_shape_pca() +
     legend_guides() +
     big_font_theme +
     ggplot2::theme(
       legend.position = "right",
+      legend.box = "vertical",
       legend.box.margin = ggplot2::margin(0, 0, 0, 0),
       legend.margin = ggplot2::margin(0, 0, 0, 0),
       legend.key.height = grid::unit(0.45, "cm"),
       legend.key.width = grid::unit(0.45, "cm")
     )
-
+  
   leg <- cowplot::get_legend(p_leg)
-
+  
   comb <- cowplot::plot_grid(
     p1,
     p2,
@@ -583,7 +720,7 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     align = "h",
     axis = "tb"
   )
-
+  
   cowplot::ggdraw() +
     cowplot::draw_label(
       paste("Comparison of PCA Before and After", compared_to),
@@ -602,7 +739,6 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       height = 0.93
     )
 }
-
 
 #' Build PCA loading plot from precomputed PCA results
 #'
@@ -1209,20 +1345,23 @@ get_pca_compare_data <- function(p, d, pca_compare) {
 #'
 #' @noRd
 make_all_pca_plots <- function(p, d, meta_df = NULL) {
-  build_name <- function(compare, color) {
-    sprintf("pca_%s_%s", compare, color)
+  build_name <- function(compare, color, shape) {
+    sprintf("pca_%s_%s_%s", compare, color, shape)
   }
 
   if (is.null(meta_df)) {
     color_choices <- c("batch", "class", "order")
+    shape_choices <- c("batch", "class")
     meta_cols <- c("sample", "batch", "class", "order")
   } else {
     color_choices <- setdiff(names(meta_df), "sample")
+    shape_choices <- setdiff(names(meta_df), c("sample", "order"))
     meta_cols <- c("sample", color_choices)
   }
 
   specs <- expand.grid(
     color_col = color_choices,
+    shape_col = shape_choices,
     pca_compare = "filtered_cor_data",
     stringsAsFactors = FALSE
   )
@@ -1257,6 +1396,7 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
   for (i in seq_len(nrow(specs))) {
     temp_params <- p
     temp_params$color_col <- specs$color_col[i]
+    temp_params$shape_col <- specs$shape_col[i]
     temp_params$pca_compare <- specs$pca_compare[i]
 
     pca_plots[[i]] <- plot_pca_from_result(
@@ -1265,7 +1405,7 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
       compared_to = pca_pairs[[temp_params$pca_compare]]$compared_to
     )
 
-    plot_names[i] <- build_name(temp_params$pca_compare, temp_params$color_col)
+    plot_names[i] <- build_name(temp_params$pca_compare, temp_params$color_col, temp_params$shape_col)
   }
 
   loading_compares <- unique(specs$pca_compare)

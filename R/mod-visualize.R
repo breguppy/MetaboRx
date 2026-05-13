@@ -83,7 +83,7 @@ mod_visualize_ui <- function(id) {
         uiOutput(ns("pca_options")),
         width = 400
       ),
-      plotOutput(ns("pca_plot"), height = "530px", width = "1000px") %>% withSpinner(color = "#404040"),
+      plotOutput(ns("pca_plot"), height = "530px", width = "1200px") %>% withSpinner(color = "#404040"),
       plotOutput(ns("pca_loading_plot"), height = "530px", width = "1000px") %>% withSpinner(color = "#404040")
     )),
     card(
@@ -202,14 +202,17 @@ mod_visualize_server <- function(id, data, params) {
       pca_p <- p()
       pca_p$pca_compare <- input$pca_compare
       pca_p$color_col <- input$color_col
+      pca_p$shape_col <- input$shape_col
       
       cmp <- pca_compare_data()
       
-      plot_pca_from_result(
-        p = pca_p,
-        pca_pair = pca_pair_reactive(),
-        compared_to = cmp$compared_to
-      )
+      suppressWarnings({
+        plot_pca_from_result(
+                      p = pca_p,
+                      pca_pair = pca_pair_reactive(),
+                      compared_to = cmp$compared_to
+        )
+      })
     }, res = 120)
     
     #-- PCA loading plot

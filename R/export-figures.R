@@ -70,14 +70,16 @@ export_figures <- function(p, d, out_dir = tempdir()) {
     rsd_res <- make_all_rsd_plots(p, d)
     for (i in seq_along(rsd_res$rsd_plots)) {
       rsd_path <- file.path(rsd_dir, sprintf("%s.%s", rsd_res$plot_names[i], fmt))
-      rsd_paths <- c(rsd_paths, save_plot(rsd_path, rsd_res$rsd_plots[[i]], 7.5, 4.5))
+      rsd_paths <- c(rsd_paths, save_plot(rsd_path, rsd_res$rsd_plots[[i]], 9.375, 5.625))
       shiny::incProgress(1 / N, detail = "Saved: rsd figures")
     }
     
-    pca_res <- make_all_pca_plots(p, d, d$cleaned$meta_df)
+    suppressWarnings({
+      pca_res <- make_all_pca_plots(p, d, d$cleaned$meta_df)
+    })
     for (i in seq_along(pca_res$pca_plots)) {
       pca_path <- file.path(pca_dir, sprintf("%s.%s", pca_res$plot_names[i], fmt))
-      pca_paths <- c(pca_paths, save_plot(pca_path, pca_res$pca_plots[[i]], 8.333, 4.417))
+      pca_paths <- c(pca_paths, save_plot(pca_path, pca_res$pca_plots[[i]], 12.5, 5.521))
       shiny::incProgress(1 / N, detail = "Saved: pca figure")
     }
     
@@ -85,7 +87,7 @@ export_figures <- function(p, d, out_dir = tempdir()) {
       loading_path <- file.path(pca_dir, sprintf("%s.%s", pca_res$loading_plot_names[i], fmt))
       pca_loading_paths <- c(
         pca_loading_paths,
-        save_plot(loading_path, pca_res$pca_loading_plots[[i]], 8.75, 4.417)
+        save_plot(loading_path, pca_res$pca_loading_plots[[i]], 10.417, 5.521)
       )
       shiny::incProgress(1 / N, detail = "Saved: pca loading figure")
     }
@@ -103,7 +105,7 @@ export_figures <- function(p, d, out_dir = tempdir()) {
       fig <- make_met_scatter(d, p, metab)
       safe <- gsub("[^A-Za-z0-9_\\-]+", "_", metab)
       path <- file.path(met_dir, sprintf("%s.%s", safe, fmt))
-      met_paths <- c(met_paths, save_plot(path, fig, 5, 5))
+      met_paths <- c(met_paths, save_plot(path, fig, 6.25, 6.25))
       })
       shiny::incProgress(1 / n, detail = paste("Saved:", safe))
     }
