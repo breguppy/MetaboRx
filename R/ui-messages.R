@@ -467,7 +467,7 @@ ui_how_to_correct <- function(df,
   htmltools::tagList(
     summary_bits,
     rec_block,
-    htmltools::tags$ul(items),
+    #htmltools::tags$ul(items),
     caution_block
   )
 }

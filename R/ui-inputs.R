@@ -390,6 +390,7 @@ ui_correction_method <- function(df, ns = identity) {
   
   required_cols <- c("class", "batch", "order")
   missing_cols <- setdiff(required_cols, names(df))
+  
   if (length(missing_cols) > 0L) {
     stop(
       sprintf(
@@ -424,6 +425,7 @@ ui_correction_method <- function(df, ns = identity) {
   
   if (!is.numeric(ord)) {
     ord_num <- suppressWarnings(as.numeric(ord))
+    
     if (!all(is.na(ord_num))) {
       ord <- ord_num
     }
@@ -444,6 +446,7 @@ ui_correction_method <- function(df, ns = identity) {
   
   median_gap <- qc_gap_stats$median_gap %||% NA_real_
   max_gap <- qc_gap_stats$max_gap %||% NA_real_
+  
   has_spacing <- !is.null(qc_gap_stats) &&
     is.finite(median_gap) &&
     is.finite(max_gap)
@@ -454,7 +457,7 @@ ui_correction_method <- function(df, ns = identity) {
   allow_loess <- total_qcs >= 5L
   allow_rf <- total_qcs >= 9L
   
-  # Spacing support
+  # Spacing support: used for recommendation only
   supports_loess <- has_spacing &&
     median_gap <= 10 &&
     max_gap <= 15
@@ -463,41 +466,51 @@ ui_correction_method <- function(df, ns = identity) {
     median_gap <= 9 &&
     max_gap <= 10
   
-  # Build the displayed choices using QC count only
-  choices <- list()
-  
-  if (allow_lc) {
-    choices[["Local constant"]] <- "LC"
-  }
-  if (allow_ll) {
-    choices[["Local linear"]] <- "LL"
-  }
-  if (allow_loess) {
-    choices[["Local polynomial"]] <- "LOESS"
-  }
-  if (allow_rf) {
-    choices[["Random forest"]] <- "RF"
-  }
+  # All methods remain visible.
+  # `allowed` controls whether the radio option is enabled.
+  method_options <- tibble::tibble(
+    label = c(
+      "Local constant",
+      "Local linear",
+      "Local polynomial",
+      "Random forest"
+    ),
+    value = c("LC", "LL", "LOESS", "RF"),
+    allowed = c(
+      allow_lc,
+      allow_ll,
+      allow_loess,
+      allow_rf
+    ),
+    unavailable_reason = c(
+      "Requires at least 1 QC sample.",
+      "Requires at least 3 QC samples.",
+      "Requires at least 5 QC samples.",
+      "Requires at least 9 QC samples."
+    )
+  )
   
   # Recommended selection
-  # Logic:
-  # 1. If RF is allowed and spacing supports it -> RF
-  # 2. Else if LOESS is allowed and spacing supports it -> LOESS
-  # 3. Else if LL is allowed -> LL
-  # 4. Else -> LC
   selected <- if (allow_rf && supports_rf) {
     "RF"
   } else if (allow_loess && supports_loess) {
     "LOESS"
   } else if (allow_ll) {
     "LL"
-  } else {
+  } else if (allow_lc) {
     "LC"
+  } else {
+    character(0)
   }
   
-  # Safety check in case something changes later
-  if (!selected %in% unname(unlist(choices))) {
-    selected <- unname(unlist(choices))[1]
+  available_values <- method_options$value[method_options$allowed]
+  
+  if (length(selected) == 0L || !selected %in% available_values) {
+    selected <- if (length(available_values) > 0L) {
+      available_values[[1L]]
+    } else {
+      character(0)
+    }
   }
   
   label_with_info <- shiny::tagList(
@@ -519,11 +532,70 @@ ui_correction_method <- function(df, ns = identity) {
     )
   )
   
-  shiny::radioButtons(
-    inputId = ns("corMethod"),
-    label = label_with_info,
-    choices = choices,
-    selected = selected
+  input_id <- ns("corMethod")
+  label_id <- paste0(input_id, "-label")
+  
+  make_radio_choice <- function(label, value, allowed, unavailable_reason) {
+    is_selected <- length(selected) == 1L && identical(value, selected)
+    
+    shiny::tags$div(
+      class = if (isTRUE(allowed)) "radio" else "radio disabled",
+      title = if (isTRUE(allowed)) NULL else unavailable_reason,
+      shiny::tags$label(
+        shiny::tags$input(
+          type = "radio",
+          name = input_id,
+          value = value,
+          checked = if (is_selected) "checked" else NULL,
+          disabled = if (!isTRUE(allowed)) "disabled" else NULL
+        ),
+        shiny::tags$span(label)
+      )
+    )
+  }
+  
+  radio_choices <- purrr::pmap(
+    list(
+      label = method_options$label,
+      value = method_options$value,
+      allowed = method_options$allowed,
+      unavailable_reason = method_options$unavailable_reason
+    ),
+    make_radio_choice
+  )
+  
+  shiny::tagList(
+    shiny::tags$style(
+      htmltools::HTML(
+        "
+        .cor-method-radio .radio.disabled label {
+          color: #6c757d;
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+        
+        .cor-method-radio .radio.disabled input {
+          cursor: not-allowed;
+        }
+        "
+      )
+    ),
+    shiny::tags$div(
+      id = input_id,
+      class = "form-group shiny-input-radiogroup shiny-input-container cor-method-radio",
+      role = "radiogroup",
+      `aria-labelledby` = label_id,
+      shiny::tags$label(
+        class = "control-label",
+        id = label_id,
+        `for` = input_id,
+        label_with_info
+      ),
+      shiny::tags$div(
+        class = "shiny-options-group",
+        radio_choices
+      )
+    )
   )
 }
 
