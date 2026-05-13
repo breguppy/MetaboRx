@@ -19,9 +19,6 @@ mod_correct_ui <- function(id) {
         column(3, tags$h5("Choose Correction Method"), uiOutput(ns(
           "correctionMethod"
         ))),
-        #column(3, tags$h5("Unavailable Options"), uiOutput(ns(
-        #  "unavailable_options"
-        #))),
         column(3, tags$h5("How to choose a correction method"), uiOutput(ns(
           "how_to_correct"
         ))),
@@ -282,6 +279,12 @@ mod_correct_server <- function(id, data, params) {
       
       df_filtered  <- filtered_r()$df
       df_corrected <- corrected_r()$df
+      
+      # remove imputed values if selected:
+      if (isTRUE(input$remove_imputed)) {
+        df_corrected <- remove_imputed_from_corrected(raw_df = df_filtered,
+                                                      corrected_df = df_corrected)
+      }
       
       pct_threshold <- input$qc_average_pct_threshold %||% 100
       pct_threshold <- as.numeric(pct_threshold)

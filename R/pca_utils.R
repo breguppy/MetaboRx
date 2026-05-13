@@ -117,32 +117,42 @@ get_shared_pca_metab_cols <- function(
 #' Prepare PCA matrix
 #'
 #' Restricts the input data frame to a specified set of metabolite columns,
-#' imputes missing values if needed, and validates that all PCA inputs are
-#' numeric.
+#' validates that all PCA inputs are numeric, imputes missing values with KNN
+#' if needed, and verifies that no missing values remain before PCA.
+#'
+#' PCA uses KNN imputation regardless of the user-selected QC/sample imputation
+#' settings because `stats::prcomp()` cannot handle missing values.
 #'
 #' @param df data.frame
 #'   Input data frame containing metadata and metabolite columns.
 #' @param p list
-#'   Parameter list containing imputation settings.
+#'   Parameter list. Included for compatibility with existing PCA calls.
+#'   User-selected imputation methods are intentionally ignored for PCA.
 #' @param metab_cols character
 #'   Metabolite columns to include in PCA.
 #'
 #' @return data.frame
-#'   Numeric data frame containing only metabolite columns.
+#'   Numeric data frame containing only metabolite columns, with missing values
+#'   imputed by KNN when needed.
 #'
 #' @noRd
 prep_pca_matrix <- function(df, p, metab_cols) {
   if (length(metab_cols) == 0L) {
     stop("No metabolite columns available for PCA.")
   }
-
-  out <- df[, metab_cols, drop = FALSE]
-
-  if (anyNA(out)) {
-    results <- impute_missing(df, metab_cols, p$qcImputeM, p$samImputeM)
-    out <- results$df[, metab_cols, drop = FALSE]
+  
+  missing_metab_cols <- setdiff(metab_cols, names(df))
+  if (length(missing_metab_cols) > 0L) {
+    stop(
+      sprintf(
+        "These PCA metabolite columns are missing from `df`: %s",
+        paste(utils::head(missing_metab_cols, 20L), collapse = ", ")
+      )
+    )
   }
-
+  
+  out <- df[, metab_cols, drop = FALSE]
+  
   is_num <- vapply(out, is.numeric, logical(1))
   if (!all(is_num)) {
     bad_cols <- names(out)[!is_num]
@@ -153,7 +163,50 @@ prep_pca_matrix <- function(df, p, metab_cols) {
       )
     )
   }
-
+  
+  all_missing_cols <- names(out)[
+    vapply(out, function(x) all(is.na(x)), logical(1))
+  ]
+  
+  if (length(all_missing_cols) > 0L) {
+    stop(
+      sprintf(
+        paste(
+          "KNN imputation cannot be used for PCA because these metabolite",
+          "columns are entirely missing: %s"
+        ),
+        paste(utils::head(all_missing_cols, 20L), collapse = ", ")
+      )
+    )
+  }
+  
+  if (anyNA(out)) {
+    results <- impute_missing(
+      df = df,
+      metab_cols = metab_cols,
+      qcImputeM = "KNN",
+      samImputeM = "KNN"
+    )
+    
+    out <- results$df[, metab_cols, drop = FALSE]
+    
+    if (anyNA(out)) {
+      still_missing <- names(out)[
+        vapply(out, function(x) any(is.na(x)), logical(1))
+      ]
+      
+      stop(
+        sprintf(
+          paste(
+            "KNN imputation was applied before PCA, but missing values remain",
+            "in these metabolite columns: %s"
+          ),
+          paste(utils::head(still_missing, 20L), collapse = ", ")
+        )
+      )
+    }
+  }
+  
   out
 }
 
