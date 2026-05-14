@@ -550,9 +550,17 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
     df <- filtered_corrected_result$df_mv
+    metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
+    n_missv    <- sum(is.na(df[, metab_cols]))
+    imputed_removed_ui <- htmltools::tagList(metric_card(
+      "Imputed values are removed after correction",
+      n_missv
+    ),
+    tags$br())
   } else {
     removed <- filtered_corrected_result$removed_metabolites_no_mv
     df <- filtered_corrected_result$df_no_mv
+    imputed_removed_ui <- NULL
   }
   
   flagged <- filtered_corrected_result$flagged_mets
@@ -637,6 +645,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   
   if (isFALSE(post_cor_filter)) {
     ui <- list(
+      imputed_removed_ui,
       warning_ui,
       flagged_ui,
       metric_card(
@@ -659,6 +668,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     )
   } else {
     ui <- list(
+      imputed_removed_ui,
       warning_ui,
       flagged_ui,
       tags$span(
@@ -671,30 +681,42 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
   do.call(tagList, ui)
 }
 
+#' Candidate extreme values summary table UI
+#'
+#' @param detect_result Result returned by `detect_hotelling_nonqc_dual_z()`.
+#' @param top_n Number of candidate extreme values to display.
+#' @param sample_col Name of the sample column in the extreme values table.
+#' @param class_col Name of the class column in the extreme values table.
+#' @param digits_z Number of digits used for z-score display.
+#' @param digits_T2 Number of digits used for Mahalanobis distance display.
+#'
+#' @return A Shiny tag list containing metric cards and the outlier table.
+#'
 #' @keywords internal
 #' @noRd
-ui_outliers <- function(p, d,
-                        top_n         = 10L,
-                        sample_col    = "sample",
-                        class_col     = "class",
-                        digits_z      = 2L,
-                        digits_T2     = 2L,
-                        pca_output_id = "hotelling_pca",
-                        ns            = identity,
-                        include_plot  = TRUE) {
+ui_outliers_table <- function(detect_result,
+                              top_n     = 10L,
+                              sample_col = "sample",
+                              class_col  = "class",
+                              digits_z   = 2L,
+                              digits_T2  = 2L) {
+  if (is.null(detect_result)) {
+    stop("detect_result is NULL.")
+  }
   
-  df <- d$filtered_corrected$df_no_mv
-  detect_result <- detect_hotelling_nonqc_dual_z(df, p)
-  
-  ev   <- detect_result$extreme_values
+  ev <- detect_result$extreme_values
   dres <- detect_result$data
   
   if (is.null(ev)) {
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
   
+  if (is.null(dres)) {
+    stop("detect_result$data is NULL. Did you pass the correct object?")
+  }
+  
   n_outlier_samples <- sum(dres$is_outlier_sample, na.rm = TRUE)
-  n_extreme_values  <- nrow(ev)
+  n_extreme_values <- nrow(ev)
   
   cards <- shiny::div(
     style = paste(
@@ -707,56 +729,47 @@ ui_outliers <- function(p, d,
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
   
-  plot_ui <- if (isTRUE(include_plot)) {
-    shiny::plotOutput(ns(pca_output_id), height = "350px")
-  } else {
-    NULL
-  }
-  
   if (nrow(ev) == 0L) {
-    
-    content <- shiny::tagList(
-      cards,
-      shiny::tags$em("No extreme metabolite values detected in outlier samples.")
+    return(
+      shiny::tagList(
+        cards,
+        shiny::tags$em("No extreme metabolite values detected.")
+      )
     )
-    
-    if (include_plot) {
-      return(
-        shiny::tagList(
-          shiny::tags$div(
-            style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
-            shiny::tags$div(style = "flex:0 0 42%;", plot_ui),
-            shiny::tags$div(style = "flex:1 1 58%; min-width:0;", content)
-          )
-        )
-      )
-    } else {
-      return(
-        shiny::tagList(
-          shiny::tags$div(
-            style = "width:100%;",
-            content
-          )
-        )
-      )
-    }
   }
   
   required_cols <- c(
-    sample_col, class_col, "metabolite",
-    "z_global", "abs_z_global", "z_class", "abs_z_class", "T2"
+    sample_col,
+    class_col,
+    "metabolite",
+    "z_global",
+    "abs_z_global",
+    "z_class",
+    "abs_z_class",
+    "T2"
   )
+  
   missing_cols <- setdiff(required_cols, names(ev))
+  
   if (length(missing_cols) > 0L) {
-    stop("Missing columns in extreme_values: ", paste(missing_cols, collapse = ", "))
+    stop(
+      "Missing columns in extreme_values: ",
+      paste(missing_cols, collapse = ", ")
+    )
+  }
+  
+  top_n <- as.integer(top_n)
+  
+  if (length(top_n) != 1L || is.na(top_n) || top_n < 1L) {
+    top_n <- 10L
   }
   
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
-  ev_top    <- head(ev_sorted, top_n)
+  ev_top <- head(ev_sorted, top_n)
   
   z_g_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
-  z_c_fmt <- formatC(ev_top$z_class,  format = "f", digits = digits_z)
-  T2_fmt  <- formatC(ev_top$T2,       format = "f", digits = digits_T2)
+  z_c_fmt <- formatC(ev_top$z_class, format = "f", digits = digits_z)
+  T2_fmt <- formatC(ev_top$T2, format = "f", digits = digits_T2)
   
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
@@ -784,12 +797,12 @@ ui_outliers <- function(p, d,
     shiny::tags$tbody(rows)
   )
   
-  table_content <- shiny::tagList(
+  shiny::tagList(
     cards,
     shiny::tags$p(
-      "Top 10 potential extreme values are listed below. ",
+      sprintf("Top %s potential extreme values are listed below. ", top_n),
       "The full list of potential extreme values ",
-      "'extreme_values_*today's_date*.xlsx' ",
+      sprintf("'extreme_values_%s.xlsx' ", Sys.Date()),
       "is available for download."
     ),
     shiny::tags$div(
@@ -797,27 +810,4 @@ ui_outliers <- function(p, d,
       table_tag
     )
   )
-  
-  if (include_plot) {
-    shiny::tagList(
-      shiny::tags$div(
-        style = "display:flex; gap:20px; align-items:flex-start; width:100%;",
-        shiny::tags$div(
-          style = "flex:0 0 42%;",
-          plot_ui
-        ),
-        shiny::tags$div(
-          style = "flex:1 1 58%; min-width:0;",
-          table_content
-        )
-      )
-    )
-  } else {
-    shiny::tagList(
-      shiny::tags$div(
-        style = "width:100%;",
-        table_content
-      )
-    )
-  }
 }

@@ -45,9 +45,9 @@ mod_correct_ui <- function(id) {
           "post_cor_filter_block"
         )), width = 400),
         fluidRow(column(
-          4, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
+          6, uiOutput(ns("post_cor_filter_info")) %>% withSpinner(color = "#404040")
         ), 
-        column(4, 
+        column(6, 
                shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Metric guide"),
@@ -65,9 +65,9 @@ mod_correct_ui <- function(id) {
                            customClass = "popover-responsive") 
           )
         ),
-        uiOutput(ns("rsd_comparison_stats"))),
-        column(4, uiOutput(ns("download_cor_rsd_btn")
-        )))
+        uiOutput(ns("rsd_comparison_stats")),
+        uiOutput(ns("download_cor_rsd_btn")),
+        ))
       )
     ),
     card(
@@ -95,11 +95,12 @@ mod_correct_ui <- function(id) {
       ),
       fluidRow(
         column(
-          width = 9,
+          width = 7,
           uiOutput(ns("outliers_table"))
         ),
         column(
-          width = 3,
+          width = 5,
+          shiny::plotOutput(ns("hotelling_pca"), height = "400px"),
           uiOutput(ns("download_ev_btn"))
         )
       )
@@ -395,8 +396,14 @@ mod_correct_server <- function(id, data, params) {
     )
     hotelling_res_r <- reactive({
       req(filtered_corrected_r())
+      
       df <- filtered_corrected_r()$df_no_mv
-      p  <- list(qcImputeM = input$qcImputeM, samImputeM = input$samImputeM)
+      
+      p <- list(
+        qcImputeM = input$qcImputeM,
+        samImputeM = input$samImputeM
+      )
+      
       detect_hotelling_nonqc_dual_z(df, p)
     })
     
@@ -407,10 +414,13 @@ mod_correct_server <- function(id, data, params) {
     
     output$outliers_table <- renderUI({
       res <- req(hotelling_res_r())
-      d <- list(filtered_corrected = filtered_corrected_r())
-      p <- list(qcImputeM = input$qcImputeM, 
-                samImputeM = input$samImputeM)
-      ui_outliers(p, d, top_n = 10L, ns = ns)
+      
+      ui_outliers_table(
+        detect_result = res,
+        top_n = 10L,
+        sample_col = "sample",
+        class_col = "class"
+      )
     })
     
     output$download_ev_btn <- renderUI({
