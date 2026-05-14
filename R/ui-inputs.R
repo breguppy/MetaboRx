@@ -606,8 +606,20 @@ ui_correction_method <- function(df, ns = identity) {
 #' @noRd
 ui_post_cor_filter <- function(ns) {
   shiny::tagList(
-    htmltools::tags$h5("Sample Distance From QC Filtering"),
     
+    htmltools::tags$h5("Imputed Values"),
+    
+    tooltip(
+      shiny::checkboxInput(
+        inputId = ns("remove_imputed"),
+        label = "Remove imputed values after correction",
+        value = FALSE
+      ),
+      "Check this box if you want the corrected data to have the same missing values as the raw data.",
+      placement = "right"
+    ),
+    shiny::tags$hr(),
+    htmltools::tags$h5("Sample Distance From QC Filtering"),
     tooltip(
       shiny::sliderInput(
         inputId = ns("qc_average_pct_threshold"),
@@ -629,20 +641,6 @@ ui_post_cor_filter <- function(ns) {
         value = FALSE
       ),
       "Removes metabolites where the average non-QC sample intensity differs from the average QC intensity by at least the selected percentage.",
-      placement = "right"
-    ),
-    
-    shiny::tags$hr(),
-    
-    htmltools::tags$h5("Imputed Values"),
-    
-    tooltip(
-      shiny::checkboxInput(
-        inputId = ns("remove_imputed"),
-        label = "Remove imputed values after correction",
-        value = FALSE
-      ),
-      "Check this box if you want the corrected data to have the same missing values as the raw data.",
       placement = "right"
     ),
     

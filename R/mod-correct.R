@@ -344,7 +344,7 @@ mod_correct_server <- function(id, data, params) {
       rsd_filter     <- input$rsd_filter %||% Inf
       post_cor_all   <- isTRUE(input$post_cor_filter)
       
-      ui_postcor_filter_info(res, remove_imputed, rsd_filter, post_cor_all)
+      ui_postcor_filter_info(res, remove_imputed, rsd_filter, post_cor_all, input$remove_qc_average_pct_filter)
     })
     
     output$rsd_comparison_stats <- renderUI({

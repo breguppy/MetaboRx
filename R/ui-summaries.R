@@ -545,7 +545,8 @@ ui_corr_range_info <- function(all_corr, range) {
 ui_postcor_filter_info <- function(filtered_corrected_result,
                                    remove_imputed,
                                    rsd_cutoff,
-                                   post_cor_filter) {
+                                   post_cor_filter,
+                                   remove_qc_average_pct_filter) {
   if (isTRUE(remove_imputed)) {
     removed <- filtered_corrected_result$removed_metabolites_mv
     df <- filtered_corrected_result$df_mv
@@ -592,6 +593,27 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     )
   }
   
+  removal_status <- if (isTRUE(remove_qc_average_pct_filter)) {
+    if (length(flagged) > 0L) {
+      shiny::tags$p(
+        style = "margin-top: 8px; margin-bottom: 0;",
+        sprintf(
+          "%d metabolite column(s) were removed before RSD filtering.",
+          length(flagged)
+        )
+      )
+    } else {
+      shiny::tags$p(
+        style = "margin-top: 8px; margin-bottom: 0;",
+        "Differs from QC average removal is enabled, but no metabolite columns were removed."
+      )
+    }
+  } else {
+    shiny::tags$p(
+      style = "margin-top: 8px; margin-bottom: 0;",
+      "Differs from QC average removal is disabled. Failed metabolites are flagged but retained."
+    )
+  }
   # optional warning banner for metabolites not within 2-fold of QC
   flagged_ui <- NULL
   if (!is.null(flagged) && length(flagged) > 0) {
@@ -608,7 +630,8 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
       ),
       tags$ul(
         lapply(flagged, tags$li)
-      )
+      ),
+      removal_status
     )
   }
   
