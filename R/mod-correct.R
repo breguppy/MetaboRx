@@ -112,12 +112,10 @@ mod_correct_ui <- function(id) {
       fluidRow(column(
         8,
         ui_table_scroll("cor_data", ns) %>% withSpinner(color = "#404040"),
+        uiOutput(ns("download_cor_btn"))
       ),
-      column(4, uiOutput(ns(
-        "download_cor_btn"
-      )))),
-      fluidRow(
-        column(4, shiny::tags$div(
+      column(4, 
+             shiny::tags$div(
           style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
           shiny::tags$strong("Metric guide"),
           bslib::popover(
@@ -133,11 +131,11 @@ mod_correct_ui <- function(id) {
             options = list(container = "body",
                            customClass = "popover-responsive") 
           )
-        ),uiOutput(ns("post_transform_rsd_compare"))),
-      column(4, uiOutput(ns(
-        "download_tc_rsd_btn"
-      )))
-    ))),
+        ),
+        uiOutput(ns("post_transform_rsd_compare")),
+        uiOutput(ns("download_tc_rsd_btn"))
+             )),
+    )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
         title = "2.5 Metabolite Correlation (Optional)",
