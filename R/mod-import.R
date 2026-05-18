@@ -376,11 +376,8 @@ mod_import_server <- function(id) {
       fd <- filtered_r()
       req(fd)
       
-      ui_filter_info(
-        fd$mv_removed_cols,
-        input$mv_cutoff,
-        fd$qc_missing_mets,
-        fd$class_metab_all_missing
+      ui_filter_info(fd,
+        input$mv_cutoff
       )
     })
     

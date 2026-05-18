@@ -61,6 +61,7 @@ info_card <- function(title,
   
   shiny::tags$div(
     class = "card border-info mb-3",
+    #class = "alert alert-info",
     style = "margin-top: 10px;",
     shiny::tags$div(class = "card-header", 
                     header),
@@ -409,7 +410,20 @@ ui_blank_threshold_info <- function(blank_threshold_result,
 }
 
 # Filter info for section 1.4 Filter Raw Data
-ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_all_missing) {
+ui_filter_info <- function(fd, mv_cutoff) {
+  mv_removed <- fd$mv_removed_cols
+  qc_missing_mets <- fd$qc_missing_mets
+  class_metab_all_missing <- fd$class_metab_all_missing
+  df <- fd$df
+  
+  metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
+  n_metab    <- length(metab_cols)
+  n_missv    <- sum(is.na(df[, metab_cols]))
+  n_qcs      <- sum(df$class == "QC")
+  n_samp     <- sum(df$class != "QC")
+  perc_missv <- round(100 * (n_missv / ((n_samp + n_qcs) * n_metab)), digits = 2)
+  
+  
   left_col <- if (length(mv_removed) == 0) {
     tags$div(style = "flex: 1; padding-right: 10px;",
              tags$span(
@@ -429,7 +443,7 @@ ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_a
           length(mv_removed),
           " metabolite(s) removed based on missing value percentage above ",
           mv_cutoff,
-          "%"
+          "%."
         )
       ),
       tags$ul(lapply(mv_removed, tags$li))
@@ -438,21 +452,29 @@ ui_filter_info <- function(mv_removed, mv_cutoff, qc_missing_mets, class_metab_a
   
   right_col <- if(length(qc_missing_mets) == 0) {
     tags$div(
-      style = "flex:1; padding-left:10px;",
-      tags$span(style = "color:darkgreen; font-weight:bold;",
-                "No metabolites have missing values in QC samples after filtering."))
+      class = "alert alert-success",
+      style = "margin-bottom: 10px;",
+      #tags$span(style = "color:darkgreen; font-weight:bold;",
+       tags$strong("No metabolites have missing values in QC samples after filtering."))
   } else {
     tags$div(
-      style = "flex:1; padding-left:10px;",
-      tags$span(style = "color:darkorange; font-weight:bold;",
-                paste0(length(qc_missing_mets),
+      class = "alert alert-warning",
+      style = "margin-bottom: 10px;",
+      #tags$span(style = "color:darkorange; font-weight:bold;",
+      tags$strong(          paste0(length(qc_missing_mets),
                        " metabolite(s) with at least one QC missing value after filtering.")),
       tags$ul(lapply(qc_missing_mets, tags$li)))
   }
-  
+  right_col1 <- tags$div(style = "flex: 1; min-width: 250px;",
+                        right_col,
+                        tags$div(
+                          style = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;",
+                          metric_card("Metabolite Columns", n_metab),
+                          metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)")))
+  )
   summary_row <- tags$div(
     style = "display:flex; gap:16px; align-items:flex-start;",
-    left_col, right_col
+    left_col, right_col1
   )
   
   has_all_missing <- !is.null(class_metab_all_missing) &&
