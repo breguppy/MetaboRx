@@ -99,18 +99,17 @@ mod_import_ui <- function(id) {
           shiny::uiOutput(ns("mv_filter_slider")),
           width = 400
         ),
-        
-        shiny::fluidRow(
-          shiny::column(
-            8,
+        #shiny::fluidRow(
+        #  shiny::column(
+         #   8,
             shiny::uiOutput(ns("blank_threshold_info")),
-            shiny::uiOutput(ns("filter_info"))
-          ),
-          shiny::column(
-            4,
+            shiny::uiOutput(ns("filter_info")),
+          #),
+          #shiny::column(
+           # 4,
             shiny::uiOutput(ns("download_mv_btn"))
-          )
-        )
+          #)
+        #)
       )
     ),
     # Next: Choose Correction Settings
