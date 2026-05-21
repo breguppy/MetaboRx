@@ -2,6 +2,9 @@
 title: "`r params$title %||% 'Metabolomics Data Quality Report'`"
 output:
   html_document:
+    theme:
+      version: 5
+      bootswatch: cosmo
     self_contained: true
     toc: true
     toc_depth: 2
@@ -26,21 +29,28 @@ library(dplyr)
 library(QCcorrection)
 ```
 # Raw Data
-### Metabolite columns removed before correction
+<!-- ### Metabolite columns removed before correction -->
 ```{r}
-QCcorrection:::report_text_withheld_columns(params$p, params$d)
+#QCcorrection:::report_text_withheld_columns(params$p, params$d)
 ```
 
 ### Raw Data Summary and Structural Checks
 ```{r}
 QCcorrection:::ui_basic_info(params$d$cleaned)
-QCcorrection:::report_text_data_inspection()
+#QCcorrection:::report_text_data_inspection()
 ```
 
 ### Filter Missing Values in Raw Data
 ```{r}
-QCcorrection:::ui_filter_info(params$d$filtered$mv_removed_cols, params$d$filtered$mv_cutoff, params$d$filtered$qc_missing_mets, params$d$filtered$class_metab_all_missing)
-QCcorrection:::report_text_mv_filter()
+QCcorrection:::ui_blank_threshold_info(params$d$filtered$blank_threshold_result, 
+                                       params$d$cleaned$blank_df,
+                                       params$d$filtered$blank_threshold,
+                                       params$d$filtered$remove_blank_threshold_cols,
+                                       params$d$filtered$removed_blank_threshold_cols)
+
+QCcorrection:::ui_filter_info(params$d$filtered, 
+                              params$d$filtered$mv_cutoff)
+#QCcorrection:::report_text_mv_filter()
 ```
 
 # Imputation, Signal Drift Correction, and Transformation.
@@ -53,7 +63,7 @@ QCcorrection:::report_text_imputation(params$p, params$d)
 ### Correction Description
 ```{r}
 QCcorrection:::report_text_correction(params$p, params$d)
-QCcorrection:::report_text_correction_descriptions()
+#QCcorrection:::report_text_correction_descriptions()
 ```
 ##### How to choose a correction method
 ```{r}
@@ -64,8 +74,12 @@ QCcorrection:::ui_how_to_correct(params$d$filtered$df)
 #### QC RSD Filtering
 
 ```{r}
-QCcorrection:::report_text_rsd_cal()
-QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected, params$p$remove_imputed, params$p$rsd_cutoff, params$p$post_cor_filter)
+#QCcorrection:::report_text_rsd_cal()
+QCcorrection:::ui_postcor_filter_info(params$d$filtered_corrected,
+                                      params$p$remove_imputed, 
+                                      params$p$rsd_cutoff, 
+                                      params$p$post_cor_filter,
+                                      params$p$remove_qc_average_pct_filter)
 ```
 ```{r}
 QCcorrection:::ui_rsd_stats(compare_to = "filtered_cor_data", params$p, params$d)
@@ -83,25 +97,25 @@ if (!is.null(hp)) {
 }
 ```
 ```{r}
-QCcorrection:::ui_outliers(params$p, params$d, include_plot = FALSE) 
-QCcorrection:::report_text_ev_detection()
+QCcorrection:::ui_outliers_table(params$d$hotelling_res) 
+#QCcorrection:::report_text_ev_detection()
 ```
 
 ### Transformation
 ```{r}
 QCcorrection:::report_text_transformation(params$p, params$d)
-QCcorrection:::report_text_transform_methods()
+#QCcorrection:::report_text_transform_methods()
 ```
 
 #### RSD Post-transformation Comparison
 ```{r}
 QCcorrection:::ui_rsd_stats(compare_to = "transformed_cor_data", params$p, params$d)
-QCcorrection:::report_text_rsd_tc_table()
+#QCcorrection:::report_text_rsd_tc_table()
 ```
 
 ###  Metabolite Correlations
 ```{r}
-QCcorrection:::report_text_correlations()
+#QCcorrection:::report_text_correlations()
 if (!is.null(params$d$all_corr)) {
   QCcorrection:::ui_corr_range_info(params$d$all_corr, params$p$corr_threshold)
 } else {

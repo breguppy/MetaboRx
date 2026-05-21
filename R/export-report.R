@@ -60,7 +60,8 @@ render_report <- function(
       compared_to = pca_compare_data$compared_to
     )
     
-    hotelling_pca_plot <- make_hotelling_pca_plot(p, d)
+    #hotelling_pca_plot <- make_hotelling_pca_plot(p, d)
+    hotelling_pca_plot <- d$hotelling_res$pca_plot
     
     shiny::incProgress(1 / 3, detail = "Saved: plots for report")
     

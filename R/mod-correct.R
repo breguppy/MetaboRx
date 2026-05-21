@@ -877,6 +877,7 @@ mod_correct_server <- function(id, data, params) {
       remove_imputed     = isTRUE(input$remove_imputed),
       post_cor_filter    = input$post_cor_filter,
       rsd_cutoff         = filtered_corrected_r()$rsd_cutoff,
+      remove_qc_average_pct_filter = isTRUE(input$remove_qc_average_pct_filter),
       transform          = input$transform,
       ex_ISTD            = isTRUE(input$ex_ISTD),
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),

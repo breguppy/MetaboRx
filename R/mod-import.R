@@ -457,8 +457,8 @@ mod_import_server <- function(id) {
         n_withhold         = input$n_withhold %||% 0,
         no_control         = isTRUE(input$no_control),
         control_class      = input$control_class %||% "",
-        mv_cutoff          = input$mv_cutoff,
-        raw_corr_threshold = input$corr_threshold
+        mv_cutoff          = input$mv_cutoff
+        
       )
     })
     

@@ -275,7 +275,7 @@ ui_basic_info <- function(cleaned) {
         # metrics grid
         tags$div(
           style = "display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px;",
-          metric_card("Metabolite Columns", n_metab),
+          metric_card("Metabolites", n_metab),
           metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)")),
           metric_card("QC Samples", n_qcs),
           metric_card("Samples", n_samp),
@@ -469,7 +469,7 @@ ui_filter_info <- function(fd, mv_cutoff) {
                         right_col,
                         tags$div(
                           style = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;",
-                          metric_card("Metabolite Columns", n_metab),
+                          metric_card("Metabolites", n_metab),
                           metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)")))
   )
   summary_row <- tags$div(

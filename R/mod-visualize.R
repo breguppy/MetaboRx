@@ -314,6 +314,7 @@ mod_visualize_server <- function(id, data, params) {
         rsd_plot_type = input$rsd_plot_type,
         pca_compare = input$pca_compare,
         color_col = input$color_col,
+        shape_col = input$shape_col,
         fig_format = input$fig_format
       ))
     )
