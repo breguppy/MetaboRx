@@ -42,22 +42,36 @@ plot_rsd_comparison_class_met <- function(df_before, df_after, compared_to) {
 
 #' Plot metabolite RSD distributions before and after correction
 #'
-#' @param df_before Data frame for computing Raw RSD
-#' @param df_after Data frame for computing met RSD after correction or
-#'  correction and transformation.
-#' @param compared_to the type of data in df_after either "Correction" or
-#'  "Correction and Transformation"
-#' @param before_label Character, label for the "before" group in the legend.
-#' @param after_label Character, label for the "after" group in the legend.
+#' @param df_before Data frame for computing raw RSD.
+#' @param df_after Data frame for computing metabolite-level RSD after correction
+#'   or correction and transformation.
+#' @param compared_to Character. Type of comparison, usually "Correction" or
+#'   "Correction and Transformation".
+#' @param before_label Character. Label for the before group in the legend.
+#' @param after_label Character. Label for the after group in the legend.
+#' @param facet_scales Character. Facet scale behavior passed to
+#'   `ggplot2::facet_wrap()`. Use `"free_x"` to allow QC and Samples panels to
+#'   use separate x-axis ranges. Use `"fixed"` to force the same x-axis range.
 #'
-#' @return A ggplot object with two panels: QC on the left, NonQC on the right.
+#' @return A ggplot object with two panels: Samples and QC.
 #' @keywords internal
 #' @noRd
 plot_met_rsd_distributions <- function(df_before,
                                        df_after,
                                        compared_to,
                                        before_label = "Before",
-                                       after_label = "After") {
+                                       after_label = "After",
+                                       facet_scales = "free_x") {
+  valid_scales <- c("fixed", "free", "free_x", "free_y")
+  
+  if (!facet_scales %in% valid_scales) {
+    stop(
+      "'facet_scales' must be one of: ",
+      paste(valid_scales, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  
   rsd_results <- .build_rsd_results(df_before, df_after)
   rsd_before <- rsd_results$metabolite$before
   rsd_after <- rsd_results$metabolite$after
@@ -80,6 +94,11 @@ plot_met_rsd_distributions <- function(df_before,
     labels = c("Samples", "QC")
   )
   
+  rsd_long$dataset <- factor(
+    rsd_long$dataset,
+    levels = c(before_label, after_label)
+  )
+  
   rsd_long <- rsd_long[!is.na(rsd_long$RSD), , drop = FALSE]
   
   col_vals <- stats::setNames(
@@ -87,17 +106,18 @@ plot_met_rsd_distributions <- function(df_before,
     c(before_label, after_label)
   )
   
-  ggplot2::ggplot(rsd_long, ggplot2::aes(x = RSD, fill = dataset, color = dataset)) +
-    ggplot2::facet_wrap(~ type, nrow = 1, scales = "fixed") +
+  ggplot2::ggplot(
+    rsd_long,
+    ggplot2::aes(x = RSD, fill = dataset, color = dataset)
+  ) +
+    ggplot2::facet_wrap(~ type, nrow = 1, scales = facet_scales) +
     ggplot2::geom_density(
       data = subset(rsd_long, dataset == before_label),
-      ggplot2::aes(color = dataset, fill = dataset),
       alpha = 0.3,
       adjust = 1
     ) +
     ggplot2::geom_density(
       data = subset(rsd_long, dataset == after_label),
-      ggplot2::aes(color = dataset, fill = dataset),
       alpha = 0.3,
       adjust = 1
     ) +
@@ -128,24 +148,39 @@ plot_met_rsd_distributions <- function(df_before,
     )
 }
 
+
 #' Plot class metabolite RSD distributions before and after correction
 #'
-#' @param df_before Data frame for computing Raw RSD
-#' @param df_after Data frame for computing met RSD after correction or
-#'  correction and transformation.
-#' @param compared_to the type of data in df_after either "Correction" or
-#'  "Correction and Transformation"
-#' @param before_label Character, label for the "before" group in the legend.
-#' @param after_label Character, label for the "after" group in the legend.
+#' @param df_before Data frame for computing raw RSD.
+#' @param df_after Data frame for computing class-metabolite RSD after correction
+#'   or correction and transformation.
+#' @param compared_to Character. Type of comparison, usually "Correction" or
+#'   "Correction and Transformation".
+#' @param before_label Character. Label for the before group in the legend.
+#' @param after_label Character. Label for the after group in the legend.
+#' @param facet_scales Character. Facet scale behavior passed to
+#'   `ggplot2::facet_wrap()`. Use `"free_x"` to allow QC and Samples panels to
+#'   use separate x-axis ranges. Use `"fixed"` to force the same x-axis range.
 #'
-#' @return A ggplot object with two panels: QC on the left, NonQC on the right.
+#' @return A ggplot object with two panels: Samples and QC.
 #' @keywords internal
 #' @noRd
 plot_class_rsd_distributions <- function(df_before,
                                          df_after,
                                          compared_to,
                                          before_label = "Before",
-                                         after_label = "After") {
+                                         after_label = "After",
+                                         facet_scales = "free_x") {
+  valid_scales <- c("fixed", "free", "free_x", "free_y")
+  
+  if (!facet_scales %in% valid_scales) {
+    stop(
+      "'facet_scales' must be one of: ",
+      paste(valid_scales, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  
   rsd_results <- .build_rsd_results(df_before, df_after)
   rsd_before <- rsd_results$class_metabolite$before
   rsd_after <- rsd_results$class_metabolite$after
@@ -155,9 +190,14 @@ plot_class_rsd_distributions <- function(df_before,
   
   rsd_all <- dplyr::bind_rows(rsd_before2, rsd_after2)
   
-  rsd_all$dataset <- factor(rsd_all$dataset, levels = c(before_label, after_label))
+  rsd_all$dataset <- factor(
+    rsd_all$dataset,
+    levels = c(before_label, after_label)
+  )
+  
   rsd_all$type <- ifelse(rsd_all$class == "QC", "QC", "Samples")
   rsd_all$type <- factor(rsd_all$type, levels = c("Samples", "QC"))
+  
   rsd_all <- rsd_all[!is.na(rsd_all$RSD), , drop = FALSE]
   
   col_vals <- stats::setNames(
@@ -165,17 +205,18 @@ plot_class_rsd_distributions <- function(df_before,
     c(before_label, after_label)
   )
   
-  ggplot2::ggplot(rsd_all, ggplot2::aes(x = RSD, fill = dataset, color = dataset)) +
-    ggplot2::facet_wrap(~ type, nrow = 1, scales = "fixed") +
+  ggplot2::ggplot(
+    rsd_all,
+    ggplot2::aes(x = RSD, fill = dataset, color = dataset)
+  ) +
+    ggplot2::facet_wrap(~ type, nrow = 1, scales = facet_scales) +
     ggplot2::geom_density(
       data = subset(rsd_all, dataset == before_label),
-      ggplot2::aes(color = dataset, fill = dataset),
       alpha = 0.3,
       adjust = 1
     ) +
     ggplot2::geom_density(
       data = subset(rsd_all, dataset == after_label),
-      ggplot2::aes(color = dataset, fill = dataset),
       alpha = 0.3,
       adjust = 1
     ) +
