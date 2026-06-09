@@ -11,7 +11,7 @@
 * This package is an interactive data quality assessment and preprocessing tool for metabolomics data.
 * The UI is easy for non-programmers to use and contains explanations in information popovers.
 * This tool offers transparent quality filters and and flexible options for users.
-* The general workflow is 
+* The general workflow: Diagnose raw data quality (duplicate features, missing values, blank signal filtering), preprocess data (missing value imputation, signal drift correction, normalization), Evaluate (QC RSD, drift plots, PCA, extreme value detection), and export (analysis-ready output, figures, quality report).
 
 ## Critical Project Commands
 * Document the package: `Rscript -e "devtools::document()"`
