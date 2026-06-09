@@ -11,5 +11,10 @@ Shiny app to clean, correct, visualize, and export LC-MS metabolomics data using
 \author{
 \strong{Maintainer}: Breanna Guppy \email{breanna-guppy@uiowa.edu}
 
+Authors:
+\itemize{
+  \item Breanna Guppy \email{breanna-guppy@uiowa.edu}
+}
+
 }
 \keyword{internal}
