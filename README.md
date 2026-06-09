@@ -1,5 +1,5 @@
 # QCcorrection
-Shiny app for vetting data quality and correction signal drift in metabolomics data
+Shiny app for interactive quality assessment and preprocessing for metabolomics data
 
 ### Requirements
 
@@ -64,7 +64,7 @@ Raw data must be located on the **first sheet** of `.xls` or `.xlsx` files.
 - **Class column (required):**  
   Column indicating sample type.  
   Must contain QC samples labeled as `NA`, `QC`, `Qc`, or `qc`.  
-  If blank samples are present, they must be labeled as `blank`.
+  If blank samples are present, they must be labeled as `blank`, `processing blank`, or `pb`.
 
 - **Injection order column (required):**  
   Column indicating the order in which samples were injected.
@@ -82,7 +82,7 @@ Data (excluding blank samples) must **begin and end with QC samples** when sorte
 
 ### 4. Internal standard metabolites
 
-Internal standard metabolites must have column names beginning with:
+Internal standard metabolites must have column names containing:
 
 - `ISTD`
 - `ITSD`
