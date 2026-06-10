@@ -4,9 +4,9 @@
 #' @noRd
 export_xlsx <- function(p, d, file = NULL) {
   .require_pkg("openxlsx", "write Excel workbooks")
-  
+
   wb <- openxlsx::createWorkbook()
-  
+
   # make column names bold and descriptions with orange backgroud
   bold <- openxlsx::createStyle(textDecoration = "Bold")
   note <- openxlsx::createStyle(
@@ -14,16 +14,16 @@ export_xlsx <- function(p, d, file = NULL) {
     valign = "top",
     fgFill = "#f8cbad"
   )
-  
+
   .add_sheet <- function(name) {
     nm <- gsub("[\\[\\]\\*\\?:/\\\\]", "_", name)
     nm <- substr(nm, 1L, 31L)
     openxlsx::addWorksheet(wb, nm)
     nm
   }
-  
+
   add_eq_sheet <- identical(p$transform, "TRN")
-  
+
   # base steps:
   # 1 Raw
   # 2 Settings
@@ -35,7 +35,7 @@ export_xlsx <- function(p, d, file = NULL) {
   # +1 Appendix2 if extra metadata exists
   # +1 Equal weight sheet if TRN
   has_fold_change <- !isTRUE(p$no_control) && nzchar(p$control_class)
-  
+
   meta_df <- d$cleaned$meta_df
   has_meta_appendix <- FALSE
   if (!is.null(meta_df)) {
@@ -43,12 +43,12 @@ export_xlsx <- function(p, d, file = NULL) {
     extra_cols <- setdiff(names(meta_df), core_cols)
     has_meta_appendix <- length(extra_cols) > 0
   }
-  
+
   N <- 6L +
     as.integer(has_fold_change) +
     as.integer(has_meta_appendix) +
     as.integer(add_eq_sheet)
-  
+
   shiny::withProgress(
     message = "Creating corrected_data_*today's_date*.xlsx...",
     value = 0,
@@ -90,7 +90,7 @@ export_xlsx <- function(p, d, file = NULL) {
       )
       openxlsx::setRowHeights(wb, s0, rows = 1, heights = 60)
       shiny::incProgress(1 / N, detail = "Saved: Raw Data")
-      
+
       # Sheet 1: Correction settings
       s1 <- .add_sheet("1. Correction Settings")
       settings <- data.frame(
@@ -123,8 +123,7 @@ export_xlsx <- function(p, d, file = NULL) {
           p$transform,
           isTRUE(p$ex_ISTD),
           isTRUE(p$keep_corrected_qcs)
-        ),
-        stringsAsFactors = FALSE
+        )
       )
       txt1 <- paste(
         "Tab 1. This tab contains the correction settings along a list of metabolites",
@@ -164,7 +163,7 @@ export_xlsx <- function(p, d, file = NULL) {
       width_vec_header <- nchar(colnames(settings)) + 2
       max_width_vec <- pmax(width_vec, width_vec_header)
       openxlsx::setColWidths(wb, s1, cols = 1:2, widths = max_width_vec)
-      
+
       # Optional lists
       # columns withheld from correction: d$cleaned$withheld_cols
       # columns filtered by missing value: d$filtered$mv_removed_cols
@@ -177,13 +176,17 @@ export_xlsx <- function(p, d, file = NULL) {
         qc_rsd_removed_columns <- d$filtered_corrected$removed_metabolites_no_mv
         trn_withheld_columns <- d$transformed$withheld_cols_no_mv
       }
-      
-      cur_col <- 4
-      add_list <- function(vec, header) {
+
+      cur_col <- 4L
+      add_list <- function(cur_col, vec, header) {
+        vec <- unlist(vec, use.names = FALSE)
         if (length(vec) == 0) {
-          return(invisible(NULL))
+          return(cur_col)
         }
-        df <- data.frame(setNames(list(vec), header))
+        df <- stats::setNames(
+          data.frame(as.character(vec), check.names = FALSE),
+          header
+        )
         openxlsx::writeData(
           wb,
           s1,
@@ -200,35 +203,40 @@ export_xlsx <- function(p, d, file = NULL) {
         width_vec_header <- nchar(colnames(df)) + 2
         max_width_vec <- pmax(width_vec, width_vec_header)
         openxlsx::setColWidths(wb, s1, cols = cur_col, widths = max_width_vec)
-        assign("cur_col", cur_col + 2, inherits = TRUE)
+        cur_col + 2L
       }
-      
+
       if (isTRUE(p$withhold_cols)) {
-        add_list(
+        cur_col <- add_list(
+          cur_col,
           d$cleaned$withheld_cols,
           "Columns Withheld From Correction"
         )
       }
-      add_list(
+      cur_col <- add_list(
+        cur_col,
         d$filtered$mv_removed_cols,
         "Missing-Value Filtered Metabolites"
       )
-      add_list(
+      cur_col <- add_list(
+        cur_col,
         d$filtered$qc_missing_mets,
         "Metabolites with QC Missing Values"
       )
-      add_list(
+      cur_col <- add_list(
+        cur_col,
         qc_rsd_removed_columns,
         "QC-RSD Filtered Metabolites"
       )
       if (length(trn_withheld_columns) > 0) {
-        add_list(
+        cur_col <- add_list(
+          cur_col,
           trn_withheld_columns,
           "Excluded From Normalization"
         )
       }
       shiny::incProgress(1 / N, detail = "Saved: Correction Settings")
-      
+
       # Sheet 2: Drift Normalized
       s2 <- .add_sheet("2. Drift Corrected")
       if (isTRUE(p$remove_imputed)) {
@@ -281,24 +289,24 @@ export_xlsx <- function(p, d, file = NULL) {
         headerStyle = bold
       )
       shiny::incProgress(1 / N, detail = "Saved: Drift Corrected")
-      
+
       # Dynamic sheet numbering after Drift Normalized
       next_sheet_num <- 3L
-      
+
       # Optional Sheet 3: Equal Weight (TRN only)
       if (add_eq_sheet) {
         s_eq <- .add_sheet(paste0(next_sheet_num, ". Equal Weight"))
-        
+
         if (isTRUE(p$remove_imputed)) {
           df_eq <- d$transformed$equal_weight_df_mv
         } else {
           df_eq <- d$transformed$equal_weight_df_no_mv
         }
-        
+
         if (!isTRUE(p$keep_corrected_qcs)) {
           df_eq <- df_eq[df_eq$class != "QC", , drop = FALSE]
         }
-        
+
         txt_eq <- paste(
           "Tab", next_sheet_num, ". This tab shows metabolite level values after equal weighting.",
           "All metabolites included in TRN have been rescaled so that each metabolite has",
@@ -306,7 +314,7 @@ export_xlsx <- function(p, d, file = NULL) {
           "total ratio normalization so that high-abundance metabolites do not dominate the",
           "normalization step."
         )
-        
+
         openxlsx::writeData(
           wb,
           s_eq,
@@ -331,11 +339,11 @@ export_xlsx <- function(p, d, file = NULL) {
           startRow = 3,
           headerStyle = bold
         )
-        
+
         shiny::incProgress(1 / N, detail = "Saved: Equal Weight")
         next_sheet_num <- next_sheet_num + 1L
       }
-      
+
       # Scaled or Normalized
       s_scaled <- .add_sheet(paste0(next_sheet_num, ". Samples Normalized"))
       if (isTRUE(p$remove_imputed)) {
@@ -343,16 +351,15 @@ export_xlsx <- function(p, d, file = NULL) {
       } else {
         df3 <- d$transformed$df_no_mv
       }
-      
+
       keep <- setdiff(names(df3), trn_withheld_columns)
       df3 <- if (!isTRUE(p$keep_corrected_qcs)) {
         df3[df3$class != "QC", keep, drop = FALSE]
       } else {
         df3[, keep, drop = FALSE]
       }
-      
-      txt3 <- switch(
-        p$transform,
+
+      txt3 <- switch(p$transform,
         "TRN" = paste(
           "Tab", next_sheet_num, ". This tab shows metabolite level values",
           "ratiometrically normalized to total metabolite signal on a per",
@@ -382,7 +389,7 @@ export_xlsx <- function(p, d, file = NULL) {
           "Tab", next_sheet_num, ". No scaling or normalization method has been applied to the data."
         )
       )
-      
+
       openxlsx::writeData(
         wb,
         s_scaled,
@@ -408,9 +415,9 @@ export_xlsx <- function(p, d, file = NULL) {
         headerStyle = bold
       )
       shiny::incProgress(1 / N, detail = "Saved: Samples Normalized")
-      
+
       next_sheet_num <- next_sheet_num + 1L
-      
+
       # Grouped Data Organized
       s_grouped <- .add_sheet(paste0(next_sheet_num, ". Grouped Data Organized"))
       gdat <- group_stats(df3)
@@ -461,9 +468,9 @@ export_xlsx <- function(p, d, file = NULL) {
         r <- r + 6
       }
       shiny::incProgress(1 / N, detail = "Saved: Grouped Data Organized")
-      
+
       next_sheet_num <- next_sheet_num + 1L
-      
+
       # Grouped Data Fold Change
       if (has_fold_change) {
         s_fc <- .add_sheet(paste0(next_sheet_num, ". Grouped Data Fold Change"))
@@ -526,7 +533,7 @@ export_xlsx <- function(p, d, file = NULL) {
       } else {
         tf <- df3
       }
-      
+
       # Appendix1. MetaboAnalyst Ready
       s6 <- .add_sheet("Appendix1. MetaboAnalyst Ready")
       names(tf)[names(tf) == "sample"] <- "Sample Name"
@@ -535,37 +542,37 @@ export_xlsx <- function(p, d, file = NULL) {
       tf$order <- NULL
       openxlsx::writeData(wb, s6, x = tf)
       shiny::incProgress(1 / N, detail = "Saved: MetaboAnalyst Ready")
-      
+
       # Appendix2. MetaboAnalyst Meta tab (if extra metadata exists)
       if (has_meta_appendix) {
         core_cols <- c("sample", "batch", "class", "order")
-        
+
         # Keep only rows present in Appendix1 (tf)
         meta_out <- meta_df[meta_df$sample %in% tf$`Sample Name`, , drop = FALSE]
-        
+
         # enforce same ordering as tf
         meta_out <- meta_out[match(tf$`Sample Name`, meta_out$sample), , drop = FALSE]
-        
+
         s7 <- .add_sheet("Appendix2. MetaboAnalyst Meta")
-        
+
         # Rename to MetaboAnalyst convention
         names(meta_out)[names(meta_out) == "sample"] <- "Sample Name"
         names(meta_out)[names(meta_out) == "class"] <- "Group"
-        
+
         # Remove unused columns
         meta_out$batch <- NULL
         meta_out$order <- NULL
-        
+
         openxlsx::writeData(wb, s7, x = meta_out)
         shiny::incProgress(1 / N, detail = "Saved: MetaboAnalyst Meta")
       }
-      
+
       if (!is.null(file)) {
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
         return(normalizePath(file, winslash = "/"))
       }
     }
   )
-  
+
   return(wb)
 }

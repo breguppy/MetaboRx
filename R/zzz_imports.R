@@ -5,13 +5,11 @@
 #'
 #' @importFrom rlang `%||%`
 #'
-#' @importFrom magrittr %>%
-#' 
 #' @importFrom utils head
 #'
 #' @importFrom stats ecdf median prcomp predict sd setNames
 #' @importFrom stats loess predict sd median
-#' @importFrom utils modifyList read.csv setTxtProgressBar txtProgressBar zip
+#' @importFrom utils modifyList setTxtProgressBar txtProgressBar zip
 #'
 #' @importFrom shiny NS moduleServer fluidPage titlePanel
 #' @importFrom shiny tags icon div h4 h5 h6 span br p tagList
@@ -34,17 +32,17 @@
 #' @importFrom tidyr pivot_longer all_of
 #'
 #' @importFrom tibble tibble as_tibble
-#' 
+#'
 #' @importFrom readxl read_excel
-#' 
+#'
 #' @importFrom openxlsx createWorkbook createStyle addWorksheet writeData mergeCells addStyle setRowHeights setColWidths saveWorkbook
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_line labs guides
 #' @importFrom ggplot2 theme theme_minimal element_text scale_color_manual scale_color_brewer
 #' @importFrom ggplot2 scale_x_continuous scale_y_continuous xlim ylim ggsave
-#' 
+#'
 #' @importFrom impute impute.knn
-#' 
+#'
 #' @importFrom grDevices cairo_pdf
 #' @importFrom htmltools HTML
 NULL

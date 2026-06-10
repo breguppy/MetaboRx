@@ -4,7 +4,7 @@
 #'
 #' @details
 #' This function checks that core package dependencies listed in \code{Imports}
-#' are installed. Core dependencies are installed automatically when 
+#' are installed. Core dependencies are installed automatically when
 #' QCcorrection itself is installed.
 #'
 #' @return
@@ -19,17 +19,17 @@ check_required_dependencies <- function() {
   required_pkgs <- c(
     "shiny", "ggplot2", "dplyr", "tidyr", "purrr", "tibble",
     "stringr", "bslib", "shinyjs", "shinycssloaders", "rlang",
-    "magrittr", "htmltools", "readxl", "openxlsx", "rmarkdown",
+    "htmltools", "readxl", "openxlsx", "rmarkdown",
     "impute"
   )
-  
+
   missing <- required_pkgs[!vapply(
     required_pkgs,
     requireNamespace,
     logical(1),
     quietly = TRUE
   )]
-  
+
   if (length(missing) > 0L) {
     stop(
       "Missing required packages: ",
@@ -37,6 +37,6 @@ check_required_dependencies <- function() {
       call. = FALSE
     )
   }
-  
+
   invisible(TRUE)
 }

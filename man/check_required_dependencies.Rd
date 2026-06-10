@@ -14,7 +14,7 @@ Checks that packages required by QCcorrection are installed
 }
 \details{
 This function checks that core package dependencies listed in \code{Imports}
-are installed. Core dependencies are installed automatically when 
+are installed. Core dependencies are installed automatically when
 QCcorrection itself is installed.
 }
 \examples{

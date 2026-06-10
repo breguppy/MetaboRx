@@ -11,14 +11,13 @@ metric_card <- function(label, value) {
 }
 # Download card used for all download buttons on the first 3 tabs
 download_card <- function(title,
-                      body,
-                      btn) {
-  
+                          body,
+                          btn) {
   header <- shiny::tags$div(
     style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
     shiny::tags$span(title),
   )
-  
+
   shiny::tags$div(
     class = "card bg-light mb-3",
     style = "margin-top: 10px;",
@@ -39,7 +38,7 @@ info_card <- function(title,
                       info_placement = "auto",
                       info_class = "popover-responsive") {
   has_info <- !is.null(info_title) || !is.null(info_content)
-  
+
   header <- shiny::tags$div(
     style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
     shiny::tags$span(title),
@@ -58,13 +57,15 @@ info_card <- function(title,
       )
     }
   )
-  
+
   shiny::tags$div(
     class = "card border-info mb-3",
-    #class = "alert alert-info",
+    # class = "alert alert-info",
     style = "margin-top: 10px;",
-    shiny::tags$div(class = "card-header", 
-                    header),
+    shiny::tags$div(
+      class = "card-header",
+      header
+    ),
     shiny::tags$div(
       class = "card-body",
       shiny::tags$p(class = "card-text", body),
@@ -81,7 +82,7 @@ warn_card <- function(title,
                       info_placement = "auto",
                       info_class = "popover-responsive") {
   has_info <- !is.null(info_title) || !is.null(info_content)
-  
+
   header <- shiny::tags$div(
     style = "display:flex; align-items:center; justify-content:space-between; gap:8px;",
     shiny::tags$span(title),
@@ -103,12 +104,14 @@ warn_card <- function(title,
       )
     }
   )
-  
+
   shiny::tags$div(
     class = "card border-warning mb-3",
     style = "margin-top: 10px;",
-    shiny::tags$div(class = "card-header",
-                    header),
+    shiny::tags$div(
+      class = "card-header",
+      header
+    ),
     shiny::tags$div(
       class = "card-body",
       shiny::tags$p(class = "card-text", body),
@@ -119,7 +122,6 @@ warn_card <- function(title,
 
 # Basic info for section 1.2 Select non-metabolite columns
 ui_basic_info <- function(cleaned) {
-  
   df <- cleaned$df
   replacement_counts <- cleaned$replacement_counts
   non_numeric_cols <- cleaned$non_numeric_cols
@@ -128,26 +130,26 @@ ui_basic_info <- function(cleaned) {
   duplicate_col_names <- cleaned$duplicate_col_names
   blank_df <- cleaned$blank_df
   below_blank_threshold <- cleaned$below_blank_threshold_ex_ISTD
-  
+
   metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
-  n_metab    <- length(metab_cols)
-  n_missv    <- sum(is.na(df[, metab_cols]))
-  n_qcs      <- sum(df$class == "QC")
-  n_samp     <- sum(df$class != "QC")
-  n_bat      <- dplyr::n_distinct(df$batch)
-  n_class    <- dplyr::n_distinct(df$class[df$class != "QC"])
+  n_metab <- length(metab_cols)
+  n_missv <- sum(is.na(df[, metab_cols]))
+  n_qcs <- sum(df$class == "QC")
+  n_samp <- sum(df$class != "QC")
+  n_bat <- dplyr::n_distinct(df$batch)
+  n_class <- dplyr::n_distinct(df$class[df$class != "QC"])
   class_list <- sort(unique(df$class[df$class != "QC"]))
   perc_missv <- round(100 * (n_missv / ((n_samp + n_qcs) * n_metab)), digits = 2)
-  
-  qc_per_batch <- df %>%
-    dplyr::group_by(batch) %>%
+
+  qc_per_batch <- df |>
+    dplyr::group_by(batch) |>
     dplyr::summarise(qc_in_class = sum(class == "QC"), .groups = "drop")
-  
+
   total_replaced <- sum(
     replacement_counts$non_numeric_replaced +
       replacement_counts$zero_replaced
   )
-  
+
   class_badges <- tags$div(
     style = "display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px;",
     lapply(class_list, function(cls) {
@@ -157,33 +159,34 @@ ui_basic_info <- function(cleaned) {
       )
     })
   )
-  
+
   # ---------- Warning box 1: replaced values ----------
   replaced_card <- NULL
   if (total_replaced > 0) {
     replaced_card <- info_card(
       title = "Replaced non-numeric or zeros values in metabolite columns",
-      body  = paste0(
+      body = paste0(
         total_replaced,
         " values were converted to missing (NA) prior to processing."
       ),
     )
   }
-  
+
   # ---------- Warning box 2: removed metabolite columns ----------
   nonnum_card <- NULL
-  
+
   removed_non_numeric <- sort(unique(non_numeric_cols))
   removed_all_zero_qc <- sort(unique(all_missing_zero_qc_cols))
-  
+
   if (
     length(removed_non_numeric) > 0 ||
-    length(removed_all_zero_qc) > 0
+      length(removed_all_zero_qc) > 0
   ) {
-    
     section_tag <- function(title, values) {
-      if (length(values) == 0) return(NULL)
-      
+      if (length(values) == 0) {
+        return(NULL)
+      }
+
       tags$div(
         tags$p(
           style = "font-weight: 600; margin-top: 8px; margin-bottom: 4px;",
@@ -195,10 +198,10 @@ ui_basic_info <- function(cleaned) {
         )
       )
     }
-    
+
     nonnum_card <- warn_card(
       title = "Removed metabolite columns",
-      body  = "The following metabolite columns were removed prior to processing:",
+      body = "The following metabolite columns were removed prior to processing:",
       body_tags = tags$div(
         section_tag(
           "Non-numerical columns:",
@@ -211,25 +214,23 @@ ui_basic_info <- function(cleaned) {
       )
     )
   }
-  
+
   # ---------- Warning box 3: duplicate column names ----------
   duplicate_columns <- NULL
   if (!is.null(duplicate_col_names) && length(duplicate_col_names) > 0) {
-    
     duplicate_columns <- warn_card(
       title = "Duplicate column names",
-      body  = "The follow column names appear more than once in your dataset. We have appended '_1', '_2', etc. to subsequent duplicates.",
+      body = "The follow column names appear more than once in your dataset. We have appended '_1', '_2', etc. to subsequent duplicates.",
       body_tags = tags$ul(
         style = "margin-bottom: 0;",
         lapply(sort(duplicate_col_names), tags$li)
       )
     )
   }
-  
+
   # ---------- Warning box 4: duplicate metabolites ----------
   duplicate_card <- NULL
   if (!is.null(duplicate_mets) && nrow(duplicate_mets) > 0) {
-    
     dup_badges <- tags$div(
       style = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;",
       lapply(seq_len(nrow(duplicate_mets)), function(i) {
@@ -246,10 +247,10 @@ ui_basic_info <- function(cleaned) {
         )
       })
     )
-    
+
     duplicate_card <- warn_card(
       title = "Potential duplicate metabolites",
-      body  = sprintf(
+      body = sprintf(
         "%d column pairs appear equal or nearly equal based on non-missing values.",
         nrow(duplicate_mets)
       ),
@@ -264,14 +265,13 @@ ui_basic_info <- function(cleaned) {
     nonnum_card,
     duplicate_columns,
     duplicate_card,
-    
     tags$div(
       style = "display: flex; flex-wrap: wrap; gap: 20px; margin-top: 10px;",
-      
+
       # left section
       tags$div(
         style = "display: grid; grid-template-columns: repeat(1, 1fr); gap: 20px;",
-        
+
         # metrics grid
         tags$div(
           style = "display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px;",
@@ -282,7 +282,7 @@ ui_basic_info <- function(cleaned) {
           metric_card("Batches", n_bat),
           metric_card("Classes", n_class)
         ),
-        
+
         # class list badges
         tags$div(
           style = "flex: 1; min-width: 250px;",
@@ -290,7 +290,7 @@ ui_basic_info <- function(cleaned) {
           class_badges
         )
       ),
-      
+
       # right section
       tags$div(
         style = "flex: 1; min-width: 250px;",
@@ -338,20 +338,20 @@ ui_blank_threshold_info <- function(blank_threshold_result,
   } else {
     0L
   }
-  
+
   if (n_blanks == 0L || is.null(blank_threshold_result)) {
     return(NULL)
   }
-  
+
   below_blank_threshold <- unique(stats::na.omit(
     as.character(blank_threshold_result$below_blank_threshold_ex_ISTD)
   ))
-  
+
   blank_body <- sprintf(
     "%d blank/processing blank sample(s) detected and excluded from downstream processing.",
     n_blanks
   )
-  
+
   threshold_status <- if (length(below_blank_threshold) > 0L) {
     shiny::tags$div(
       shiny::tags$p(
@@ -376,7 +376,7 @@ ui_blank_threshold_info <- function(blank_threshold_result,
       )
     )
   }
-  
+
   removal_status <- if (isTRUE(remove_blank_threshold_cols)) {
     if (length(removed_blank_threshold_cols) > 0L) {
       shiny::tags$p(
@@ -398,7 +398,7 @@ ui_blank_threshold_info <- function(blank_threshold_result,
       "Blank-threshold removal is disabled. Failed metabolites are flagged but retained."
     )
   }
-  
+
   warn_card(
     title = "Blank threshold filtering",
     body = blank_body,
@@ -415,25 +415,27 @@ ui_filter_info <- function(fd, mv_cutoff) {
   qc_missing_mets <- fd$qc_missing_mets
   class_metab_all_missing <- fd$class_metab_all_missing
   df <- fd$df
-  
+
   metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
-  n_metab    <- length(metab_cols)
-  n_missv    <- sum(is.na(df[, metab_cols]))
-  n_qcs      <- sum(df$class == "QC")
-  n_samp     <- sum(df$class != "QC")
+  n_metab <- length(metab_cols)
+  n_missv <- sum(is.na(df[, metab_cols]))
+  n_qcs <- sum(df$class == "QC")
+  n_samp <- sum(df$class != "QC")
   perc_missv <- round(100 * (n_missv / ((n_samp + n_qcs) * n_metab)), digits = 2)
-  
-  
+
+
   left_col <- if (length(mv_removed) == 0) {
-    tags$div(style = "flex: 1; padding-right: 10px;",
-             tags$span(
-               style = "color:darkgreen;font-weight:bold;",
-               paste0(
-                 "No metabolites with missing value percentage above ",
-                 mv_cutoff,
-                 "%."
-               )
-             ))
+    tags$div(
+      style = "flex: 1; padding-right: 10px;",
+      tags$span(
+        style = "color:darkgreen;font-weight:bold;",
+        paste0(
+          "No metabolites with missing value percentage above ",
+          mv_cutoff,
+          "%."
+        )
+      )
+    )
   } else {
     tags$div(
       style = "flex: 1; padding-right: 10px;",
@@ -449,38 +451,44 @@ ui_filter_info <- function(fd, mv_cutoff) {
       tags$ul(lapply(mv_removed, tags$li))
     )
   }
-  
-  right_col <- if(length(qc_missing_mets) == 0) {
+
+  right_col <- if (length(qc_missing_mets) == 0) {
     tags$div(
       class = "alert alert-success",
       style = "margin-bottom: 10px;",
-      #tags$span(style = "color:darkgreen; font-weight:bold;",
-       tags$strong("No metabolites have missing values in QC samples after filtering."))
+      # tags$span(style = "color:darkgreen; font-weight:bold;",
+      tags$strong("No metabolites have missing values in QC samples after filtering.")
+    )
   } else {
     tags$div(
       class = "alert alert-warning",
       style = "margin-bottom: 10px;",
-      #tags$span(style = "color:darkorange; font-weight:bold;",
-      tags$strong(          paste0(length(qc_missing_mets),
-                       " metabolite(s) with at least one QC missing value after filtering.")),
-      tags$ul(lapply(qc_missing_mets, tags$li)))
+      # tags$span(style = "color:darkorange; font-weight:bold;",
+      tags$strong(paste0(
+        length(qc_missing_mets),
+        " metabolite(s) with at least one QC missing value after filtering."
+      )),
+      tags$ul(lapply(qc_missing_mets, tags$li))
+    )
   }
-  right_col1 <- tags$div(style = "flex: 1; min-width: 250px;",
-                        right_col,
-                        tags$div(
-                          style = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;",
-                          metric_card("Metabolites", n_metab),
-                          metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)")))
+  right_col1 <- tags$div(
+    style = "flex: 1; min-width: 250px;",
+    right_col,
+    tags$div(
+      style = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;",
+      metric_card("Metabolites", n_metab),
+      metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)"))
+    )
   )
   summary_row <- tags$div(
     style = "display:flex; gap:16px; align-items:flex-start;",
     left_col, right_col1
   )
-  
+
   has_all_missing <- !is.null(class_metab_all_missing) &&
     is.data.frame(class_metab_all_missing) &&
     nrow(class_metab_all_missing) > 0L
-  
+
   all_missing_card <- NULL
   if (has_all_missing) {
     # Create bullet list like: "QC — MetaboliteA"
@@ -489,17 +497,17 @@ ui_filter_info <- function(fd, mv_cutoff) {
       1,
       function(r) paste0(r[[1]], " — ", r[[2]])
     )
-    
+
     all_missing_card <- warn_card(
       title = "All-missing class/metabolite combinations detected",
-      body  = paste0(
+      body = paste0(
         "The following class–metabolite pairs have all values missing. ",
         "These values will remain missing if you choose a class-metabolite imputation method."
       ),
       body_tags = shiny::tags$ul(lapply(pair_items, shiny::tags$li))
     )
   }
-  
+
   shiny::tagList(
     summary_row,
     all_missing_card
@@ -534,17 +542,19 @@ ui_filter_info <- function(fd, mv_cutoff) {
       range[2]
     )
   }
-  correlated_card <- info_card(title = card_title,
-                               body  = card_body,
-                               body_tags = cor_badges)
+  correlated_card <- info_card(
+    title = card_title,
+    body = card_body,
+    body_tags = cor_badges
+  )
 }
 ui_corr_range_info <- function(all_corr, range) {
-  raw_high_corr_mets       <- filter_correlation_pairs_by_range(all_corr$raw, range)
+  raw_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$raw, range)
   corrected_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$corrected, range)
-  
-  raw_corr_card       <- .make_correlation_card(raw_high_corr_mets, range, "Raw Metabolite Correlations")
+
+  raw_corr_card <- .make_correlation_card(raw_high_corr_mets, range, "Raw Metabolite Correlations")
   corrected_corr_card <- .make_correlation_card(corrected_high_corr_mets, range, "Corrected Metabolite Correlations")
-  
+
   transformed_block <- if (isTRUE(all_corr$transformed_included)) {
     transformed_high_corr_mets <- filter_correlation_pairs_by_range(all_corr$transformed, range)
     .make_correlation_card(
@@ -555,7 +565,7 @@ ui_corr_range_info <- function(all_corr, range) {
   } else {
     NULL
   }
-  
+
   htmltools::tagList(
     raw_corr_card,
     corrected_corr_card,
@@ -573,36 +583,38 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
     removed <- filtered_corrected_result$removed_metabolites_mv
     df <- filtered_corrected_result$df_mv
     metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
-    n_missv    <- sum(is.na(df[, metab_cols]))
-    imputed_removed_ui <- htmltools::tagList(metric_card(
-      "Imputed values are removed after correction",
-      n_missv
-    ),
-    tags$br())
+    n_missv <- sum(is.na(df[, metab_cols]))
+    imputed_removed_ui <- htmltools::tagList(
+      metric_card(
+        "Imputed values are removed after correction",
+        n_missv
+      ),
+      tags$br()
+    )
   } else {
     removed <- filtered_corrected_result$removed_metabolites_no_mv
     df <- filtered_corrected_result$df_no_mv
     imputed_removed_ui <- NULL
   }
-  
+
   flagged <- filtered_corrected_result$flagged_mets
-  
+
   n_removed <- length(removed)
-  
+
   # get ISTD/ITSD metabolites
   is_istd <- grepl("ISTD|ITSD", removed, ignore.case = TRUE)
   istd_names <- removed[is_istd]
   n_istd <- length(istd_names)
-  
+
   met_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
   total <- n_removed + length(met_cols)
-  
+
   pct_below <- if (total > 0) {
     round((length(met_cols) / total) * 100, digits = 1)
   } else {
     NA_real_
   }
-  
+
   # optional warning banner for internal standards failing RSD filter
   warning_ui <- NULL
   if (n_istd > 0) {
@@ -622,7 +634,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
       )
     )
   }
-  
+
   removal_status <- if (isTRUE(remove_qc_average_pct_filter)) {
     if (length(flagged) > 0L) {
       shiny::tags$p(
@@ -664,7 +676,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
       removal_status
     )
   }
-  
+
   if (isFALSE(post_cor_filter)) {
     ui <- list(
       imputed_removed_ui,
@@ -699,7 +711,7 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
       )
     )
   }
-  
+
   do.call(tagList, ui)
 }
 
@@ -717,29 +729,29 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
 #' @keywords internal
 #' @noRd
 ui_outliers_table <- function(detect_result,
-                              top_n     = 10L,
+                              top_n = 10L,
                               sample_col = "sample",
-                              class_col  = "class",
-                              digits_z   = 2L,
-                              digits_T2  = 2L) {
+                              class_col = "class",
+                              digits_z = 2L,
+                              digits_T2 = 2L) {
   if (is.null(detect_result)) {
     stop("detect_result is NULL.")
   }
-  
+
   ev <- detect_result$extreme_values
   dres <- detect_result$data
-  
+
   if (is.null(ev)) {
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
-  
+
   if (is.null(dres)) {
     stop("detect_result$data is NULL. Did you pass the correct object?")
   }
-  
+
   n_outlier_samples <- sum(dres$is_outlier_sample, na.rm = TRUE)
   n_extreme_values <- nrow(ev)
-  
+
   cards <- shiny::div(
     style = paste(
       "display:flex;",
@@ -750,7 +762,7 @@ ui_outliers_table <- function(detect_result,
     metric_card("Samples outside the Mahalanobis 95% limit", n_outlier_samples),
     metric_card("Potential extreme metabolite values", n_extreme_values)
   )
-  
+
   if (nrow(ev) == 0L) {
     return(
       shiny::tagList(
@@ -759,7 +771,7 @@ ui_outliers_table <- function(detect_result,
       )
     )
   }
-  
+
   required_cols <- c(
     sample_col,
     class_col,
@@ -770,29 +782,29 @@ ui_outliers_table <- function(detect_result,
     "abs_z_class",
     "T2"
   )
-  
+
   missing_cols <- setdiff(required_cols, names(ev))
-  
+
   if (length(missing_cols) > 0L) {
     stop(
       "Missing columns in extreme_values: ",
       paste(missing_cols, collapse = ", ")
     )
   }
-  
+
   top_n <- as.integer(top_n)
-  
+
   if (length(top_n) != 1L || is.na(top_n) || top_n < 1L) {
     top_n <- 10L
   }
-  
+
   ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
   ev_top <- head(ev_sorted, top_n)
-  
+
   z_g_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
   z_c_fmt <- formatC(ev_top$z_class, format = "f", digits = digits_z)
   T2_fmt <- formatC(ev_top$T2, format = "f", digits = digits_T2)
-  
+
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
       shiny::tags$td(ev_top[[sample_col]][i]),
@@ -803,7 +815,7 @@ ui_outliers_table <- function(detect_result,
       shiny::tags$td(T2_fmt[i])
     )
   })
-  
+
   table_tag <- shiny::tags$table(
     class = "table table-striped table-condensed table-hover",
     shiny::tags$thead(
@@ -818,7 +830,7 @@ ui_outliers_table <- function(detect_result,
     ),
     shiny::tags$tbody(rows)
   )
-  
+
   shiny::tagList(
     cards,
     shiny::tags$p(

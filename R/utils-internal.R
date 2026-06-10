@@ -1,5 +1,5 @@
 #' Require a package or fail with a clear message
-#' 
+#'
 #' @keywords internal
 #' @noRd
 .require_pkg <- function(pkg, why) {
@@ -24,14 +24,14 @@ utils::globalVariables(c(
   "geom_point", "ggplot", "ggsave", "guides", "isolate", "labs",
   "left_join", "mean_RSD", "median", "mergeCells", "modifyList", "n", "p",
   "percent", "percent_format", "pivot_longer", "plotOutput", "prcomp", "predict",
-  "pull", "radioButtons", "read.csv", "read_excel", "renderPlot", "rsd_QC",
+  "pull", "radioButtons", "read_excel", "renderPlot", "rsd_QC",
   "rsd_after", "rsd_before", "rsd_nonqc_after", "rsd_nonqc_before",
   "rsd_qc_after", "rsd_qc_before", "saveWorkbook", "scale_color_brewer",
   "scale_color_manual", "scale_x_continuous", "scale_y_continuous", "sd",
   "setColWidths", "setNames", "setRowHeights", "setTxtProgressBar",
   "showNotification", "slice_head", "stopApp", "tagList", "theme",
-  "theme_minimal", "tibble", "type", "ungroup", "withProgress", "withSpinner", 
-  "writeData", "xlim", "xmax", "xmin", "y", "ylim", "zip", "RSD_a","RSD_b",
-  "delta","flagged","group_id","z","panel","variable_wrapped","loading",
-  "decision"," "
+  "theme_minimal", "tibble", "type", "ungroup", "withProgress", "withSpinner",
+  "writeData", "xlim", "xmax", "xmin", "y", "ylim", "zip", "RSD_a", "RSD_b",
+  "delta", "flagged", "group_id", "z", "panel", "variable_wrapped", "loading",
+  "decision", " "
 ))
