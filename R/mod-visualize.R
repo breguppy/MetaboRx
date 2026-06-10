@@ -23,14 +23,16 @@ mod_visualize_ui <- function(id) {
             report_text_met_scatter(),
             title = "What information does the metabolite scatter plot show?",
             placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
+            options = list(
+              container = "body",
+              customClass = "popover-responsive"
+            )
           )
         ),
         uiOutput(ns("met_plot_selectors")),
         width = 400
       ),
-      plotOutput(ns("metab_scatter"), height = "600px", width = "600px") %>% withSpinner(color = "#404040"),
+      plotOutput(ns("metab_scatter"), height = "600px", width = "600px") |> withSpinner(color = "#404040"),
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -49,14 +51,16 @@ mod_visualize_ui <- function(id) {
             report_text_rsd_plots(),
             title = "What information does the RSD comparison plots show?",
             placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
+            options = list(
+              container = "body",
+              customClass = "popover-responsive"
+            )
           )
         ),
         ui_rsd_eval(ns),
         width = 400
       ),
-      plotOutput(ns("rsd_comparison_plot"), height = "540px", width = "900px") %>% withSpinner(color = "#404040")
+      plotOutput(ns("rsd_comparison_plot"), height = "540px", width = "900px") |> withSpinner(color = "#404040")
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -76,15 +80,17 @@ mod_visualize_ui <- function(id) {
             report_text_pca_plots(),
             title = "What information does the PCA plots and loading plots show?",
             placement = "auto",
-            options = list(container = "body",
-                           customClass = "popover-responsive") 
+            options = list(
+              container = "body",
+              customClass = "popover-responsive"
+            )
           )
         ),
         uiOutput(ns("pca_options")),
         width = 400
       ),
-      plotOutput(ns("pca_plot"), height = "530px", width = "1200px") %>% withSpinner(color = "#404040"),
-      plotOutput(ns("pca_loading_plot"), height = "530px", width = "1000px") %>% withSpinner(color = "#404040")
+      plotOutput(ns("pca_plot"), height = "530px", width = "1200px") |> withSpinner(color = "#404040"),
+      plotOutput(ns("pca_loading_plot"), height = "530px", width = "1000px") |> withSpinner(color = "#404040")
     )),
     card(
       layout_sidebar(
@@ -98,7 +104,7 @@ mod_visualize_ui <- function(id) {
           column(4, uiOutput(ns("download_fig_zip_btn")))
         ),
         uiOutput(ns("progress_ui"))
-        )
+      )
     ),
     card(
       actionButton(ns("next_export"), "Next: Export All", class = "btn-primary btn-lg"),
@@ -111,7 +117,7 @@ mod_visualize_server <- function(id, data, params) {
     ns <- session$ns
     d <- reactive(data())
     p <- reactive(params())
-    
+
     #-- Let user select which metabolite to display in scatter plot
     output$met_plot_selectors <- renderUI({
       req(d()$filtered, d()$filtered_corrected)
@@ -127,19 +133,22 @@ mod_visualize_server <- function(id, data, params) {
       validate(need(length(cols) >= 1, "No overlapping metabolites."))
       selectInput(ns("met_col"), "Metabolite column", choices = cols, selected = cols[1])
     })
-    
+
     #-- Metabolite scatter plot
-    output$metab_scatter <- renderPlot({
-      req(input$met_col)
-      suppressWarnings({
-        print(make_met_scatter(d(), p(), input$met_col))
-      })
-    }, res = 120)
-    
+    output$metab_scatter <- renderPlot(
+      {
+        req(input$met_col)
+        suppressWarnings({
+          print(make_met_scatter(d(), p(), input$met_col))
+        })
+      },
+      res = 120
+    )
+
     #-- RSD comparison plot
     output$rsd_comparison_plot <- renderPlot(execOnResize = FALSE, res = 120, {
       req(input$rsd_compare, input$rsd_cal)
-      
+
       make_rsd_plot(
         list(
           rsd_compare = input$rsd_compare,
@@ -150,7 +159,7 @@ mod_visualize_server <- function(id, data, params) {
         d()
       )
     })
-    
+
     #-- PCA options
     output$pca_options <- renderUI({
       ui_pca_eval(d()$cleaned$meta_df, ns = session$ns)
@@ -164,9 +173,9 @@ mod_visualize_server <- function(id, data, params) {
         pca_compare = input$pca_compare
       )
     })
-    
+
     #-- Compute PCA once and reuse for both PCA plots
-    
+
     pca_meta_df <- reactive({
       req(d(), d()$cleaned, d()$cleaned$meta_df)
       d()$cleaned$meta_df
@@ -175,15 +184,15 @@ mod_visualize_server <- function(id, data, params) {
       req(pca_meta_df())
       unique(c("sample", setdiff(names(pca_meta_df()), "sample")))
     })
-    
+
     pca_pair_reactive <- reactive({
       req(input$pca_compare)
-      
+
       pca_p <- p()
       pca_p$pca_compare <- input$pca_compare
-      
+
       cmp <- pca_compare_data()
-      
+
       compute_pca_pair(
         before = cmp$before,
         after = cmp$after,
@@ -196,41 +205,47 @@ mod_visualize_server <- function(id, data, params) {
       )
     })
     #-- PCA score plot
-    output$pca_plot <- renderPlot({
-      req(input$pca_compare, input$color_col)
-      
-      pca_p <- p()
-      pca_p$pca_compare <- input$pca_compare
-      pca_p$color_col <- input$color_col
-      pca_p$shape_col <- input$shape_col
-      
-      cmp <- pca_compare_data()
-      
-      suppressWarnings({
-        plot_pca_from_result(
-                      p = pca_p,
-                      pca_pair = pca_pair_reactive(),
-                      compared_to = cmp$compared_to
-        )
-      })
-    }, res = 120)
-    
+    output$pca_plot <- renderPlot(
+      {
+        req(input$pca_compare, input$color_col)
+
+        pca_p <- p()
+        pca_p$pca_compare <- input$pca_compare
+        pca_p$color_col <- input$color_col
+        pca_p$shape_col <- input$shape_col
+
+        cmp <- pca_compare_data()
+
+        suppressWarnings({
+          plot_pca_from_result(
+            p = pca_p,
+            pca_pair = pca_pair_reactive(),
+            compared_to = cmp$compared_to
+          )
+        })
+      },
+      res = 120
+    )
+
     #-- PCA loading plot
-    output$pca_loading_plot <- renderPlot({
-      req(input$pca_compare)
-      
-      cmp <- pca_compare_data()
-      
-      plot_pca_loading_from_result(
-        pca_pair = pca_pair_reactive(),
-        compared_to = cmp$compared_to
-      )
-    }, res = 120)
-    
+    output$pca_loading_plot <- renderPlot(
+      {
+        req(input$pca_compare)
+
+        cmp <- pca_compare_data()
+
+        plot_pca_loading_from_result(
+          pca_pair = pca_pair_reactive(),
+          compared_to = cmp$compared_to
+        )
+      },
+      res = 120
+    )
+
     #-- Download all figures as zip folder.
     output$download_fig_zip_btn <- renderUI({
       req(d()$filtered, d()$filtered_corrected)
-      
+
       download_card(
         "Download Figures",
         "If there are many metabolites, downloading figures may take a few minutes.",
@@ -247,10 +262,10 @@ mod_visualize_server <- function(id, data, params) {
         )
       )
     })
-    
+
     # -- progress bar
     progress_reactive <- reactiveVal(0)
-    
+
     #-- progress for downloading all images
     output$progress_ui <- renderUI({
       req(progress_reactive() > 0, progress_reactive() <= 1)
@@ -265,14 +280,14 @@ mod_visualize_server <- function(id, data, params) {
         tags$span(sprintf("%.0f%%", progress_reactive() * 100))
       )
     })
-    
+
     output$download_fig_zip <- downloadHandler(
       filename = function() {
         paste0("figures_", Sys.Date(), ".zip")
       },
       content = function(file) {
         .require_pkg("zip", "create a zip archive")
-        
+
         choices <- list(
           rsd_cal = input$rsd_cal,
           rsd_compare = input$rsd_compare,
@@ -285,27 +300,27 @@ mod_visualize_server <- function(id, data, params) {
           qcImputeM = p()$qcImputeM,
           samImputeM = p()$samImputeM
         )
-        
+
         figs <- export_figures(p = choices, d = d(), out_dir = tempdir())
-        
+
         fig_dir <- normalizePath(figs$fig_dir, winslash = "/", mustWork = TRUE)
         zipfile <- tempfile(fileext = ".zip")
         zip::zipr(zipfile, files = fig_dir)
-        
+
         file.copy(zipfile, file, overwrite = TRUE)
-        
+
         unlink(figs$fig_dir, recursive = TRUE, force = TRUE)
         unlink(zipfile, force = TRUE)
-        
+
         progress_reactive(0)
       }
     )
-    
+
     #-- Move to next tab after inspecting the corrected data figures
     observeEvent(input$next_export, {
       updateTabsetPanel(session$rootScope(), "main_steps", "tab_export")
     })
-    
+
     list(
       progress = progress_reactive,
       params = reactive(list(

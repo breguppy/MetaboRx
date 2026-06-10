@@ -2,54 +2,54 @@
 #' and list of metabolites that increase QC rsd after correction.
 #'
 #' @keywords internal
-#' @noRd 
+#' @noRd
 
 .get_top_two <- function(p, d) {
   if (p$rsd_cal == "met") {
-    top2 <- metabolite_rsd(d$filtered$df)  %>%
-      select(Metabolite, RSD_NonQC_before = RSD_NonQC) %>%
-      inner_join(
-        metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
-          select(Metabolite, RSD_NonQC_after = RSD_NonQC),
+    top2 <- metabolite_rsd(d$filtered$df) |>
+      dplyr::select(Metabolite, RSD_NonQC_before = RSD_NonQC) |>
+      dplyr::inner_join(
+        metabolite_rsd(d$filtered_corrected$df_no_mv) |>
+          dplyr::select(Metabolite, RSD_NonQC_after = RSD_NonQC),
         by = "Metabolite"
-      ) %>%
-      mutate(decrease = RSD_NonQC_before - RSD_NonQC_after) %>%
-      filter(is.finite(decrease)) %>%
-      arrange(desc(decrease)) %>%
-      slice_head(n = 2) %>%
-      pull(Metabolite)
+      ) |>
+      dplyr::mutate(decrease = RSD_NonQC_before - RSD_NonQC_after) |>
+      dplyr::filter(is.finite(decrease)) |>
+      dplyr::arrange(dplyr::desc(decrease)) |>
+      dplyr::slice_head(n = 2) |>
+      dplyr::pull(Metabolite)
   } else {
-    top2 <- class_metabolite_rsd(d$filtered$df) %>%
-      filter(class != "QC") %>%
-      select(Metabolite, RSD_before = RSD) %>%
-      inner_join(
-        class_metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
-          filter(class != "QC") %>%
-          select(Metabolite, RSD_after = RSD),
+    top2 <- class_metabolite_rsd(d$filtered$df) |>
+      dplyr::filter(class != "QC") |>
+      dplyr::select(Metabolite, RSD_before = RSD) |>
+      dplyr::inner_join(
+        class_metabolite_rsd(d$filtered_corrected$df_no_mv) |>
+          dplyr::filter(class != "QC") |>
+          dplyr::select(Metabolite, RSD_after = RSD),
         by = "Metabolite"
-      ) %>%
-      mutate(decrease = RSD_before - RSD_after) %>%
-      filter(is.finite(decrease)) %>%
-      arrange(desc(decrease)) %>%
-      distinct(Metabolite, .keep_all = TRUE) %>%
-      slice_head(n = 2) %>%
-      pull(Metabolite)
+      ) |>
+      dplyr::mutate(decrease = RSD_before - RSD_after) |>
+      dplyr::filter(is.finite(decrease)) |>
+      dplyr::arrange(dplyr::desc(decrease)) |>
+      dplyr::distinct(Metabolite, .keep_all = TRUE) |>
+      dplyr::slice_head(n = 2) |>
+      dplyr::pull(Metabolite)
   }
 }
 
 .increased_qc_rsd <- function(d) {
-  increased_qc <- class_metabolite_rsd(d$filtered$df) %>%
-    filter(class == "QC") %>%
-    select(Metabolite, RSD_before = RSD) %>%
-    inner_join(
-      class_metabolite_rsd(d$filtered_corrected$df_no_mv) %>%
-        filter(class == "QC") %>%
-        select(Metabolite, RSD_after = RSD),
+  increased_qc <- class_metabolite_rsd(d$filtered$df) |>
+    dplyr::filter(class == "QC") |>
+    dplyr::select(Metabolite, RSD_before = RSD) |>
+    dplyr::inner_join(
+      class_metabolite_rsd(d$filtered_corrected$df_no_mv) |>
+        dplyr::filter(class == "QC") |>
+        dplyr::select(Metabolite, RSD_after = RSD),
       by = "Metabolite"
-    ) %>%
-    filter(RSD_after > RSD_before) %>%
-    arrange(desc(RSD_after - RSD_before)) %>%
-    pull(Metabolite)
+    ) |>
+    dplyr::filter(RSD_after > RSD_before) |>
+    dplyr::arrange(dplyr::desc(RSD_after - RSD_before)) |>
+    dplyr::pull(Metabolite)
 }
 
 #--------- Report text helper for popovers and HTML report
@@ -133,7 +133,6 @@ report_text_data_inspection <- function() {
       "confirming the dataset is formatted correctly. This step identifies common quality issues ",
       "by flagging invaild metabolite values, duplicate metabolites/columns, and possible contaminates."
     ),
-    
     htmltools::tags$h4("Cleaning performed"),
     htmltools::tags$ul(
       htmltools::tags$li(
@@ -172,7 +171,6 @@ report_text_data_inspection <- function() {
         )
       )
     ),
-    
     htmltools::tags$h4("Checks and summaries reported"),
     htmltools::tags$ul(
       htmltools::tags$li(
@@ -197,7 +195,6 @@ report_text_data_inspection <- function() {
         "when blank samples are present, flags metabolites whose QC signal is low relative to blanks for review."
       )
     ),
-    
     htmltools::tags$h4("How to use this section"),
     htmltools::tags$ul(
       htmltools::tags$li(
@@ -220,13 +217,17 @@ report_text_withheld_columns <- function(p, d) {
   if (isTRUE(p$withhold_cols) && !is.null(p$n_withhold) && length(d$cleaned$withheld_cols) > 0) {
     htmltools::tagList(
       htmltools::tags$br(),
-      htmltools::tags$span(style = "font-weight:bold;", 
-                           "The following metabolite columns were withheld from correction:"),
+      htmltools::tags$span(
+        style = "font-weight:bold;",
+        "The following metabolite columns were withheld from correction:"
+      ),
       htmltools::tags$ul(lapply(d$cleaned$withheld_cols, htmltools::tags$li))
     )
   } else {
-    htmltools::tags$span(style = "font-weight:bold;", 
-                         "All metabolite columns in the raw data were included in the correction.")
+    htmltools::tags$span(
+      style = "font-weight:bold;",
+      "All metabolite columns in the raw data were included in the correction."
+    )
   }
 }
 
@@ -235,15 +236,19 @@ report_text_withheld_columns <- function(p, d) {
 #' @noRd
 report_text_mv_filter <- function() {
   htmltools::tagList(
-    htmltools::tags$p("Metabolites with missing value percentage above the ",
+    htmltools::tags$p(
+      "Metabolites with missing value percentage above the ",
       "selected threshold for at least 1 sample class are removed from the ",
       " dataset. After filtering by missing value percentage, metabolites that ",
       "have at least 1 missing value for QC samples are displayed. Since missing",
       "values for QC samples is not common, further investigation is need to ",
-      "determine if the value is truly not detected."),
-    htmltools::tags$p("If a metabolite is missing for all samples in a single ",
-    "class, a warning will appear stating the class and metabolite with all ",
-    "missing values."),
+      "determine if the value is truly not detected."
+    ),
+    htmltools::tags$p(
+      "If a metabolite is missing for all samples in a single ",
+      "class, a warning will appear stating the class and metabolite with all ",
+      "missing values."
+    ),
     htmltools::tags$h4("How to use this section"),
     htmltools::tags$ul(
       htmltools::tags$li(
@@ -279,7 +284,7 @@ report_text_correlations <- function() {
 #' @noRd
 report_text_imputation <- function(p, d) {
   paragraphs <- character(0)
-  
+
   if (!identical(d$imputed$qc_str, "nothing to impute")) {
     paragraphs <- c(
       paragraphs,
@@ -291,7 +296,7 @@ report_text_imputation <- function(p, d) {
       "Since there are no missing QC values, no imputation is necessary."
     )
   }
-  
+
   if (!identical(d$imputed$sam_str, "nothing to impute")) {
     paragraphs <- c(
       paragraphs,
@@ -303,18 +308,18 @@ report_text_imputation <- function(p, d) {
       "Since there are no missing sample values, no imputation is necessary."
     )
   }
-  
+
   if (
     (!identical(d$imputed$qc_str, "nothing to impute") ||
-     !identical(d$imputed$sam_str, "nothing to impute")) &&
-    isTRUE(p$remove_imputed)
+      !identical(d$imputed$sam_str, "nothing to impute")) &&
+      isTRUE(p$remove_imputed)
   ) {
     paragraphs <- c(
       paragraphs,
       "Imputed values are removed after correction."
     )
   }
-  
+
   htmltools::tagList(
     htmltools::tags$p(paste(paragraphs, collapse = " ")),
     htmltools::tags$strong("Imputation method descriptions:"),
@@ -485,12 +490,15 @@ report_text_ev_detection <- function() {
       "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
     ),
     htmltools::tags$p(
-      htmltools::tags$b("Caution: ",style = "color: red;"),
-                  "Candidate extreme values are displayed for the user's benefit. ",
-                  "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."),
-    htmltools::tags$p(htmltools::strong("Note:" ),
-                      "This is not an exhaustive outlier search. This extreme value detection sections aims to help identify unreasonable ",
-                      "metabolite values thats make a sample stand out from the others.")
+      htmltools::tags$b("Caution: ", style = "color: red;"),
+      "Candidate extreme values are displayed for the user's benefit. ",
+      "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."
+    ),
+    htmltools::tags$p(
+      htmltools::strong("Note:"),
+      "This is not an exhaustive outlier search. This extreme value detection sections aims to help identify unreasonable ",
+      "metabolite values thats make a sample stand out from the others."
+    )
   )
 }
 
@@ -498,7 +506,7 @@ report_text_ev_detection <- function() {
 #' @noRd
 report_text_transformation <- function(p, d) {
   base <- htmltools::tags$p(d$transformed$str)
-  
+
   if (length(d$transformed$withheld_cols) > 0) {
     return(htmltools::tagList(
       base,
@@ -506,7 +514,7 @@ report_text_transformation <- function(p, d) {
       htmltools::tags$ul(lapply(d$transformed$withheld_cols, htmltools::tags$li))
     ))
   }
-  
+
   base
 }
 
@@ -543,8 +551,8 @@ report_text_transform_methods <- function() {
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
-      htmltools::tags$b("Caution: ",style = "color: red;"),
-      "Internal Standard Normalization should not be used when only a single internal standard is measured.", 
+      htmltools::tags$b("Caution: ", style = "color: red;"),
+      "Internal Standard Normalization should not be used when only a single internal standard is measured.",
       "The single internal standard may not be representive of all metabolites measured in the samples.",
       "Total Ratio Normalization (TRN) relies on the assuption that total intensity should be the same across as samples",
       " and is sensitive to extreme values or dominate metabolites with high relative intensities."
@@ -606,20 +614,20 @@ report_text_scatter_intro <- function(p, d) {
     "The two metabolites shown above have the largest decrease in sample variation.",
     "The change in variation was determined by calculating relative standard deviation (RSD) for each metabolite"
   )
-  
+
   if (identical(p$rsd_cal, "class_met")) {
     parts <- c(parts, "grouping by sample class.")
   } else {
     parts <- c(parts, ".")
   }
-  
+
   if (isTRUE(!p$post_cor_filter)) {
     parts <- c(parts, sprintf(
       "Some metabolites may have been filtered out of the post-corrected dataset if the QC RSD is above %s%%.",
       p$rsd_cutoff
     ))
   }
-  
+
   htmltools::tags$p(paste(parts, collapse = " "))
 }
 #' RSD comparison plot explanation.
@@ -628,11 +636,13 @@ report_text_scatter_intro <- function(p, d) {
 report_text_rsd_plots <- function() {
   htmltools::tagList(
     htmltools::tags$p(htmltools::strong("How to read this plot")),
-    htmltools::tags$p("This section compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
-                  "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
-                  "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
-                  "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
-                  "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."),
+    htmltools::tags$p(
+      "This section compares relative standard deviation (RSD) in the corrected or transformed and corrected data ",
+      "(depending on the setting selected under 'Compare raw data to') to the raw data. ",
+      "RSD is computed by dividing the standard deviation of each metabolite by the mean of that metabolite and is expressed ",
+      "as a percentage. RSD is computed for each metabolite for QC samples and non-QC samples separtely. RSD can also be computed for non-QC ",
+      "samples grouping samples by class type (depending on the settings selected under 'Calculate RSD by')."
+    ),
     htmltools::tags$hr(),
     htmltools::strong("Visualize changes in RSD by: Distrbution"),
     htmltools::tags$p(
@@ -651,7 +661,7 @@ report_text_rsd_plots <- function() {
     htmltools::tags$p(
       "In the scatter plot comparison the x-axis is RSD before correction/transformation and correction and the y-axis is RSD after. ",
       "RSDs for non-QC samples are displayed in the left panel and QC samples in the right panel. ",
-      "Red dots indicate that RSD increased after correction/transformation and correction. ", 
+      "Red dots indicate that RSD increased after correction/transformation and correction. ",
       "Gray dot indicate no change in RSD after correction/transformation and correction. ",
       "Green dots indicate a decrease in RSD after correction/transformation. ",
       "The percentages of increased, no change, and decreased RSDs are shown at the top of each panel."
@@ -668,13 +678,13 @@ report_text_rsd_plots <- function() {
 #' @noRd
 report_text_rsd_intro <- function(p, d) {
   increased_qc <- .increased_qc_rsd(d)
-  
+
   main <- sprintf(
     "In these plots, RSD is computed per %s after %s and compared to the raw data.",
     if (identical(p$rsd_cal, "class_met")) "sample class and metabolite" else "metabolite",
     if (identical(p$rsd_compare, "filtered_cor_data")) "correction" else "transformation and correction"
   )
-  
+
   extra <- character(0)
   if (isTRUE(!p$post_cor_filter)) {
     extra <- c(extra, sprintf(
@@ -682,9 +692,9 @@ report_text_rsd_intro <- function(p, d) {
       p$rsd_cutoff
     ))
   }
-  
+
   x <- htmltools::tags$p(paste(c(main, extra), collapse = " "))
-  
+
   if (length(increased_qc) > 0) {
     x <- htmltools::tagList(
       x,
@@ -696,7 +706,7 @@ report_text_rsd_intro <- function(p, d) {
       )
     )
   }
-  
+
   x
 }
 #' Change in RSD table description.
@@ -706,9 +716,11 @@ report_text_rsd_table <- function() {
   htmltools::tagList(
     htmltools::strong("Performance Metric"),
     htmltools::tags$p("\u0394 RSD = RSD after correction \u2212 RSD before correction"),
-    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
-                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
-                      "grouping samples based on the 'class' column."),
+    htmltools::tags$p(
+      "The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+      "grouping samples based on the 'class' column."
+    ),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction, RSD should decrease for both QC and non-QC samples. ",
@@ -716,9 +728,11 @@ report_text_rsd_table <- function() {
     ),
     htmltools::tags$hr(),
     htmltools::strong("Post-correction Change"),
-    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction.",
-                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
-                      "based on the 'class' column."),
+    htmltools::tags$p(
+      "The second table shows the percentages of RSDs that increased or decreased after correction.",
+      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+      "based on the 'class' column."
+    ),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction, RSD should decrease for both QC and non-QC samples. ",
@@ -734,9 +748,11 @@ report_text_rsd_tc_table <- function() {
   htmltools::tagList(
     htmltools::strong("Performance Metric"),
     htmltools::tags$p("\u0394 RSD = RSD after correction and transformation \u2212 RSD in raw data"),
-    htmltools::tags$p("The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
-                      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
-                      "grouping samples based on the 'class' column."),
+    htmltools::tags$p(
+      "The first table shows the median change in (\u0394) RSD for both QC samples and non-QC samples.",
+      "\u0394 Metabolite RSD is computed for all non-QC samples and \u0394 Class-Metabolite RSD is computed by ",
+      "grouping samples based on the 'class' column."
+    ),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction, RSD should decrease for both QC and non-QC samples. ",
@@ -744,9 +760,11 @@ report_text_rsd_tc_table <- function() {
     ),
     htmltools::tags$hr(),
     htmltools::strong("Post-transformation Change"),
-    htmltools::tags$p("The second table shows the percentages of RSDs that increased or decreased after correction and transformation.",
-                      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
-                      "based on the 'class' column."),
+    htmltools::tags$p(
+      "The second table shows the percentages of RSDs that increased or decreased after correction and transformation.",
+      "Metabolite RSD is computed for all non-QC samples and Class-Metabolite RSD is computed by grouping samples ",
+      "based on the 'class' column."
+    ),
     htmltools::tags$p(
       htmltools::strong("Goal: "),
       "After correction and transformation, RSD should decrease for both QC and non-QC samples. ",
@@ -761,9 +779,11 @@ report_text_rsd_tc_table <- function() {
 report_text_pca_plots <- function() {
   htmltools::tagList(
     htmltools::tags$p(htmltools::strong("What is principal component analysis (PCA)?")),
-    htmltools::tags$p("PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
-                  "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
-                  "data."),
+    htmltools::tags$p(
+      "PCA is a dimension reduction technique that projects the original data onto components that capture the maxium variance in the data. ",
+      "Principal conponent 1 (PC1) represents the most variance in the data. After PC1, PC2 represents the most variance in the remaining ",
+      "data."
+    ),
     htmltools::tags$hr(),
     htmltools::strong("PCA score plots"),
     htmltools::tags$p(
@@ -792,4 +812,3 @@ report_text_pca_plots <- function() {
     ),
   )
 }
-
