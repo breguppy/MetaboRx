@@ -177,7 +177,7 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
       metab_cols = metab_cols_mv_trn,
       class_col = "class",
       qc_label = "QC",
-      target_mean = 1000,
+      target_mean = 1,
       na_rm = TRUE
     )
     
@@ -186,7 +186,7 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
       metab_cols = metab_cols_no_mv_trn,
       class_col = "class",
       qc_label = "QC",
-      target_mean = 1000,
+      target_mean = 1,
       na_rm = TRUE
     )
     
@@ -257,7 +257,7 @@ equally_weight_metabolites <- function(df,
                                        metab_cols,
                                        class_col = "class",
                                        qc_label = "QC",
-                                       target_mean = 1000,
+                                       target_mean = 1,
                                        na_rm = TRUE) {
   if (!is.data.frame(df)) {
     stop("`df` must be a data.frame.")
