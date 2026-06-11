@@ -38,6 +38,8 @@ make_met_scatter <- function(d, p, met_col) {
 #' @noRd
 # Helper for creating the RSD plot
 make_rsd_plot <- function(p, d) {
+  p <- .normalize_rsd_plot_params(p)
+
   df_before <- d$filtered$df
   # Determine df_after based on rsd_compare selected by user.
   if (p$rsd_compare == "filtered_cor_data") {
@@ -92,6 +94,59 @@ make_rsd_plot <- function(p, d) {
 
 #' @keywords internal
 #' @noRd
+.normalize_rsd_choice <- function(value,
+                                  arg,
+                                  choices,
+                                  aliases = character()) {
+  value <- as.character(value)
+  if (length(value) != 1L || is.na(value) || !nzchar(value)) {
+    stop(
+      "`", arg, "` must be one of: ",
+      paste(choices, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  if (value %in% names(aliases)) {
+    value <- unname(aliases[[value]])
+  }
+
+  if (!value %in% choices) {
+    stop(
+      "`", arg, "` must be one of: ",
+      paste(choices, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  value
+}
+
+#' @keywords internal
+#' @noRd
+.normalize_rsd_plot_params <- function(p) {
+  p$rsd_compare <- .normalize_rsd_choice(
+    p$rsd_compare,
+    "rsd_compare",
+    c("filtered_cor_data", "transformed_cor_data")
+  )
+  p$rsd_plot_type <- .normalize_rsd_choice(
+    p$rsd_plot_type,
+    "rsd_plot_type",
+    c("dist", "scatter")
+  )
+  p$rsd_cal <- .normalize_rsd_choice(
+    p$rsd_cal,
+    "rsd_cal",
+    c("class_met", "met"),
+    aliases = c("class-met" = "class_met")
+  )
+
+  p
+}
+
+#' @keywords internal
+#' @noRd
 make_all_rsd_plots <- function(p, d) {
   build_name <- function(plot_type, compare, cal) {
     sprintf("rsd_%s_%s_%s", plot_type, compare, cal)
@@ -100,8 +155,9 @@ make_all_rsd_plots <- function(p, d) {
   # Base grid: plot types x calcs (always for filtered_cor_data)
   specs <- expand.grid(
     rsd_plot_type = c("dist", "scatter"),
-    rsd_cal       = c("class-met", "met"),
-    rsd_compare   = "filtered_cor_data"
+    rsd_cal = c("class_met", "met"),
+    rsd_compare = "filtered_cor_data",
+    stringsAsFactors = FALSE
   )
 
   # Add transformed_cor_data variants only when transform is not "none"
