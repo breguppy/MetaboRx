@@ -22,6 +22,55 @@ export_xlsx <- function(p, d, file = NULL) {
     nm
   }
 
+  metadata_cols <- c("sample", "batch", "class", "order", "Sample Name", "Group", " ")
+
+  metabolite_cols_for_export <- function(df) {
+    setdiff(names(df), metadata_cols)
+  }
+
+  round_metabolites_for_export <- function(df, metab_cols, digits = 3) {
+    if (!is.data.frame(df) || length(metab_cols) == 0L) {
+      return(df)
+    }
+
+    metab_cols <- intersect(metab_cols, names(df))
+    numeric_metab_cols <- metab_cols[
+      vapply(df[, metab_cols, drop = FALSE], is.numeric, logical(1L))
+    ]
+
+    if (length(numeric_metab_cols) == 0L) {
+      return(df)
+    }
+
+    df |>
+      dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of(numeric_metab_cols),
+          ~ round(.x, digits = digits)
+        )
+      )
+  }
+
+  qc_rsd_flagged_metabolites <- function(df, rsd_cutoff) {
+    if (!is.data.frame(df) ||
+      length(rsd_cutoff) != 1L ||
+      is.na(rsd_cutoff) ||
+      !is.finite(rsd_cutoff)) {
+      return(character(0))
+    }
+
+    rsd_df <- tryCatch(
+      metabolite_rsd(df),
+      error = function(e) NULL
+    )
+
+    if (is.null(rsd_df)) {
+      return(character(0))
+    }
+
+    rsd_df$Metabolite[is.na(rsd_df$RSD_QC) | rsd_df$RSD_QC > rsd_cutoff]
+  }
+
   add_eq_sheet <- identical(p$transform, "TRN")
 
   # base steps:
@@ -105,6 +154,10 @@ export_xlsx <- function(p, d, file = NULL) {
           "Correction Method",
           "Remove Imputed After Correction?",
           "QC RSD% Threshold",
+          "Blank Threshold Multiplier",
+          "Remove Blank-Threshold Failures?",
+          "Sample/QC Average Difference Threshold",
+          "Remove Sample/QC Average Failures?",
           "Scaling/Normalization",
           "Exclude ISTD in Scaling/Normalization",
           "Keep Corrected QCs"
@@ -119,7 +172,16 @@ export_xlsx <- function(p, d, file = NULL) {
           d$imputed$sam_str,
           d$corrected$str,
           isTRUE(p$remove_imputed),
-          sprintf("%s%%", d$filtered_corrected$rsd_cutoff),
+          sprintf(
+            "%s%%",
+            p$rsd_filter_threshold %||%
+              p$rsd_cutoff %||%
+              d$filtered_corrected$rsd_cutoff
+          ),
+          d$filtered$blank_threshold %||% NA,
+          isTRUE(d$filtered$remove_blank_threshold_cols),
+          sprintf("%s%%", d$filtered_corrected$percent_threshold %||% NA),
+          isTRUE(p$remove_qc_average_pct_filter),
           p$transform,
           isTRUE(p$ex_ISTD),
           isTRUE(p$keep_corrected_qcs)
@@ -164,11 +226,6 @@ export_xlsx <- function(p, d, file = NULL) {
       max_width_vec <- pmax(width_vec, width_vec_header)
       openxlsx::setColWidths(wb, s1, cols = 1:2, widths = max_width_vec)
 
-      # Optional lists
-      # columns withheld from correction: d$cleaned$withheld_cols
-      # columns filtered by missing value: d$filtered$mv_removed_cols
-      # columns filtered by QC RSD: d$filtered_corrected$removed_metabolites(_no)_mv
-      # columns withheld from TRN
       if (isTRUE(p$remove_imputed)) {
         qc_rsd_removed_columns <- d$filtered_corrected$removed_metabolites_mv
         trn_withheld_columns <- d$transformed$withheld_cols_mv
@@ -177,16 +234,75 @@ export_xlsx <- function(p, d, file = NULL) {
         trn_withheld_columns <- d$transformed$withheld_cols_no_mv
       }
 
+      rsd_filter_disabled <- isTRUE(p$post_cor_filter) ||
+        is.infinite(d$filtered_corrected$rsd_cutoff %||% Inf)
+      qc_rsd_columns <- if (rsd_filter_disabled) {
+        qc_rsd_flagged_metabolites(
+          if (isTRUE(p$remove_imputed)) {
+            d$filtered_corrected$df_mv
+          } else {
+            d$filtered_corrected$df_no_mv
+          },
+          p$rsd_filter_threshold %||%
+            p$rsd_cutoff %||%
+            d$filtered_corrected$rsd_cutoff
+        )
+      } else {
+        qc_rsd_removed_columns
+      }
+      qc_rsd_header <- if (rsd_filter_disabled) {
+        "QC-RSD Flagged Metabolites"
+      } else {
+        "QC-RSD Filtered Metabolites"
+      }
+
+      blank_threshold_columns <- if (isTRUE(d$filtered$remove_blank_threshold_cols)) {
+        d$filtered$removed_blank_threshold_cols
+      } else {
+        d$filtered$blank_threshold_result$below_blank_threshold_ex_ISTD
+      }
+      blank_threshold_header <- if (isTRUE(d$filtered$remove_blank_threshold_cols)) {
+        "Blank-Threshold Filtered Metabolites"
+      } else {
+        "Blank-Threshold Flagged Metabolites"
+      }
+
+      qc_average_columns <- if (isTRUE(p$remove_qc_average_pct_filter)) {
+        d$filtered_corrected$removed_mets_pct_diff
+      } else {
+        d$filtered_corrected$flagged_mets
+      }
+      qc_average_header <- if (isTRUE(p$remove_qc_average_pct_filter)) {
+        "Sample/QC Average Filtered Metabolites"
+      } else {
+        "Sample/QC Average Flagged Metabolites"
+      }
+
       cur_col <- 4L
-      add_list <- function(cur_col, vec, header) {
-        vec <- unlist(vec, use.names = FALSE)
-        if (length(vec) == 0) {
+      add_settings_table <- function(cur_col, x, header = NULL) {
+        if (is.null(x)) {
           return(cur_col)
         }
-        df <- stats::setNames(
-          data.frame(as.character(vec), check.names = FALSE),
-          header
-        )
+
+        if (is.data.frame(x)) {
+          if (nrow(x) == 0L || ncol(x) == 0L) {
+            return(cur_col)
+          }
+          df <- x
+          if (!is.null(header)) {
+            names(df) <- header
+          }
+        } else {
+          vec <- as.character(stats::na.omit(unlist(x, use.names = FALSE)))
+          if (length(vec) == 0L) {
+            return(cur_col)
+          }
+          df <- stats::setNames(
+            data.frame(vec, check.names = FALSE),
+            header
+          )
+        }
+
         openxlsx::writeData(
           wb,
           s1,
@@ -195,41 +311,71 @@ export_xlsx <- function(p, d, file = NULL) {
           startCol = cur_col,
           headerStyle = bold
         )
-        width_vec <- apply(
-          df,
-          2,
-          function(x) max(nchar(as.character(x)) + 2, na.rm = TRUE)
+        width_vec <- vapply(
+          seq_along(df),
+          function(i) {
+            max(nchar(c(names(df)[i], as.character(df[[i]]))) + 2, na.rm = TRUE)
+          },
+          numeric(1L)
         )
-        width_vec_header <- nchar(colnames(df)) + 2
-        max_width_vec <- pmax(width_vec, width_vec_header)
-        openxlsx::setColWidths(wb, s1, cols = cur_col, widths = max_width_vec)
-        cur_col + 2L
+        openxlsx::setColWidths(
+          wb,
+          s1,
+          cols = cur_col:(cur_col + ncol(df) - 1L),
+          widths = width_vec
+        )
+        cur_col + ncol(df) + 1L
       }
 
       if (isTRUE(p$withhold_cols)) {
-        cur_col <- add_list(
+        cur_col <- add_settings_table(
           cur_col,
           d$cleaned$withheld_cols,
           "Columns Withheld From Correction"
         )
       }
-      cur_col <- add_list(
+      cur_col <- add_settings_table(
+        cur_col,
+        d$cleaned$all_missing_zero_qc_cols,
+        "All Missing/Zero in QC Metabolites Removed"
+      )
+      cur_col <- add_settings_table(
+        cur_col,
+        d$cleaned$duplicate_col_names,
+        "Duplicate Raw Column Names Repaired"
+      )
+      cur_col <- add_settings_table(
+        cur_col,
+        d$cleaned$duplicate_mets,
+        c("Equal/Duplicate Metabolite Pairs Detected", "Paired Metabolite")
+      )
+      cur_col <- add_settings_table(
+        cur_col,
+        blank_threshold_columns,
+        blank_threshold_header
+      )
+      cur_col <- add_settings_table(
         cur_col,
         d$filtered$mv_removed_cols,
         "Missing-Value Filtered Metabolites"
       )
-      cur_col <- add_list(
+      cur_col <- add_settings_table(
         cur_col,
         d$filtered$qc_missing_mets,
-        "Metabolites with QC Missing Values"
+        "QC Missing After Missing-Value Filtering"
       )
-      cur_col <- add_list(
+      cur_col <- add_settings_table(
         cur_col,
-        qc_rsd_removed_columns,
-        "QC-RSD Filtered Metabolites"
+        qc_average_columns,
+        qc_average_header
+      )
+      cur_col <- add_settings_table(
+        cur_col,
+        qc_rsd_columns,
+        qc_rsd_header
       )
       if (length(trn_withheld_columns) > 0) {
-        cur_col <- add_list(
+        cur_col <- add_settings_table(
           cur_col,
           trn_withheld_columns,
           "Excluded From Normalization"
@@ -284,7 +430,7 @@ export_xlsx <- function(p, d, file = NULL) {
       openxlsx::writeData(
         wb,
         s2,
-        x = df2,
+        x = round_metabolites_for_export(df2, metabolite_cols_for_export(df2)),
         startRow = 3,
         headerStyle = bold
       )
@@ -310,7 +456,7 @@ export_xlsx <- function(p, d, file = NULL) {
         txt_eq <- paste(
           "Tab", next_sheet_num, ". This tab shows metabolite level values after equal weighting.",
           "All metabolites included in TRN have been rescaled so that each metabolite has",
-          "an average value of 1000 across samples. This equally weights metabolites before",
+          "an average value of 1 across samples. This equally weights metabolites before",
           "total ratio normalization so that high-abundance metabolites do not dominate the",
           "normalization step."
         )
@@ -335,7 +481,7 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_eq,
-          x = df_eq,
+          x = round_metabolites_for_export(df_eq, metabolite_cols_for_export(df_eq)),
           startRow = 3,
           headerStyle = bold
         )
@@ -410,7 +556,7 @@ export_xlsx <- function(p, d, file = NULL) {
       openxlsx::writeData(
         wb,
         s_scaled,
-        x = df3,
+        x = round_metabolites_for_export(df3, metabolite_cols_for_export(df3)),
         startRow = 3,
         headerStyle = bold
       )
@@ -452,7 +598,10 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_grouped,
-          x = gdat$group_dfs[[nm]],
+          x = round_metabolites_for_export(
+            gdat$group_dfs[[nm]],
+            metabolite_cols_for_export(gdat$group_dfs[[nm]])
+          ),
           startRow = r,
           headerStyle = bold
         )
@@ -460,7 +609,10 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_grouped,
-          x = gdat$group_stats_dfs[[nm]],
+          x = round_metabolites_for_export(
+            gdat$group_stats_dfs[[nm]],
+            metabolite_cols_for_export(gdat$group_stats_dfs[[nm]])
+          ),
           startRow = r,
           startCol = 2,
           headerStyle = bold
@@ -513,7 +665,10 @@ export_xlsx <- function(p, d, file = NULL) {
           openxlsx::writeData(
             wb,
             s_fc,
-            x = gfc$group_dfs[[nm]],
+            x = round_metabolites_for_export(
+              gfc$group_dfs[[nm]],
+              metabolite_cols_for_export(gfc$group_dfs[[nm]])
+            ),
             startRow = r,
             headerStyle = bold
           )
@@ -521,7 +676,10 @@ export_xlsx <- function(p, d, file = NULL) {
           openxlsx::writeData(
             wb,
             s_fc,
-            x = gfc$group_stats_dfs[[nm]],
+            x = round_metabolites_for_export(
+              gfc$group_stats_dfs[[nm]],
+              metabolite_cols_for_export(gfc$group_stats_dfs[[nm]])
+            ),
             startRow = r,
             startCol = 2,
             headerStyle = bold
@@ -540,7 +698,11 @@ export_xlsx <- function(p, d, file = NULL) {
       names(tf)[names(tf) == "class"] <- "Group"
       tf$batch <- NULL
       tf$order <- NULL
-      openxlsx::writeData(wb, s6, x = tf)
+      openxlsx::writeData(
+        wb,
+        s6,
+        x = round_metabolites_for_export(tf, metabolite_cols_for_export(tf))
+      )
       shiny::incProgress(1 / N, detail = "Saved: MetaboAnalyst Ready")
 
       # Appendix2. MetaboAnalyst Meta tab (if extra metadata exists)
