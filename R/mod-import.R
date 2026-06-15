@@ -129,7 +129,9 @@ mod_import_server <- function(id) {
       req(input$file1)
       read_raw_data(input$file1$datapath)
     })
-    output$contents <- renderTable(data_raw())
+    output$contents <- renderTable({
+      data_raw()
+    })
 
     #---------- 1.2 Raw Data Inspection server
     # requires raw data to display selection choices
@@ -143,15 +145,15 @@ mod_import_server <- function(id) {
     }) |> debounce(200)
 
     output$column_selectors <- renderUI({
-      req(data_raw())
-      ui_nonmet_cols(names(data_raw()), ns = session$ns)
+      df <- req(data_raw())
+      ui_nonmet_cols(names(df), ns = session$ns)
     })
 
     output$column_warning <- renderUI({
-      req(data_raw())
+      df <- req(data_raw())
       sel <- selections_r()
       ui_column_warning(
-        data_raw(),
+        df,
         c(sel$sample, sel$batch, sel$class, sel$order)
       )
     })
@@ -185,27 +187,27 @@ mod_import_server <- function(id) {
       setdiff(vals, c(sel$sample, sel$batch, sel$class, sel$order))
     }) |> debounce(200)
 
-    observe({
-      req(data_raw())
-      max_withhold <- max(ncol(data_raw()) - 4, 0)
-      output$n_withhold_ui <- renderUI({
-        if (isTRUE(input$withhold_cols)) {
-          numericInput(
-            ns("n_withhold"),
-            "Number of columns to withhold",
-            1,
-            1,
-            max_withhold
-          )
-        }
-      })
+    output$n_withhold_ui <- renderUI({
+      df <- req(data_raw())
+      max_withhold <- max(ncol(df) - 4, 0)
+
+      if (isTRUE(input$withhold_cols)) {
+        numericInput(
+          ns("n_withhold"),
+          "Number of columns to withhold",
+          1,
+          1,
+          max_withhold
+        )
+      }
     })
 
     output$withhold_selectors_ui <- renderUI({
-      req(data_raw(), input$n_withhold)
+      df <- req(data_raw())
+      req(input$n_withhold)
       sel <- selections_r()
       cols <- setdiff(
-        names(data_raw()),
+        names(df),
         c(sel$sample, sel$batch, sel$class, sel$order)
       )
       ids <- withheld_ids_r()
@@ -257,15 +259,14 @@ mod_import_server <- function(id) {
         order = sel$order,
         withheld_cols = withheld
       )
-    }) |> bindCache(reactiveVal(NULL)(), selections_r(), withheld_r())
+    }) |> bindCache(input$file1$datapath, selections_r(), withheld_r())
 
     output$basic_info <- renderUI({
       cd <- req(cleaned_r())
       ui_basic_info(cd)
     })
     output$ui_control_class_selector <- renderUI({
-      cd <- cleaned_r()
-      req(cd)
+      cd <- req(cleaned_r())
       ui_control_class_selector(cd$df, ns = session$ns)
     })
 
@@ -327,6 +328,7 @@ mod_import_server <- function(id) {
     # 2) then apply missing-value filter
     filtered_r <- shiny::reactive({
       cd <- req(cleaned_r())
+      mv_cutoff <- req(input$mv_cutoff)
 
       df_for_filtering <- cd$df
       blank_threshold_result <- blank_threshold_result_r()
@@ -356,7 +358,7 @@ mod_import_server <- function(id) {
       mv_filter_result <- filter_by_missing(
         df_for_filtering,
         metab_cols,
-        input$mv_cutoff
+        mv_cutoff
       )
 
       mv_filter_result$blank_threshold_result <- blank_threshold_result
@@ -391,8 +393,7 @@ mod_import_server <- function(id) {
 
     # Existing missing-value filter info.
     output$filter_info <- shiny::renderUI({
-      fd <- filtered_r()
-      req(fd)
+      fd <- req(filtered_r())
 
       ui_filter_info(
         fd,
@@ -427,25 +428,14 @@ mod_import_server <- function(id) {
         p <- list()
 
         d <- list(
-          cleaned = cleaned_r(),
-          filtered = filtered_r()
+          cleaned = req(cleaned_r()),
+          filtered = req(filtered_r())
         )
 
         wb <- export_mv_xlsx(p, d)
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
       }
     )
-
-    filtered_version_r <- reactiveVal(0L)
-
-    observeEvent(filtered_r()$df,
-      {
-        filtered_version_r(filtered_version_r() + 1L)
-      },
-      ignoreInit = TRUE
-    )
-
-    computed_version_r <- reactiveVal(NA_integer_)
 
     #---------- Next: Choose Correction Settings server
     # requires raw correlations

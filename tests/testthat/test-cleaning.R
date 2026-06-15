@@ -23,7 +23,17 @@ test_that("clean_data basic cleaning and outputs", {
   
   # structure
   expect_type(out, "list")
-  expect_named(out, c("df", "meta_df" ,"replacement_counts", "withheld_cols", "non_numeric_cols", "all_missing_zero_qc_cols", "duplicate_mets", "blank_df", "below_blank_threshold", "below_blank_threshold_ex_ISTD"))
+  expect_named(out, c(
+    "df",
+    "meta_df",
+    "replacement_counts",
+    "withheld_cols",
+    "non_numeric_cols",
+    "all_missing_zero_qc_cols",
+    "duplicate_mets",
+    "duplicate_col_names",
+    "blank_df"
+  ))
   expect_equal(out$withheld_cols, "note")
   expect_equal(out$all_missing_zero_qc_cols, "met3")
   
@@ -175,7 +185,7 @@ test_that("clean_data duplicate_mets is empty when no equal pairs exist", {
   expect_setequal(names(out$duplicate_mets), c("col1", "col2"))
 })
 
-test_that("clean_data detects blanks, returns blank_df, removes blanks, and computes below_blank_threshold (QC-only)", {
+test_that("clean_data separates blanks for downstream blank-threshold detection", {
   df <- data.frame(
     SampleID  = paste0("s", 1:8),
     BatchID   = 1,
@@ -201,13 +211,19 @@ test_that("clean_data detects blanks, returns blank_df, removes blanks, and comp
   expect_equal(nrow(out$blank_df), 2L)
   expect_true(all(tolower(trimws(out$blank_df$class)) == "blank"))
   expect_false(any(tolower(trimws(out$df$class)) == "blank"))
-  
-  expect_type(out$below_blank_threshold, "character")
-  expect_true("met_low" %in% out$below_blank_threshold)
-  expect_false("met_high" %in% out$below_blank_threshold)
+
+  threshold <- detect_blank_threshold(
+    df = out$df,
+    blank_df = out$blank_df,
+    metab_cols = c("met_high", "met_low")
+  )
+
+  expect_type(threshold$below_blank_threshold, "character")
+  expect_true("met_low" %in% threshold$below_blank_threshold)
+  expect_false("met_high" %in% threshold$below_blank_threshold)
 })
 
-test_that("clean_data returns empty blank_df and empty below_blank_threshold when no blanks exist", {
+test_that("clean_data returns empty blank_df when no blanks exist", {
   df <- data.frame(
     SampleID  = paste0("s", 1:5),
     BatchID   = 1,
@@ -229,11 +245,9 @@ test_that("clean_data returns empty blank_df and empty below_blank_threshold whe
   
   expect_true(is.data.frame(out$blank_df))
   expect_equal(nrow(out$blank_df), 0L)
-  expect_type(out$below_blank_threshold, "character")
-  expect_equal(length(out$below_blank_threshold), 0L)
 })
 
-test_that("below_blank_threshold does not flag metabolites when blank mean is 0 or non-finite (QC-only)", {
+test_that("detect_blank_threshold does not flag metabolites when blank mean is 0 or non-finite", {
   df <- data.frame(
     SampleID  = paste0("s", 1:7),
     BatchID   = 1,
@@ -254,9 +268,28 @@ test_that("below_blank_threshold does not flag metabolites when blank mean is 0 
     order  = "Injection",
     withheld_cols = character()
   )
-  
-  expect_false("met_zero_blank" %in% out$below_blank_threshold)
-  expect_true("met_flag" %in% out$below_blank_threshold)
+
+  threshold <- detect_blank_threshold(
+    df = out$df,
+    blank_df = out$blank_df,
+    metab_cols = c("met_zero_blank", "met_flag")
+  )
+
+  expect_false("met_zero_blank" %in% threshold$below_blank_threshold)
+  expect_true("met_flag" %in% threshold$below_blank_threshold)
+})
+
+test_that("repair_duplicate_column_names avoids generated-name collisions", {
+  df <- data.frame(
+    a = 1,
+    a_1 = 2,
+    a = 3,
+    check.names = FALSE
+  )
+
+  out <- repair_duplicate_column_names(df)
+
+  expect_identical(names(out), c("a", "a_1", "a_2"))
 })
 
 
