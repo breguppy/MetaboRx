@@ -119,6 +119,110 @@ test_that("filter_by_missing errors if class column is absent", {
   )
 })
 
+test_that("filter_by_missing handles empty metabolite sets", {
+  df <- data.frame(
+    sample = paste0("s", 1:3),
+    batch = 1L,
+    class = c("QC", "sample", "QC"),
+    order = 1:3,
+    stringsAsFactors = FALSE
+  )
+
+  out <- filter_by_missing(df, metab_cols = character(0), mv_cutoff = 50)
+
+  expect_named(
+    out,
+    c("df", "mv_cutoff", "mv_removed_cols", "qc_missing_mets", "class_metab_all_missing")
+  )
+  expect_equal(out$df, df)
+  expect_identical(out$mv_removed_cols, character(0))
+  expect_identical(out$qc_missing_mets, character(0))
+  expect_equal(nrow(out$class_metab_all_missing), 0L)
+})
+
+test_that("filter_by_missing keeps matrix shape with one metabolite and one class", {
+  df <- data.frame(
+    sample = paste0("s", 1:3),
+    batch = 1L,
+    class = c("QC", "QC", "QC"),
+    order = 1:3,
+    A = c(1, NA, 3),
+    stringsAsFactors = FALSE
+  )
+
+  out <- filter_by_missing(df, metab_cols = "A", mv_cutoff = 50)
+
+  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "A"))
+  expect_identical(out$mv_removed_cols, character(0))
+  expect_identical(out$qc_missing_mets, "A")
+})
+
+test_that("filter_by_missing retains metabolites while cutoff is NULL", {
+  df <- data.frame(
+    sample = paste0("s", 1:3),
+    batch = 1L,
+    class = c("QC", "sample", "QC"),
+    order = 1:3,
+    A = c(1, NA, 3),
+    stringsAsFactors = FALSE
+  )
+
+  out <- filter_by_missing(df, metab_cols = "A", mv_cutoff = NULL)
+
+  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "A"))
+  expect_null(out$mv_cutoff)
+  expect_identical(out$mv_removed_cols, character(0))
+})
+
+test_that("detect_blank_threshold returns expected vectorized threshold table", {
+  df <- data.frame(
+    sample = paste0("s", 1:4),
+    batch = 1L,
+    class = c("QC", "sample", "sample", "QC"),
+    order = 1:4,
+    met_high = c(10, 2, 2, 10),
+    met_low = c(2, 10, 10, 2),
+    ISTD_low = c(2, 10, 10, 2),
+    stringsAsFactors = FALSE
+  )
+  blank_df <- data.frame(
+    sample = paste0("b", 1:2),
+    batch = 1L,
+    class = "blank",
+    order = 5:6,
+    met_high = c(1, 1),
+    met_low = c(1, 1),
+    ISTD_low = c(1, 1),
+    stringsAsFactors = FALSE
+  )
+
+  out <- detect_blank_threshold(
+    df = df,
+    blank_df = blank_df,
+    metab_cols = c("met_high", "met_low", "ISTD_low"),
+    threshold = 3
+  )
+
+  expect_named(out, c(
+    "blank_means",
+    "qc_means",
+    "below_blank_threshold",
+    "below_blank_threshold_ex_ISTD",
+    "threshold_table"
+  ))
+  expect_setequal(out$below_blank_threshold, c("met_low", "ISTD_low"))
+  expect_identical(out$below_blank_threshold_ex_ISTD, "met_low")
+  expect_named(out$threshold_table, c(
+    "metabolite",
+    "blank_mean",
+    "qc_mean",
+    "threshold_value",
+    "eligible",
+    "below_blank_threshold",
+    "internal_standard"
+  ))
+})
+
 test_that("remove_imputed_from_corrected masks positions where raw is NA", {
   raw <- data.frame(x = c(1, NA, 3), y = c(NA, 2, 3))
   cor <- data.frame(x = c(10, 20, 30), y = c(40, 50, 60))
