@@ -57,10 +57,10 @@ test_that("clean_data basic cleaning and outputs", {
   rc <- out$replacement_counts
   # met1: one non-numeric ("a"), one zero ("0")
   expect_equal(rc$non_numeric_replaced[rc$metabolite == "met1"], 1)
-  expect_equal(rc$zero_replaced[rc$metabolite == "met1"], 1)
+  expect_equal(unname(rc$zero_replaced[rc$metabolite == "met1"]), 1)
   # met2: one non-numeric ("foo"), one zero
   expect_equal(rc$non_numeric_replaced[rc$metabolite == "met2"], 1)
-  expect_equal(rc$zero_replaced[rc$metabolite == "met2"], 1)
+  expect_equal(unname(rc$zero_replaced[rc$metabolite == "met2"]), 1)
 })
 
 test_that("clean_data errors when first sample after sort is not QC", {
@@ -122,6 +122,104 @@ test_that("withheld cols are not present in df but are tracked", {
                     withheld_cols = "keep_me")
   expect_false("keep_me" %in% names(out$df))
   expect_equal(out$withheld_cols, "keep_me")
+})
+
+test_that("clean_data creates a default batch column when no batch column is supplied", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:4),
+    Type = c("QC", "sample", "sample", "QC"),
+    Injection = 1:4,
+    met1 = c(1, 2, 3, 4),
+    stringsAsFactors = FALSE
+  )
+
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "MissingBatch",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+
+  expect_true("batch" %in% names(out$df))
+  expect_true(all(out$df$batch == "batch1"))
+  expect_true("batch" %in% names(out$meta_df))
+  expect_true(all(out$meta_df$batch == "batch1"))
+})
+
+test_that("clean_data removes HP rows before QC boundary checks", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:6),
+    BatchID = 1,
+    Type = c("HP", "QC", "sample", "sample", "QC", "HP"),
+    Injection = 1:6,
+    met1 = c(99, 1, 2, 3, 4, 99),
+    stringsAsFactors = FALSE
+  )
+
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "BatchID",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+
+  expect_false(any(out$df$class == "HP"))
+  expect_identical(out$df$sample, c("s2", "s3", "s4", "s5"))
+  expect_identical(out$df$class[1], "QC")
+  expect_identical(out$df$class[nrow(out$df)], "QC")
+})
+
+test_that("clean_data reports and repairs duplicate column names", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:4),
+    BatchID = 1,
+    Type = c("QC", "sample", "sample", "QC"),
+    Injection = 1:4,
+    met = c(1, 2, 3, 4),
+    met = c(1, 2, 3, 4),
+    check.names = FALSE
+  )
+
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "BatchID",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+
+  expect_identical(out$duplicate_col_names, "met")
+  expect_true(all(c("met", "met_1") %in% names(out$df)))
+})
+
+test_that("clean_data removes entirely non-numeric metabolite columns", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:4),
+    BatchID = 1,
+    Type = c("QC", "sample", "sample", "QC"),
+    Injection = 1:4,
+    met_numeric = c(1, 2, 3, 4),
+    met_text = c("low", "medium", "high", "low"),
+    stringsAsFactors = FALSE
+  )
+
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "BatchID",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+
+  expect_false("met_text" %in% names(out$df))
+  expect_identical(out$non_numeric_cols, "met_text")
+  expect_identical(out$replacement_counts$metabolite, "met_numeric")
 })
 
 test_that("clean_data computes duplicate_mets correctly (nearly equal columns ignoring NAs)", {
