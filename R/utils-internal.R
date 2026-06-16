@@ -11,6 +11,41 @@
   }
 }
 
+#' Metadata columns used throughout the correction workflow
+#'
+#' @keywords internal
+#' @noRd
+.correction_metadata_cols <- function() {
+  c("sample", "batch", "class", "order")
+}
+
+#' Metabolite columns for correction workflow data frames
+#'
+#' @keywords internal
+#' @noRd
+.correction_metab_cols <- function(df, metadata_cols = .correction_metadata_cols()) {
+  setdiff(names(df), metadata_cols)
+}
+
+#' Final metabolite cleanup used by correction methods
+#'
+#' @keywords internal
+#' @noRd
+.cleanup_corrected_metabolites <- function(df, metab_cols) {
+  if (length(metab_cols) == 0L) {
+    return(df)
+  }
+
+  df[metab_cols] <- lapply(df[metab_cols], function(x) {
+    x[!is.finite(x) | x < 0] <- NA_real_
+    mp <- suppressWarnings(min(x[x > 0], na.rm = TRUE))
+    x[is.na(x)] <- if (is.finite(mp)) mp else 0
+    x
+  })
+
+  df
+}
+
 # Silence R CMD check notes for NSE/dplyr/ggplot2 variables
 utils::globalVariables(c(
   ".", ".data", "Batch", "BatchLabel", "CDF", "Group", "Mean", "Metabolite",
