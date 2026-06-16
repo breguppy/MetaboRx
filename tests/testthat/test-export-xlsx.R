@@ -136,3 +136,51 @@ test_that("export_xlsx writes expanded correction settings audit tables", {
   expect_true("average_flagged" %in% settings_values)
   expect_true("met_b" %in% settings_values)
 })
+
+test_that("samples normalized export data matches display filtering contract", {
+  transformed <- list(
+    df_no_mv = data.frame(
+      sample = c("QC1", "S1", "S2"),
+      batch = "B1",
+      class = c("QC", "Sample", "Sample"),
+      order = 1:3,
+      met_a = c(1.23456, 2.34567, 3.45678),
+      ISTD_a = c(10.11111, 20.22222, 30.33333),
+      note = c("qc", "sample 1", "sample 2"),
+      stringsAsFactors = FALSE
+    ),
+    df_mv = data.frame(
+      sample = c("QC1", "S1", "S2"),
+      batch = "B1",
+      class = c("QC", "Sample", "Sample"),
+      order = 1:3,
+      met_a = c(9.87654, NA, 7.65432),
+      ISTD_a = c(10.11111, 20.22222, 30.33333),
+      note = c("qc", "sample 1", "sample 2"),
+      stringsAsFactors = FALSE
+    ),
+    withheld_cols_no_mv = c("ISTD_a", "note"),
+    withheld_cols_mv = "ISTD_a"
+  )
+
+  displayed <- .samples_normalized_export_df(
+    transformed = transformed,
+    remove_imputed = FALSE,
+    keep_corrected_qcs = FALSE,
+    round_metabolites = TRUE
+  )
+  downloaded <- .samples_normalized_export_df(
+    transformed = transformed,
+    remove_imputed = TRUE,
+    keep_corrected_qcs = TRUE,
+    round_metabolites = TRUE
+  )
+
+  expect_equal(displayed$sample, c("S1", "S2"))
+  expect_setequal(names(displayed), c("sample", "batch", "class", "order", "met_a"))
+  expect_equal(displayed$met_a, c(2.346, 3.457))
+
+  expect_equal(downloaded$sample, c("QC1", "S1", "S2"))
+  expect_setequal(names(downloaded), c("sample", "batch", "class", "order", "met_a", "note"))
+  expect_equal(downloaded$met_a, c(9.877, NA, 7.654))
+})
