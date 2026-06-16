@@ -52,6 +52,63 @@
     dplyr::pull(Metabolite)
 }
 
+.export_metadata_cols <- function() {
+  c("sample", "batch", "class", "order", "Sample Name", "Group", " ")
+}
+
+.metabolite_cols_for_export <- function(df) {
+  setdiff(names(df), .export_metadata_cols())
+}
+
+.round_metabolites_for_export <- function(df, metab_cols, digits = 3) {
+  if (!is.data.frame(df) || length(metab_cols) == 0L) {
+    return(df)
+  }
+
+  metab_cols <- intersect(metab_cols, names(df))
+  numeric_metab_cols <- metab_cols[
+    vapply(df[, metab_cols, drop = FALSE], is.numeric, logical(1L))
+  ]
+
+  if (length(numeric_metab_cols) == 0L) {
+    return(df)
+  }
+
+  df |>
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(numeric_metab_cols),
+        ~ round(.x, digits = digits)
+      )
+    )
+}
+
+.samples_normalized_export_df <- function(transformed,
+                                          remove_imputed,
+                                          keep_corrected_qcs = FALSE,
+                                          round_metabolites = FALSE) {
+  if (isTRUE(remove_imputed)) {
+    df <- transformed$df_mv
+    withheld_cols <- transformed$withheld_cols_mv
+  } else {
+    df <- transformed$df_no_mv
+    withheld_cols <- transformed$withheld_cols_no_mv
+  }
+
+  keep <- setdiff(names(df), withheld_cols)
+  df <- if (!isTRUE(keep_corrected_qcs)) {
+    df[df$class != "QC", keep, drop = FALSE]
+  } else {
+    df[, keep, drop = FALSE]
+  }
+
+  if (isTRUE(round_metabolites)) {
+    df <- .round_metabolites_for_export(df, .metabolite_cols_for_export(df))
+  }
+
+  df
+}
+
 #--------- Report text helper for popovers and HTML report
 
 #' text for data structure and information requirements

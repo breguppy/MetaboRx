@@ -146,26 +146,33 @@ class_metabolite_rsd <- function(df,
     stop("No numeric metabolite columns detected.")
   }
 
-  long_df <- tidyr::pivot_longer(
-    data = df,
-    cols = dplyr::all_of(metab_cols),
-    names_to = "Metabolite",
-    values_to = "Value"
-  )
+  rows_by_class <- split(seq_len(nrow(df)), df[[class_col]])
+  rsd_by_class <- vector("list", length(rows_by_class))
+  names(rsd_by_class) <- names(rows_by_class)
 
-  long_df |>
-    dplyr::group_by(.data[[class_col]], Metabolite) |>
-    dplyr::summarise(
-      Mean = mean(Value, na.rm = TRUE),
-      SD = stats::sd(Value, na.rm = TRUE),
-      RSD = dplyr::if_else(
-        is.na(Mean) | Mean == 0,
-        NA_real_,
-        100 * SD / Mean
-      ),
-      .groups = "drop"
-    ) |>
-    dplyr::rename(class = dplyr::all_of(class_col))
+  for (i in seq_along(rows_by_class)) {
+    idx <- rows_by_class[[i]]
+    metab_df <- df[idx, metab_cols, drop = FALSE]
+
+    means <- vapply(metab_df, mean, numeric(1L), na.rm = TRUE)
+    sds <- vapply(metab_df, stats::sd, numeric(1L), na.rm = TRUE)
+    rsd <- dplyr::if_else(
+      is.na(means) | means == 0,
+      NA_real_,
+      100 * sds / means
+    )
+
+    rsd_by_class[[i]] <- data.frame(
+      class = df[[class_col]][idx[[1L]]],
+      Metabolite = metab_cols,
+      Mean = unname(means),
+      SD = unname(sds),
+      RSD = unname(rsd),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  dplyr::bind_rows(rsd_by_class)
 }
 
 # ------------------------------------------------------------------------------

@@ -185,6 +185,60 @@ mod_correct_ui <- function(id) {
   )
 }
 
+.mod_correct_pick_df <- function(x, remove_imputed) {
+  if (isTRUE(remove_imputed)) {
+    x$df_mv
+  } else {
+    x$df_no_mv
+  }
+}
+
+.mod_correct_safe_dim <- function(df) {
+  if (is.null(df)) {
+    return("NAxNA")
+  }
+  paste0(nrow(df), "x", ncol(df))
+}
+
+.mod_correct_collect_withheld <- function(input, df, prefix = "trn_withhold_col_") {
+  withheld <- character(0)
+  n_withhold <- input$trn_withhold_n %||% 0L
+
+  if (!isTRUE(input$trn_withhold_checkbox) || n_withhold <= 0L) {
+    return(withheld)
+  }
+
+  for (i in seq_len(n_withhold)) {
+    col <- input[[paste0(prefix, i)]] %||% ""
+    if (nzchar(col) && col %in% names(df)) {
+      withheld <- c(withheld, col)
+    }
+  }
+
+  withheld
+}
+
+.mod_correct_corr_key <- function(raw_df,
+                                  corrected_df,
+                                  transformed_df,
+                                  remove_imputed,
+                                  transform_method,
+                                  include_transformed) {
+  trn_dim <- if (isTRUE(include_transformed)) {
+    .mod_correct_safe_dim(transformed_df)
+  } else {
+    "SKIP"
+  }
+
+  paste0(
+    "remove_imputed=", remove_imputed,
+    "|transform=", transform_method,
+    "|raw_dim=", .mod_correct_safe_dim(raw_df),
+    "|cor_dim=", .mod_correct_safe_dim(corrected_df),
+    "|trn_dim=", trn_dim
+  )
+}
+
 mod_correct_server <- function(id, data, params) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -208,13 +262,13 @@ mod_correct_server <- function(id, data, params) {
 
     output$qcImpute <- renderUI({
       df <- filtered_r()$df
-      mc <- setdiff(names(df), c("sample", "batch", "class", "order"))
+      mc <- .correction_metab_cols(df)
       ui_qc_impute(df, mc, ns = session$ns)
     })
 
     output$sampleImpute <- renderUI({
       df <- filtered_r()$df
-      mc <- setdiff(names(df), c("sample", "batch", "class", "order"))
+      mc <- .correction_metab_cols(df)
       ui_sample_impute(df, mc, ns = session$ns)
     })
 
@@ -232,7 +286,7 @@ mod_correct_server <- function(id, data, params) {
     })
 
     metab_cols_r <- reactive({
-      setdiff(names(filtered_r()$df), c("sample", "batch", "class", "order"))
+      .correction_metab_cols(filtered_r()$df)
     })
 
     has_qc_na_r <- reactive({
@@ -349,6 +403,11 @@ mod_correct_server <- function(id, data, params) {
       filtered_cor_results$removed_mets_pct_diff <- removed_metabolites
 
       filtered_cor_results
+    })
+
+    filtered_corrected_df_r <- reactive({
+      req(filtered_corrected_r())
+      .mod_correct_pick_df(filtered_corrected_r(), input$remove_imputed)
     })
 
     output$post_cor_filter_info <- renderUI({
@@ -490,8 +549,8 @@ mod_correct_server <- function(id, data, params) {
     output$transform_selection_ui <- renderUI({
       req(filtered_corrected_r())
 
-      df <- if (isTRUE(input$remove_imputed)) filtered_corrected_r()$df_mv else filtered_corrected_r()$df_no_mv
-      mc <- setdiff(names(df), c("sample", "batch", "class", "order"))
+      df <- filtered_corrected_df_r()
+      mc <- .correction_metab_cols(df)
 
       ui_post_cor_transform(df, mc, ns = session$ns)
     })
@@ -503,22 +562,11 @@ mod_correct_server <- function(id, data, params) {
       ex_istd <- isTRUE(input$ex_ISTD)
       withhold_on <- isTRUE(input$trn_withhold_checkbox)
 
-      df_filtered <- if (isTRUE(input$remove_imputed)) {
-        filtered_corrected_r()$df_mv
+      df_filtered <- filtered_corrected_df_r()
+      withheld <- if (withhold_on) {
+        .mod_correct_collect_withheld(input, df_filtered)
       } else {
-        filtered_corrected_r()$df_no_mv
-      }
-
-      withheld <- character(0)
-      n_withhold <- input$trn_withhold_n %||% 0L
-
-      if (withhold_on && n_withhold > 0L) {
-        for (i in seq_len(n_withhold)) {
-          col <- input[[paste0("trn_withhold_col_", i)]] %||% ""
-          if (nzchar(col) && col %in% names(df_filtered)) {
-            withheld <- c(withheld, col)
-          }
-        }
+        character(0)
       }
 
       transform_data(filtered_corrected_r(), transform_method, withheld, ex_istd)
@@ -552,7 +600,7 @@ mod_correct_server <- function(id, data, params) {
 
       ex_istd <- isTRUE(input$ex_ISTD)
 
-      cols <- setdiff(names(corrected_r()$df), c("sample", "batch", "class", "order"))
+      cols <- .correction_metab_cols(corrected_r()$df)
       if (ex_istd) {
         cols <- setdiff(cols, c(grep("ISTD", cols, value = TRUE), grep("ITSD", cols, value = TRUE)))
       }
@@ -572,12 +620,12 @@ mod_correct_server <- function(id, data, params) {
 
     output$cor_data <- renderTable({
       req(transformed_r())
-      if (isTRUE(input$remove_imputed)) {
-        df <- transformed_r()$df_mv
-      } else {
-        df <- transformed_r()$df_no_mv
-      }
-      df
+      .samples_normalized_export_df(
+        transformed = transformed_r(),
+        remove_imputed = input$remove_imputed,
+        keep_corrected_qcs = input$keep_corrected_qcs,
+        round_metabolites = TRUE
+      )
     })
 
     output$post_transform_rsd_compare <- renderUI({
@@ -723,25 +771,14 @@ mod_correct_server <- function(id, data, params) {
       ui_correlation_slider(ns = session$ns)
     })
 
-    .pick_df_version <- function(x, remove_imputed) {
-      if (isTRUE(remove_imputed)) x$df_mv else x$df_no_mv
-    }
-
     .compute_corr <- function(df) {
-      metab <- setdiff(names(df), c("sample", "batch", "class", "order"))
+      metab <- .correction_metab_cols(df)
       compute_pairwise_metabolite_correlations(df, metab)
     }
 
     all_corr_r <- reactiveVal(NULL)
 
     computed_key_r <- reactiveVal(NA_character_)
-
-    .safe_dim <- function(df) {
-      if (is.null(df)) {
-        return("NAxNA")
-      }
-      paste0(nrow(df), "x", ncol(df))
-    }
 
     corr_key_r <- reactive({
       req(filtered_r(), filtered_corrected_r())
@@ -751,22 +788,22 @@ mod_correct_server <- function(id, data, params) {
       include_trn <- !identical(tr_method, "none")
 
       raw_df <- filtered_r()$df
-      cor_df <- .pick_df_version(filtered_corrected_r(), remove_imputed)
+      cor_df <- .mod_correct_pick_df(filtered_corrected_r(), remove_imputed)
 
       # Only touch transformed_r() when it should exist for the key
-      trn_dim <- if (include_trn) {
-        trn_df <- .pick_df_version(req(transformed_r()), remove_imputed)
-        .safe_dim(trn_df)
+      trn_df <- if (include_trn) {
+        .mod_correct_pick_df(req(transformed_r()), remove_imputed)
       } else {
-        "SKIP"
+        NULL
       }
 
-      paste0(
-        "remove_imputed=", remove_imputed,
-        "|transform=", tr_method,
-        "|raw_dim=", .safe_dim(raw_df),
-        "|cor_dim=", .safe_dim(cor_df),
-        "|trn_dim=", trn_dim
+      .mod_correct_corr_key(
+        raw_df = raw_df,
+        corrected_df = cor_df,
+        transformed_df = trn_df,
+        remove_imputed = remove_imputed,
+        transform_method = tr_method,
+        include_transformed = include_trn
       )
     })
 
@@ -821,11 +858,15 @@ mod_correct_server <- function(id, data, params) {
       transform_meth <- input$transform %||% "none"
 
       raw_df <- filtered_r()$df
-      cor_df <- .pick_df_version(filtered_corrected_r(), remove_imputed)
+      cor_df <- .mod_correct_pick_df(filtered_corrected_r(), remove_imputed)
 
       # Only compute transformed correlations if transform != "none"
       do_transformed <- !identical(transform_meth, "none")
-      transformed_df <- if (do_transformed) .pick_df_version(transformed_r(), remove_imputed) else NULL
+      transformed_df <- if (do_transformed) {
+        .mod_correct_pick_df(transformed_r(), remove_imputed)
+      } else {
+        NULL
+      }
 
       list(
         raw = .compute_corr(raw_df),

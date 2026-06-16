@@ -3,9 +3,12 @@
 .safe_baseline_predict <- function(qcid, qc_y, newx) {
   ok <- is.finite(qc_y)
   # flat baseline
-  if (sum(ok) < 2L) return(rep(1, length(newx)))
+  if (sum(ok) < 2L) {
+    return(rep(1, length(newx)))
+  }
   # Otherwise linear interpolation
-  qx <- qcid[ok]; qy <- qc_y[ok]
+  qx <- qcid[ok]
+  qy <- qc_y[ok]
   stats::approx(qx, qy, xout = newx, rule = 2)$y
 }
 
@@ -16,7 +19,7 @@
   if (sum(ok) < 2L || length(unique(qc_y[ok])) < 2L) {
     return(.safe_baseline_predict(qc_order, qc_y, new_order))
   }
-  
+
   rf_call <- function() {
     fit <- randomForest::randomForest(
       x = data.frame(order = qc_order[ok]),
@@ -25,46 +28,51 @@
     )
     stats::predict(fit, newdata = data.frame(order = new_order))
   }
-  
-  pred <- tryCatch({
-    if (quiet) {
-      withCallingHandlers(
-        rf_call(),
-        warning = function(w) {
-          msg <- conditionMessage(w)
-          if (grepl("five or fewer unique values", msg, ignore.case = TRUE)) {
-            invokeRestart("muffleWarning")
+
+  pred <- tryCatch(
+    {
+      if (quiet) {
+        withCallingHandlers(
+          rf_call(),
+          warning = function(w) {
+            msg <- conditionMessage(w)
+            if (grepl("five or fewer unique values", msg, ignore.case = TRUE)) {
+              invokeRestart("muffleWarning")
+            }
           }
-        }
-      )
-    } else {
-      rf_call()
-    }
-  }, error = function(e) NA_real_)
-  
+        )
+      } else {
+        rf_call()
+      }
+    },
+    error = function(e) NA_real_
+  )
+
   if (!is.numeric(pred) || all(!is.finite(pred))) {
     .safe_baseline_predict(qc_order, qc_y, new_order)
-  } else pred
+  } else {
+    pred
+  }
 }
 
-#' Random forest correction 
+#' Random forest correction
 #'
 #' @keywords internal
 #' @noRd
 rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 5) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   # sort and require QC at start and end
   df <- df[order(df$order), , drop = FALSE]
   if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC"))) {
     stop("First and last samples must be QCs.")
   }
-  
-  out  <- df
+
+  out <- df
   qcid <- which(df$class == "QC")
   if (length(qcid) < 2L) warning("Very few QC rows; falling back to baseline where needed.")
   newx <- df$order
-  
+
   for (metab in metab_cols) {
     zero_mask <- is.finite(df[[metab]]) & df[[metab]] == 0
     qc_y <- df[[metab]][qcid]
@@ -82,15 +90,9 @@ rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 5) 
     out[[metab]] <- corr
     out[[metab]][zero_mask] <- 0
   }
-  
+
   # final cleanup: smallest positive per metabolite, else 0
-  out[metab_cols] <- lapply(out[metab_cols], function(x) {
-    x[!is.finite(x) | x < 0] <- NA_real_
-    mp <- suppressWarnings(min(x[x > 0], na.rm = TRUE))
-    x[is.na(x)] <- if (is.finite(mp)) mp else 0
-    x
-  })
-  out
+  .cleanup_corrected_metabolites(out, metab_cols)
 }
 
 #' Batch-wise random forest correction
@@ -101,21 +103,23 @@ bw_rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 
   if (!is.null(seed)) set.seed(seed)
   out <- df
   batches <- unique(df$batch)
-  
+  rows_by_batch <- lapply(batches, function(b) {
+    idx_all <- which(df$batch == b)
+    idx_all[order(df$order[idx_all])]
+  })
+
   for (metab in metab_cols) {
     zero_mask <- is.finite(df[[metab]]) & df[[metab]] == 0
-    for (b in batches) {
-      idx_all <- which(df$batch == b)
-      # operate on rows in this batch, sorted by order
-      ord     <- order(df$order[idx_all])
-      b_idx   <- idx_all[ord]
-      sub     <- df[b_idx, , drop = FALSE]
-      
+    for (i in seq_along(batches)) {
+      b <- batches[[i]]
+      b_idx <- rows_by_batch[[i]]
+      sub <- df[b_idx, , drop = FALSE]
+
       # require QC at start and end within batch
       if (!(identical(sub$class[1], "QC") && identical(sub$class[nrow(sub)], "QC"))) {
         stop(sprintf("Batch '%s' must start and end with QC.", b))
       }
-      
+
       qcid <- which(sub$class == "QC")
       qcy <- sub[[metab]][qcid]
       if (all(qcy <= 0, na.rm = TRUE)) {
@@ -125,9 +129,10 @@ bw_rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 
       if (length(qcid) < min_qc) {
         warning(sprintf("Skipping %s in batch %s - too few QC samples; using baseline interpolation.", metab, b))
       }
-      
+
       pred <- .safe_rf_predict(sub$order[qcid], sub[[metab]][qcid],
-                               new_order = sub$order, ntree = ntree)
+        new_order = sub$order, ntree = ntree
+      )
       pred[!is.finite(pred) | pred <= 0] <- NA_real_
       corr <- as.numeric(sub[[metab]]) / pred
       corr[!is.finite(corr) | corr < 0] <- NA_real_
@@ -135,12 +140,6 @@ bw_rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 
       out[[metab]][zero_mask] <- 0
     }
   }
-  
-  out[metab_cols] <- lapply(out[metab_cols], function(x) {
-    x[!is.finite(x) | x < 0] <- NA_real_
-    mp <- suppressWarnings(min(x[x > 0], na.rm = TRUE))
-    x[is.na(x)] <- if (is.finite(mp)) mp else 0
-    x
-  })
-  out
+
+  .cleanup_corrected_metabolites(out, metab_cols)
 }

@@ -22,35 +22,6 @@ export_xlsx <- function(p, d, file = NULL) {
     nm
   }
 
-  metadata_cols <- c("sample", "batch", "class", "order", "Sample Name", "Group", " ")
-
-  metabolite_cols_for_export <- function(df) {
-    setdiff(names(df), metadata_cols)
-  }
-
-  round_metabolites_for_export <- function(df, metab_cols, digits = 3) {
-    if (!is.data.frame(df) || length(metab_cols) == 0L) {
-      return(df)
-    }
-
-    metab_cols <- intersect(metab_cols, names(df))
-    numeric_metab_cols <- metab_cols[
-      vapply(df[, metab_cols, drop = FALSE], is.numeric, logical(1L))
-    ]
-
-    if (length(numeric_metab_cols) == 0L) {
-      return(df)
-    }
-
-    df |>
-      dplyr::mutate(
-        dplyr::across(
-          dplyr::all_of(numeric_metab_cols),
-          ~ round(.x, digits = digits)
-        )
-      )
-  }
-
   qc_rsd_flagged_metabolites <- function(df, rsd_cutoff) {
     if (!is.data.frame(df) ||
       length(rsd_cutoff) != 1L ||
@@ -430,7 +401,7 @@ export_xlsx <- function(p, d, file = NULL) {
       openxlsx::writeData(
         wb,
         s2,
-        x = round_metabolites_for_export(df2, metabolite_cols_for_export(df2)),
+        x = .round_metabolites_for_export(df2, .metabolite_cols_for_export(df2)),
         startRow = 3,
         headerStyle = bold
       )
@@ -481,7 +452,7 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_eq,
-          x = round_metabolites_for_export(df_eq, metabolite_cols_for_export(df_eq)),
+          x = .round_metabolites_for_export(df_eq, .metabolite_cols_for_export(df_eq)),
           startRow = 3,
           headerStyle = bold
         )
@@ -492,18 +463,11 @@ export_xlsx <- function(p, d, file = NULL) {
 
       # Scaled or Normalized
       s_scaled <- .add_sheet(paste0(next_sheet_num, ". Samples Normalized"))
-      if (isTRUE(p$remove_imputed)) {
-        df3 <- d$transformed$df_mv
-      } else {
-        df3 <- d$transformed$df_no_mv
-      }
-
-      keep <- setdiff(names(df3), trn_withheld_columns)
-      df3 <- if (!isTRUE(p$keep_corrected_qcs)) {
-        df3[df3$class != "QC", keep, drop = FALSE]
-      } else {
-        df3[, keep, drop = FALSE]
-      }
+      df3 <- .samples_normalized_export_df(
+        transformed = d$transformed,
+        remove_imputed = p$remove_imputed,
+        keep_corrected_qcs = p$keep_corrected_qcs
+      )
 
       txt3 <- switch(p$transform,
         "TRN" = paste(
@@ -556,7 +520,7 @@ export_xlsx <- function(p, d, file = NULL) {
       openxlsx::writeData(
         wb,
         s_scaled,
-        x = round_metabolites_for_export(df3, metabolite_cols_for_export(df3)),
+        x = .round_metabolites_for_export(df3, .metabolite_cols_for_export(df3)),
         startRow = 3,
         headerStyle = bold
       )
@@ -598,9 +562,9 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_grouped,
-          x = round_metabolites_for_export(
+          x = .round_metabolites_for_export(
             gdat$group_dfs[[nm]],
-            metabolite_cols_for_export(gdat$group_dfs[[nm]])
+            .metabolite_cols_for_export(gdat$group_dfs[[nm]])
           ),
           startRow = r,
           headerStyle = bold
@@ -609,9 +573,9 @@ export_xlsx <- function(p, d, file = NULL) {
         openxlsx::writeData(
           wb,
           s_grouped,
-          x = round_metabolites_for_export(
+          x = .round_metabolites_for_export(
             gdat$group_stats_dfs[[nm]],
-            metabolite_cols_for_export(gdat$group_stats_dfs[[nm]])
+            .metabolite_cols_for_export(gdat$group_stats_dfs[[nm]])
           ),
           startRow = r,
           startCol = 2,
@@ -665,9 +629,9 @@ export_xlsx <- function(p, d, file = NULL) {
           openxlsx::writeData(
             wb,
             s_fc,
-            x = round_metabolites_for_export(
+            x = .round_metabolites_for_export(
               gfc$group_dfs[[nm]],
-              metabolite_cols_for_export(gfc$group_dfs[[nm]])
+              .metabolite_cols_for_export(gfc$group_dfs[[nm]])
             ),
             startRow = r,
             headerStyle = bold
@@ -676,9 +640,9 @@ export_xlsx <- function(p, d, file = NULL) {
           openxlsx::writeData(
             wb,
             s_fc,
-            x = round_metabolites_for_export(
+            x = .round_metabolites_for_export(
               gfc$group_stats_dfs[[nm]],
-              metabolite_cols_for_export(gfc$group_stats_dfs[[nm]])
+              .metabolite_cols_for_export(gfc$group_stats_dfs[[nm]])
             ),
             startRow = r,
             startCol = 2,
@@ -701,7 +665,7 @@ export_xlsx <- function(p, d, file = NULL) {
       openxlsx::writeData(
         wb,
         s6,
-        x = round_metabolites_for_export(tf, metabolite_cols_for_export(tf))
+        x = .round_metabolites_for_export(tf, .metabolite_cols_for_export(tf))
       )
       shiny::incProgress(1 / N, detail = "Saved: MetaboAnalyst Ready")
 
