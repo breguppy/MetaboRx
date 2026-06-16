@@ -149,11 +149,26 @@ mod_visualize_server <- function(id, data, params) {
     output$rsd_comparison_plot <- renderPlot(execOnResize = FALSE, res = 120, {
       req(input$rsd_compare, input$rsd_cal)
 
+      rsd_data <- rsd_plot_data()
       make_rsd_plot(
         list(
           rsd_compare = input$rsd_compare,
           rsd_cal = input$rsd_cal,
           rsd_plot_type = input$rsd_plot_type,
+          remove_imputed = p()$remove_imputed
+        ),
+        d(),
+        rsd_results = rsd_data$rsd_results,
+        compared_to = rsd_data$compared_to
+      )
+    })
+
+    rsd_plot_data <- reactive({
+      req(input$rsd_compare)
+
+      .get_rsd_plot_data(
+        list(
+          rsd_compare = input$rsd_compare,
           remove_imputed = p()$remove_imputed
         ),
         d()

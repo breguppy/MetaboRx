@@ -77,6 +77,42 @@ with_stubbed_rsd_scatter_plot <- function(code) {
   force(code)
 }
 
+with_counted_rsd_results <- function(counter, code) {
+  ns <- asNamespace("QCcorrection")
+  old_build <- get(".build_rsd_results", envir = ns)
+  was_locked <- bindingIsLocked(".build_rsd_results", ns)
+
+  if (was_locked) {
+    unlockBinding(".build_rsd_results", ns)
+  }
+  assign(
+    ".build_rsd_results",
+    function(df_before, df_after) {
+      counter(counter() + 1L)
+      old_build(df_before, df_after)
+    },
+    envir = ns
+  )
+  if (was_locked) {
+    lockBinding(".build_rsd_results", ns)
+  }
+
+  on.exit(
+    {
+      if (bindingIsLocked(".build_rsd_results", ns)) {
+        unlockBinding(".build_rsd_results", ns)
+      }
+      assign(".build_rsd_results", old_build, envir = ns)
+      if (was_locked) {
+        lockBinding(".build_rsd_results", ns)
+      }
+    },
+    add = TRUE
+  )
+
+  force(code)
+}
+
 test_that("make_all_rsd_plots creates distinct correction-only export specs", {
   res <- with_stubbed_rsd_scatter_plot(
     make_all_rsd_plots(
@@ -115,6 +151,59 @@ test_that("make_all_rsd_plots includes transformed RSD export specs when enabled
   testthat::expect_length(res[["rsd_plots"]], 8L)
   testthat::expect_true(any(grepl("filtered_cor_data", res[["plot_names"]], fixed = TRUE)))
   testthat::expect_true(any(grepl("transformed_cor_data", res[["plot_names"]], fixed = TRUE)))
+})
+
+test_that("make_all_rsd_plots reuses RSD results for each comparison target", {
+  counter <- local({
+    count <- 0L
+    function(value) {
+      if (!missing(value)) {
+        count <<- value
+      }
+      count
+    }
+  })
+
+  res <- with_stubbed_rsd_scatter_plot(
+    with_counted_rsd_results(
+      counter,
+      make_all_rsd_plots(
+        make_rsd_export_params(transform = "none"),
+        make_rsd_export_data()
+      )
+    )
+  )
+
+  testthat::expect_length(res[["rsd_plots"]], 4L)
+  testthat::expect_equal(counter(), 1L)
+
+  counter(0L)
+  res <- with_stubbed_rsd_scatter_plot(
+    with_counted_rsd_results(
+      counter,
+      make_all_rsd_plots(
+        make_rsd_export_params(transform = "log"),
+        make_rsd_export_data()
+      )
+    )
+  )
+
+  testthat::expect_length(res[["rsd_plots"]], 8L)
+  testthat::expect_equal(counter(), 2L)
+})
+
+test_that("RSD plots can be built from precomputed RSD results", {
+  d <- make_rsd_export_data()
+  rsd_results <- .build_rsd_results(d$filtered$df, d$filtered_corrected$df_no_mv)
+
+  scatter_plot <- plot_rsd_comparison_from_results(rsd_results, "Correction")
+  dist_plot <- plot_met_rsd_distributions_from_results(rsd_results, "Correction")
+
+  testthat::expect_s3_class(scatter_plot, "ggplot")
+  testthat::expect_s3_class(dist_plot, "ggplot")
+  testthat::expect_equal(scatter_plot[["labels"]][["x"]], "RSD (%) Before")
+  testthat::expect_equal(scatter_plot[["labels"]][["y"]], "RSD (%) After")
+  testthat::expect_equal(dist_plot[["labels"]][["y"]], "Density")
 })
 
 test_that("make_rsd_plot validates RSD plot options", {

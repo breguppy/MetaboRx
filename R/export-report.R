@@ -22,7 +22,13 @@ render_report <- function(
 
     met1_plot <- make_met_scatter(d, p, met_candidates[1])
     met2_plot <- make_met_scatter(d, p, met_candidates[2])
-    rsd_plot <- make_rsd_plot(p, d)
+    rsd_plot_data <- .get_rsd_plot_data(p, d)
+    rsd_plot <- make_rsd_plot(
+      p,
+      d,
+      rsd_results = rsd_plot_data$rsd_results,
+      compared_to = rsd_plot_data$compared_to
+    )
 
     pca_compare_data <- get_pca_compare_data(
       p = p,
