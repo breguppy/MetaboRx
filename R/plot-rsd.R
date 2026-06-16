@@ -5,16 +5,26 @@
 #' @keywords internal
 #' @noRd
 plot_rsd_comparison <- function(df_before, df_after, compared_to) {
-  compare_df <- .build_rsd_results(df_before, df_after)$metabolite$compare
-  
+  plot_rsd_comparison_from_results(
+    rsd_results = .build_rsd_results(df_before, df_after),
+    compared_to = compared_to
+  )
+}
+
+#' @keywords internal
+#' @noRd
+plot_rsd_comparison_from_results <- function(rsd_results, compared_to) {
+  compare_df <- rsd_results$metabolite$compare
+
   d_all <- compare_df |>
-    dplyr::filter(is.finite(before), is.finite(after)) |>
-    dplyr::select(Type, before, after, change)
-  
+    dplyr::filter(is.finite(.data$before), is.finite(.data$after)) |>
+    dplyr::select(dplyr::all_of(c("Type", "before", "after", "change")))
+
   if (!nrow(d_all)) {
-    return(ggplot2::ggplot() + ggplot2::labs(title = "No overlapping metabolites"))
+    return(ggplot2::ggplot() +
+      ggplot2::labs(title = "No overlapping metabolites"))
   }
-  
+
   facet_labs <- facet_label_map(d_all)
   mk_plot(d_all, "before", "after", facet_labs, compared_to)
 }
@@ -22,16 +32,26 @@ plot_rsd_comparison <- function(df_before, df_after, compared_to) {
 #' @keywords internal
 #' @noRd
 plot_rsd_comparison_class_met <- function(df_before, df_after, compared_to) {
-  compare_df <- .build_rsd_results(df_before, df_after)$class_metabolite$compare
-  
+  plot_rsd_comparison_class_met_from_results(
+    rsd_results = .build_rsd_results(df_before, df_after),
+    compared_to = compared_to
+  )
+}
+
+#' @keywords internal
+#' @noRd
+plot_rsd_comparison_class_met_from_results <- function(rsd_results, compared_to) {
+  compare_df <- rsd_results$class_metabolite$compare
+
   d_all <- compare_df |>
-    dplyr::filter(is.finite(before), is.finite(after)) |>
-    dplyr::select(Type, before, after, change)
-  
+    dplyr::filter(is.finite(.data$before), is.finite(.data$after)) |>
+    dplyr::select(dplyr::all_of(c("Type", "before", "after", "change")))
+
   if (!nrow(d_all)) {
-    return(ggplot2::ggplot() + ggplot2::labs(title = "No overlapping metabolites"))
+    return(ggplot2::ggplot() +
+      ggplot2::labs(title = "No overlapping metabolites"))
   }
-  
+
   facet_labs <- facet_label_map(d_all)
   mk_plot(d_all, "before", "after", facet_labs, compared_to)
 }
@@ -62,8 +82,24 @@ plot_met_rsd_distributions <- function(df_before,
                                        before_label = "Before",
                                        after_label = "After",
                                        facet_scales = "free_x") {
+  plot_met_rsd_distributions_from_results(
+    rsd_results = .build_rsd_results(df_before, df_after),
+    compared_to = compared_to,
+    before_label = before_label,
+    after_label = after_label,
+    facet_scales = facet_scales
+  )
+}
+
+#' @keywords internal
+#' @noRd
+plot_met_rsd_distributions_from_results <- function(rsd_results,
+                                                    compared_to,
+                                                    before_label = "Before",
+                                                    after_label = "After",
+                                                    facet_scales = "free_x") {
   valid_scales <- c("fixed", "free", "free_x", "free_y")
-  
+
   if (!facet_scales %in% valid_scales) {
     stop(
       "'facet_scales' must be one of: ",
@@ -71,53 +107,52 @@ plot_met_rsd_distributions <- function(df_before,
       call. = FALSE
     )
   }
-  
-  rsd_results <- .build_rsd_results(df_before, df_after)
+
   rsd_before <- rsd_results$metabolite$before
   rsd_after <- rsd_results$metabolite$after
-  
+
   rsd_before2 <- dplyr::mutate(rsd_before, dataset = before_label)
   rsd_after2 <- dplyr::mutate(rsd_after, dataset = after_label)
-  
+
   rsd_all <- dplyr::bind_rows(rsd_before2, rsd_after2)
-  
+
   rsd_long <- tidyr::pivot_longer(
     rsd_all,
     cols = c("RSD_QC", "RSD_NonQC"),
     names_to = "type",
     values_to = "RSD"
   )
-  
+
   rsd_long$type <- factor(
     rsd_long$type,
     levels = c("RSD_NonQC", "RSD_QC"),
     labels = c("Samples", "QC")
   )
-  
+
   rsd_long$dataset <- factor(
     rsd_long$dataset,
     levels = c(before_label, after_label)
   )
-  
+
   rsd_long <- rsd_long[!is.na(rsd_long$RSD), , drop = FALSE]
-  
+
   col_vals <- stats::setNames(
     c("#1F77B4", "#FF7F0E"),
     c(before_label, after_label)
   )
-  
+
   ggplot2::ggplot(
     rsd_long,
     ggplot2::aes(x = RSD, fill = dataset, color = dataset)
   ) +
-    ggplot2::facet_wrap(~ type, nrow = 1, scales = facet_scales) +
+    ggplot2::facet_wrap(~type, nrow = 1, scales = facet_scales) +
     ggplot2::geom_density(
-      data = subset(rsd_long, dataset == before_label),
+      data = rsd_long[rsd_long$dataset == before_label, , drop = FALSE],
       alpha = 0.3,
       adjust = 1
     ) +
     ggplot2::geom_density(
-      data = subset(rsd_long, dataset == after_label),
+      data = rsd_long[rsd_long$dataset == after_label, , drop = FALSE],
       alpha = 0.3,
       adjust = 1
     ) +
@@ -171,8 +206,24 @@ plot_class_rsd_distributions <- function(df_before,
                                          before_label = "Before",
                                          after_label = "After",
                                          facet_scales = "free_x") {
+  plot_class_rsd_distributions_from_results(
+    rsd_results = .build_rsd_results(df_before, df_after),
+    compared_to = compared_to,
+    before_label = before_label,
+    after_label = after_label,
+    facet_scales = facet_scales
+  )
+}
+
+#' @keywords internal
+#' @noRd
+plot_class_rsd_distributions_from_results <- function(rsd_results,
+                                                      compared_to,
+                                                      before_label = "Before",
+                                                      after_label = "After",
+                                                      facet_scales = "free_x") {
   valid_scales <- c("fixed", "free", "free_x", "free_y")
-  
+
   if (!facet_scales %in% valid_scales) {
     stop(
       "'facet_scales' must be one of: ",
@@ -180,43 +231,42 @@ plot_class_rsd_distributions <- function(df_before,
       call. = FALSE
     )
   }
-  
-  rsd_results <- .build_rsd_results(df_before, df_after)
+
   rsd_before <- rsd_results$class_metabolite$before
   rsd_after <- rsd_results$class_metabolite$after
-  
+
   rsd_before2 <- dplyr::mutate(rsd_before, dataset = before_label)
   rsd_after2 <- dplyr::mutate(rsd_after, dataset = after_label)
-  
+
   rsd_all <- dplyr::bind_rows(rsd_before2, rsd_after2)
-  
+
   rsd_all$dataset <- factor(
     rsd_all$dataset,
     levels = c(before_label, after_label)
   )
-  
+
   rsd_all$type <- ifelse(rsd_all$class == "QC", "QC", "Samples")
   rsd_all$type <- factor(rsd_all$type, levels = c("Samples", "QC"))
-  
+
   rsd_all <- rsd_all[!is.na(rsd_all$RSD), , drop = FALSE]
-  
+
   col_vals <- stats::setNames(
     c("#1F77B4", "#FF7F0E"),
     c(before_label, after_label)
   )
-  
+
   ggplot2::ggplot(
     rsd_all,
     ggplot2::aes(x = RSD, fill = dataset, color = dataset)
   ) +
-    ggplot2::facet_wrap(~ type, nrow = 1, scales = facet_scales) +
+    ggplot2::facet_wrap(~type, nrow = 1, scales = facet_scales) +
     ggplot2::geom_density(
-      data = subset(rsd_all, dataset == before_label),
+      data = rsd_all[rsd_all$dataset == before_label, , drop = FALSE],
       alpha = 0.3,
       adjust = 1
     ) +
     ggplot2::geom_density(
-      data = subset(rsd_all, dataset == after_label),
+      data = rsd_all[rsd_all$dataset == after_label, , drop = FALSE],
       alpha = 0.3,
       adjust = 1
     ) +

@@ -2,7 +2,7 @@
 #' @keywords internal
 #' @noRd
 # Helper for creating metabolite scatter plot
-make_met_scatter <- function(d, p, met_col) {
+make_met_scatter <- function(d, p, met_col, scatter_context = NULL) {
   # choose the correct plotting function based on the correction method.
   cor_method <- d$corrected$str
   df_raw <- d$filtered$df
@@ -14,10 +14,19 @@ make_met_scatter <- function(d, p, met_col) {
 
   tryCatch(
     {
+      scatter_context <- scatter_context %||%
+        .scatter_prepare_context(df_raw, df_cor, met_col)
+
       if (cor_method %in% c("Random Forest", "Batchwise Random Forest")) {
-        met_scatter_rf(df_raw, df_cor, i = met_col)
+        met_scatter_rf(df_raw, df_cor, i = met_col, scatter_context = scatter_context)
       } else if (cor_method %in% c("local polynomial regression", "Batchwise LOESS", "local constant regression", "local linear regression")) {
-        met_scatter_loess(df_raw, df_cor, cor_method, i = met_col)
+        met_scatter_loess(
+          df_raw,
+          df_cor,
+          cor_method,
+          i = met_col,
+          scatter_context = scatter_context
+        )
       } else {
         ggplot2::ggplot() +
           ggplot2::labs(title = "No correction method selected.")
@@ -37,46 +46,30 @@ make_met_scatter <- function(d, p, met_col) {
 #' @keywords internal
 #' @noRd
 # Helper for creating the RSD plot
-make_rsd_plot <- function(p, d) {
+make_rsd_plot <- function(p, d, rsd_results = NULL, compared_to = NULL) {
   p <- .normalize_rsd_plot_params(p)
 
-  df_before <- d$filtered$df
-  # Determine df_after based on rsd_compare selected by user.
-  if (p$rsd_compare == "filtered_cor_data") {
-    compared_to <- "Correction"
-    if (isTRUE(p$remove_imputed)) {
-      df_after <- d$filtered_corrected$df_mv
-    } else {
-      df_after <- d$filtered_corrected$df_no_mv
-    }
-  } else {
-    compared_to <- "Correction and Transformation"
-    if (isTRUE(p$remove_imputed)) {
-      df_after <- d$transformed$df_mv
-    } else {
-      df_after <- d$transformed$df_no_mv
-    }
-  }
+  rsd_data <- .get_rsd_plot_data(p, d, rsd_results, compared_to)
 
   # Need at least 1 metabolite column
   shiny::validate(
-    shiny::need(ncol(df_before) > 4L, "No metabolites left before correction."),
-    shiny::need(ncol(df_after) > 4L, "No metabolites left after correction.")
+    shiny::need(ncol(rsd_data$df_before) > 4L, "No metabolites left before correction."),
+    shiny::need(ncol(rsd_data$df_after) > 4L, "No metabolites left after correction.")
   )
 
   tryCatch(
     {
       if (identical(p$rsd_plot_type, "scatter")) {
         if (identical(p$rsd_cal, "met")) {
-          plot_rsd_comparison(df_before, df_after, compared_to)
+          plot_rsd_comparison_from_results(rsd_data$rsd_results, rsd_data$compared_to)
         } else {
-          plot_rsd_comparison_class_met(df_before, df_after, compared_to)
+          plot_rsd_comparison_class_met_from_results(rsd_data$rsd_results, rsd_data$compared_to)
         }
       } else {
         if (identical(p$rsd_cal, "met")) {
-          plot_met_rsd_distributions(df_before, df_after, compared_to)
+          plot_met_rsd_distributions_from_results(rsd_data$rsd_results, rsd_data$compared_to)
         } else {
-          plot_class_rsd_distributions(df_before, df_after, compared_to)
+          plot_class_rsd_distributions_from_results(rsd_data$rsd_results, rsd_data$compared_to)
         }
       }
     },
@@ -89,6 +82,39 @@ make_rsd_plot <- function(p, d) {
       ggplot2::ggplot() +
         ggplot2::labs(title = "RSD comparison failed \u2013 see notification")
     }
+  )
+}
+
+#' @keywords internal
+#' @noRd
+.get_rsd_plot_data <- function(p, d, rsd_results = NULL, compared_to = NULL) {
+  df_before <- d$filtered$df
+
+  if (identical(p$rsd_compare, "filtered_cor_data")) {
+    compared_to <- compared_to %||% "Correction"
+    df_after <- if (isTRUE(p$remove_imputed)) {
+      d$filtered_corrected$df_mv
+    } else {
+      d$filtered_corrected$df_no_mv
+    }
+  } else {
+    compared_to <- compared_to %||% "Correction and Transformation"
+    df_after <- if (isTRUE(p$remove_imputed)) {
+      d$transformed$df_mv
+    } else {
+      d$transformed$df_no_mv
+    }
+  }
+
+  if (is.null(rsd_results)) {
+    rsd_results <- .build_rsd_results(df_before, df_after)
+  }
+
+  list(
+    df_before = df_before,
+    df_after = df_after,
+    compared_to = compared_to,
+    rsd_results = rsd_results
   )
 }
 
@@ -169,6 +195,7 @@ make_all_rsd_plots <- function(p, d) {
 
   rsd_plots <- vector("list", nrow(specs))
   plot_names <- character(nrow(specs))
+  compare_cache <- list()
 
   for (i in seq_len(nrow(specs))) {
     temp_params <- p
@@ -176,7 +203,17 @@ make_all_rsd_plots <- function(p, d) {
     temp_params$rsd_compare <- specs$rsd_compare[i]
     temp_params$rsd_cal <- specs$rsd_cal[i]
 
-    rsd_plots[[i]] <- make_rsd_plot(temp_params, d)
+    compare_key <- temp_params$rsd_compare
+    if (is.null(compare_cache[[compare_key]])) {
+      compare_cache[[compare_key]] <- .get_rsd_plot_data(temp_params, d)
+    }
+
+    rsd_plots[[i]] <- make_rsd_plot(
+      temp_params,
+      d,
+      rsd_results = compare_cache[[compare_key]]$rsd_results,
+      compared_to = compare_cache[[compare_key]]$compared_to
+    )
     plot_names[i] <- build_name(
       temp_params$rsd_plot_type,
       temp_params$rsd_compare,

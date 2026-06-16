@@ -228,27 +228,8 @@ compute_single_pca <- function(
   if (is.null(meta_df)) {
     meta_source <- df
   } else {
-    if (!sample_col %in% names(df)) {
-      stop(sprintf("`df` must contain '%s'.", sample_col))
-    }
-    if (!sample_col %in% names(meta_df)) {
-      stop(sprintf("`meta_df` must contain '%s'.", sample_col))
-    }
-    if (anyDuplicated(meta_df[[sample_col]]) > 0L) {
-      stop("`meta_df` contains duplicate sample values.")
-    }
-
+    meta_df <- validate_pca_meta_df(df, meta_df, sample_col)
     idx <- match(df[[sample_col]], meta_df[[sample_col]])
-    if (anyNA(idx)) {
-      missing_samples <- df[[sample_col]][is.na(idx)]
-      stop(
-        sprintf(
-          "Some PCA samples are missing from `meta_df`. Examples: %s",
-          paste(utils::head(missing_samples, 10L), collapse = ", ")
-        )
-      )
-    }
-
     meta_source <- meta_df[idx, , drop = FALSE]
   }
 
@@ -948,6 +929,9 @@ get_pca_export_datasets <- function(p, d) {
 #'   Data object containing filtered/corrected/transformed data.
 #' @param meta_cols character
 #'   Metadata columns to retain.
+#' @param pca_pairs list or NULL
+#'   Optional paired PCA results from \code{make_all_pca_plots()} to reuse when
+#'   metabolite columns exactly match an export dataset.
 #'
 #' @return named list
 #'   Named list of PCA results.
@@ -956,11 +940,24 @@ get_pca_export_datasets <- function(p, d) {
 compute_all_pca_export_results <- function(
   p,
   d,
-  meta_cols = c("sample", "batch", "class", "order")
+  meta_cols = c("sample", "batch", "class", "order"),
+  pca_pairs = NULL
 ) {
   datasets <- get_pca_export_datasets(p, d)
 
-  lapply(datasets, function(df) {
+  reusable_results <- .pca_export_results_from_pairs(
+    p = p,
+    datasets = datasets,
+    pca_pairs = pca_pairs,
+    meta_cols = meta_cols
+  )
+
+  lapply(names(datasets), function(nm) {
+    if (!is.null(reusable_results[[nm]])) {
+      return(reusable_results[[nm]])
+    }
+
+    df <- datasets[[nm]]
     metab_cols <- setdiff(names(df), meta_cols)
     compute_single_pca(
       df = df,
@@ -968,7 +965,43 @@ compute_all_pca_export_results <- function(
       metab_cols = metab_cols,
       meta_cols = meta_cols
     )
-  })
+  }) |>
+    stats::setNames(names(datasets))
+}
+
+#' @keywords internal
+#' @noRd
+.pca_export_results_from_pairs <- function(p,
+                                           datasets,
+                                           pca_pairs = NULL,
+                                           meta_cols = c("sample", "batch", "class", "order")) {
+  reusable <- stats::setNames(vector("list", length(datasets)), names(datasets))
+
+  if (is.null(pca_pairs) || !length(pca_pairs)) {
+    return(reusable)
+  }
+
+  candidates <- list()
+
+  if (!is.null(pca_pairs$filtered_cor_data)) {
+    candidates$raw_data <- pca_pairs$filtered_cor_data$before
+    candidates$corrected_data <- pca_pairs$filtered_cor_data$after
+  }
+
+  if (!is.null(pca_pairs$transformed_cor_data)) {
+    candidates$transformed_data <- pca_pairs$transformed_cor_data$after
+  }
+
+  for (nm in intersect(names(datasets), names(candidates))) {
+    metab_cols <- setdiff(names(datasets[[nm]]), meta_cols)
+    candidate <- candidates[[nm]]
+
+    if (identical(candidate$metab_cols, metab_cols)) {
+      reusable[[nm]] <- candidate
+    }
+  }
+
+  reusable
 }
 
 
