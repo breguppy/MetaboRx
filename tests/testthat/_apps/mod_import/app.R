@@ -1,21 +1,21 @@
 options(shiny.testmode = TRUE)
 library(shiny)
 
-if (!requireNamespace("QCcorrection", quietly = TRUE)) {
+if (!requireNamespace("MetaboRx", quietly = TRUE)) {
   if (!requireNamespace("pkgload", quietly = TRUE)) stop("pkgload needed")
   pkgload::load_all(path = "../../..", helpers = FALSE, quiet = TRUE)
 }
-library(QCcorrection)
+library(MetaboRx)
 
 ui <- fluidPage(
   tabsetPanel(id = "main_steps",
-              QCcorrection:::mod_import_ui("import"),
+              MetaboRx:::mod_import_ui("import"),
               tabPanel(title = "2. Correct", value = "tab_correct", "placeholder")  # add this
   )
 )
 
 server <- function(input, output, session) {
-  mod <- QCcorrection:::mod_import_server("import")
+  mod <- MetaboRx:::mod_import_server("import")
   
   output$params_json <- renderText({
     p <- mod$params()

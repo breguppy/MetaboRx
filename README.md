@@ -1,4 +1,4 @@
-# QCcorrection
+# MetaboRx
 Shiny app for interactive quality assessment and preprocessing for metabolomics data
 
 ### Requirements
@@ -19,21 +19,21 @@ install.packages("BiocManager")
 BiocManager::install("impute")
 ```
 
-To install the QCcorrection package:
+To install the MetaboRx package:
 ```r
-# Install QCcorrection (core functionality)
-remotes::install_github("breguppy/QCcorrection", dependencies = TRUE)
+# Install MetaboRx (core functionality)
+remotes::install_github("breguppy/MetaboRx", dependencies = TRUE)
 
 # make sure required packages are installed
-QCcorrection::check_required_dependencies()
+MetaboRx::check_required_dependencies()
 
 # install optional dependencies
-QCcorrection::install_optional_dependencies()
+MetaboRx::install_optional_dependencies()
 ```
 
 ## To run App
 ```r
-QCcorrection::run_app()
+MetaboRx::run_app()
 ```
 ## Data Input and Information Requirements
 
@@ -88,17 +88,17 @@ Internal standard metabolites must have column names containing:
 - `ITSD`
 
 ### Example Raw Data Stucture
-<img align="center" src="https://github.com/breguppy/QCcorrection/blob/main/www/example_data_structure.png">
+<img align="center" src="inst/app/www/example_data_structure.png">
 
 # Bug Reports/New Features
 
-#### If you run into any issues or bugs please submit a [GitHub issue](https://github.com/breguppy/QCcorrection/issues) with details of the issue.
+#### If you run into any issues or bugs please submit a [GitHub issue](https://github.com/breguppy/MetaboRx/issues) with details of the issue.
 
 - If possible please include a [reproducible example](https://reprex.tidyverse.org/). 
 
-#### Any requests for new features or enhancements can also be submitted as [GitHub issues](https://github.com/breguppy/QCcorrection/issues).
+#### Any requests for new features or enhancements can also be submitted as [GitHub issues](https://github.com/breguppy/MetaboRx/issues).
 
-#### [Pull Requests](https://github.com/breguppy/QCcorrection/pulls) are welcome for bug fixes, new features, or enhancements.
+#### [Pull Requests](https://github.com/breguppy/MetaboRx/pulls) are welcome for bug fixes, new features, or enhancements.
 
 ## Citation
 

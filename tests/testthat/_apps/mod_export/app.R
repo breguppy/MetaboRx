@@ -1,15 +1,15 @@
 options(shiny.testmode = TRUE)
 
 library(shiny)
-if (!requireNamespace("QCcorrection", quietly = TRUE)) {
+if (!requireNamespace("MetaboRx", quietly = TRUE)) {
   if (!requireNamespace("pkgload", quietly = TRUE)) stop("pkgload needed")
   pkgload::load_all(path = "../../..", helpers = FALSE, quiet = TRUE)
 }
-library(QCcorrection)
+library(MetaboRx)
 
 # --- STUB EXPORTERS to avoid heavy logic ---
 stub_exporters <- function() {
-  ns <- asNamespace("QCcorrection")
+  ns <- asNamespace("MetaboRx")
   
   stab <- function(sym, fn) {
     # Only override if the binding already exists in the namespace
@@ -94,12 +94,12 @@ params_stub <- reactiveVal(list(
 ui <- fluidPage(
   tabsetPanel(
     id = "main_steps",
-    QCcorrection:::mod_export_ui("export")
+    MetaboRx:::mod_export_ui("export")
   )
 )
 
 server <- function(input, output, session) {
-  QCcorrection:::mod_export_server(
+  MetaboRx:::mod_export_server(
     "export",
     data   = function() data_stub(),
     params = function() params_stub()

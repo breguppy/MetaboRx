@@ -2,11 +2,11 @@ options(shiny.testmode = TRUE)
 
 library(shiny)
 library(shinyjs)
-if (!requireNamespace("QCcorrection", quietly = TRUE)) {
+if (!requireNamespace("MetaboRx", quietly = TRUE)) {
   if (!requireNamespace("pkgload", quietly = TRUE)) stop("pkgload needed")
   pkgload::load_all(path = "../../..", helpers = FALSE, quiet = TRUE)
 }
-library(QCcorrection)
+library(MetaboRx)
 
 # tiny in-memory dataset (no file IO)
 df <- data.frame(
@@ -34,7 +34,7 @@ params_stub <- reactiveVal(list(
 ui <- fluidPage(
   useShinyjs(),
   tabsetPanel(id = "main_steps",
-              QCcorrection:::mod_correct_ui("correct"),
+              MetaboRx:::mod_correct_ui("correct"),
               tabPanel(title = "3. Visualize", value = "tab_visualize", "ok")
   ),
   # invisible test outputs
@@ -43,7 +43,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  mod <- QCcorrection:::mod_correct_server(
+  mod <- MetaboRx:::mod_correct_server(
     "correct",
     data   = function() data_stub(),
     params = function() params_stub()

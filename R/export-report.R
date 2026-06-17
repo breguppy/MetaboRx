@@ -6,7 +6,7 @@ render_report <- function(
   p,
   d,
   out_dir,
-  template = system.file("app", "report_templates", "report.Rmd", package = "QCcorrection"),
+  template = system.file("app", "report_templates", "report.Rmd", package = "MetaboRx"),
   rsd_plot_data = NULL,
   pca_pair = NULL,
   hotelling_res = NULL

@@ -113,7 +113,7 @@ if (
     requireNamespace("ggtext", quietly = TRUE) &&
     requireNamespace("openxlsx", quietly = TRUE)
 ) {
-  out_dir <- tempfile("qccorrection-viz-benchmark-")
+  out_dir <- tempfile("metaborx-viz-benchmark-")
   dir.create(out_dir)
   on.exit(unlink(out_dir, recursive = TRUE, force = TRUE), add = TRUE)
 

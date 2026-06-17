@@ -1,4 +1,4 @@
-#' Launches QCcorrection Shiny App
+#' Launches MetaboRx Shiny App
 #' @export
 
 run_app <- function() {

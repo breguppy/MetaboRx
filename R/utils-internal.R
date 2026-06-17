@@ -68,5 +68,7 @@ utils::globalVariables(c(
   "theme_minimal", "tibble", "type", "ungroup", "withProgress", "withSpinner",
   "writeData", "xlim", "xmax", "xmin", "y", "ylim", "zip", "RSD_a", "RSD_b",
   "delta", "flagged", "group_id", "z", "panel", "variable_wrapped", "loading",
-  "decision", " "
+  "decision", " ", ":=", "QC_after", "QC_before", "Samples_after",
+  "Samples_before", "after", "analysis", "before", "dataset", "group",
+  "unit_id"
 ))

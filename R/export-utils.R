@@ -467,7 +467,7 @@ report_text_imputation <- function(p, d) {
         "Metabolite median / mean: Across all samples.",
         "QC-metabolite median / mean: Across QC samples only.",
         "Class-metabolite median / mean: Across samples grouping by class.",
-        "Minimum / half-minimum: Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small.",
+        "Minimum / half-minimum: Common for left-censored LC-MS data. Left-censored data occur when metabolite intensities fall below the instrument's detection limit, so their exact values are unknown but known to be small.",
         "KNN: k-nearest neighbors imputation.",
         "Zero: Not recommended unless biologically justified."
       ),
@@ -494,7 +494,7 @@ report_text_correction_descriptions <- function() {
     htmltools::tags$strong("QC-based signal drift correction methods:"),
     htmltools::tags$ul(
       htmltools::tags$li(
-        htmltools::strong("Local constant regression (Nadaraya–Watson estimator): "),
+        htmltools::strong("Local constant regression (Nadaraya-Watson estimator): "),
         "Uses the weighted mean of nearby QC samples (vs injection order) to estimate drift and correct samples.",
         htmltools::tags$ul(
           htmltools::tags$li(
@@ -560,7 +560,7 @@ report_text_correction_descriptions <- function() {
           htmltools::tags$li(
             htmltools::tags$p(
               htmltools::strong("Weaknesses: "),
-              "Prefers many QCs (often ≥12–15). Highest overfitting risk because it can memorize QC noise. Less interpretable and does not enforce a smooth drift curve."
+              "Prefers many QCs (often >=12-15). Highest overfitting risk because it can memorize QC noise. Less interpretable and does not enforce a smooth drift curve."
             )
           )
         )
@@ -579,7 +579,7 @@ report_text_correction_descriptions <- function() {
 report_text_rsd_cal <- function() {
   htmltools::tags$p(
     htmltools::strong("Relative Standard Deviation (RSD): "),
-    "RSD = (SD / mean) × 100, ",
+    "RSD = (SD / mean) x 100, ",
     "where SD is the standard deviation and mean is the average metabolite signal ",
     "across samples. Mean and standard deviation are computed for each metabolite ",
     "with missing values removed. RSD describes variability as a ",
@@ -595,7 +595,7 @@ report_text_ev_detection <- function() {
     htmltools::tags$p(
       "This step flags potential extreme values using a 2D PCA / Mahalanobis ",
       "distance on non-QC samples. The squared Mahalanobis distance is computed ",
-      "in the PC1–PC2 space using a PCA model fit on non-QC samples:"
+      "in the PC1-PC2 space using a PCA model fit on non-QC samples:"
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
@@ -604,22 +604,22 @@ report_text_ev_detection <- function() {
       ),
       htmltools::tags$li(
         htmltools::strong("PCA fit (non-QC only): "),
-        "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1–PC2."
+        "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1-PC2."
       ),
       htmltools::tags$li(
         htmltools::strong("Mahalanobis distance in PC space for all samples: "),
-        "Projects all complete rows (QC + non-QC) into PC1–PC2 and computes a squared Mahalanobis distance."
+        "Projects all complete rows (QC + non-QC) into PC1-PC2 and computes a squared Mahalanobis distance."
       ),
       htmltools::tags$li(
         htmltools::strong("Ellipse cutoff: "),
-        "Flags samples outside the (1 − α) ellipse using a χ² cutoff with df = 2 (default α = 0.05 → 95%)."
+        "Flags samples outside the (1 - alpha) ellipse using a chi^2 cutoff with df = 2 (default alpha = 0.05 -> 95%)."
       ),
       htmltools::tags$li(
         htmltools::strong("Dual z-score rule (only for outlier samples): "),
         "Within samples outside the ellipse, flags metabolite values only when BOTH ",
-        htmltools::strong("|global z| ≥ 3"),
+        htmltools::strong("|global z| >= 3"),
         " (pooled non-QC scaling) AND ",
-        htmltools::strong("|class z| ≥ 3"),
+        htmltools::strong("|class z| >= 3"),
         " (within that non-QC class)."
       )
     ),

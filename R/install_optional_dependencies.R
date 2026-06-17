@@ -1,12 +1,12 @@
-#' Install optional QCcorrection dependencies
+#' Install optional MetaboRx dependencies
 #'
-#' Installs optional packages used by QCcorrection for advanced correction,
+#' Installs optional packages used by MetaboRx for advanced correction,
 #' outlier detection, reporting, and testing.
 #'
 #' @details
 #' This function installs packages intended for optional functionality, not the
 #' core package dependencies listed in \code{Imports}. Core dependencies are
-#' installed automatically when QCcorrection itself is installed.
+#' installed automatically when MetaboRx itself is installed.
 #'
 #' @return
 #' Invisibly returns a list with character vectors of missing CRAN and
@@ -14,7 +14,7 @@
 #'
 #' @examples
 #' \dontrun{
-#' QCcorrection::install_optional_dependencies()
+#' MetaboRx::install_optional_dependencies()
 #' }
 #' @export
 install_optional_dependencies <- function() {
@@ -34,10 +34,10 @@ install_optional_dependencies <- function() {
     "pkgload",
     "knitr"
   )
-  
+
   installed <- rownames(installed.packages())
   cran_missing <- setdiff(cran_pkgs, installed)
-  
+
   if (length(cran_missing) > 0L) {
     install.packages(cran_missing)
     message(
@@ -45,11 +45,11 @@ install_optional_dependencies <- function() {
       paste(cran_missing, collapse = ", ")
     )
   }
-  
+
   if (length(cran_missing) == 0L) {
-    message("All optional QCcorrection dependencies already installed.")
+    message("All optional MetaboRx dependencies already installed.")
   }
-  
+
   invisible(list(
     cran = cran_missing,
     bioc = character(0)

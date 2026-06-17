@@ -5,7 +5,7 @@
 #'
 #' @importFrom rlang `%||%`
 #'
-#' @importFrom utils head
+#' @importFrom utils head install.packages installed.packages
 #'
 #' @importFrom stats ecdf median prcomp predict sd setNames
 #' @importFrom stats loess predict sd median
