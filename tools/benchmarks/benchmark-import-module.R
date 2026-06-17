@@ -1,5 +1,5 @@
 # Local import-module benchmark.
-# Run with: Rscript inst/benchmarks/benchmark-import-module.R
+# Run with: Rscript tools/benchmarks/benchmark-import-module.R
 
 set.seed(1)
 

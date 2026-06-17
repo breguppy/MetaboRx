@@ -1,5 +1,5 @@
 # Local correction-module benchmark.
-# Run with: Rscript inst/benchmarks/benchmark-correction-module.R
+# Run with: Rscript tools/benchmarks/benchmark-correction-module.R
 
 set.seed(2)
 

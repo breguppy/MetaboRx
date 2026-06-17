@@ -1,5 +1,5 @@
 # Visualization-module benchmark.
-# Run with: Rscript inst/benchmarks/benchmark-visualization-module.R
+# Run with: Rscript tools/benchmarks/benchmark-visualization-module.R
 #
 # Suggested workflow:
 # 1. Run this script before an optimization change and save the console output.
