@@ -2,7 +2,7 @@
 % Please edit documentation in R/install_optional_dependencies.R
 \name{install_optional_dependencies}
 \alias{install_optional_dependencies}
-\title{Install optional QCcorrection dependencies}
+\title{Install optional MetaboRx dependencies}
 \usage{
 install_optional_dependencies()
 }
@@ -11,16 +11,16 @@ Invisibly returns a list with character vectors of missing CRAN and
 Bioconductor packages that were installed.
 }
 \description{
-Installs optional packages used by QCcorrection for advanced correction,
+Installs optional packages used by MetaboRx for advanced correction,
 outlier detection, reporting, and testing.
 }
 \details{
 This function installs packages intended for optional functionality, not the
 core package dependencies listed in \code{Imports}. Core dependencies are
-installed automatically when QCcorrection itself is installed.
+installed automatically when MetaboRx itself is installed.
 }
 \examples{
 \dontrun{
-QCcorrection::install_optional_dependencies()
+MetaboRx::install_optional_dependencies()
 }
 }

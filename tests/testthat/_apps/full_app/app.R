@@ -1,11 +1,11 @@
 options(shiny.testmode = TRUE)
 library(shiny)
-if (!requireNamespace("QCcorrection", quietly = TRUE)) {
+if (!requireNamespace("MetaboRx", quietly = TRUE)) {
   pkgload::load_all(path = "../../..", helpers = FALSE, quiet = TRUE)
 }
-library(QCcorrection)
+library(MetaboRx)
 
 shinyApp(
-  ui     = QCcorrection:::app_ui(),
-  server = function(input, output, session) QCcorrection:::app_server(input, output, session)
+  ui     = MetaboRx:::app_ui(),
+  server = function(input, output, session) MetaboRx:::app_server(input, output, session)
 )

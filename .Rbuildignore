@@ -4,3 +4,6 @@
 ^\.git
 ^\.codex
 ^\.agents
+^AGENTS\.md$
+^tools$
+^\.github$

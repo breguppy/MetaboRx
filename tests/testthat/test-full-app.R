@@ -2,8 +2,9 @@ library(testthat)
 library(shinytest2)
 
 test_that("full app loads and basic flow works", {
-  options(shiny.port = NULL, shiny.launch.browser = FALSE); Sys.unsetenv("SHINY_PORT")
-  
+  options(shiny.port = NULL, shiny.launch.browser = FALSE)
+  Sys.unsetenv("SHINY_PORT")
+
   app <- AppDriver$new(
     test_path("_apps/full_app"),
     name = "full_app_smoke",
@@ -12,19 +13,18 @@ test_that("full app loads and basic flow works", {
     view = "none",
     load_timeout = 20000
   )
-  
+
   # upload small fixture and drive across tabs
   csv <- test_path("fixtures/raw_small.csv")
   app$upload_file("import-file1" = csv)
   app$wait_for_value(output = "import-contents")
-  
+
   # select meta columns
   app$wait_for_js("document.getElementById('import-sample_col') !== null")
   app$set_inputs(
-    "import-sample_col"="sample","import-batch_col"="batch",
-    "import-class_col"="class","import-order_col"="order"
+    "import-sample_col" = "sample", "import-batch_col" = "batch",
+    "import-class_col" = "class", "import-order_col" = "order"
   )
-  app$set_inputs("import-mv_cutoff" = 20)
   app$wait_for_value(output = "import-filter_info")
   app$wait_for_value(output = "import-next_correction_ui")
   app$wait_for_js("
@@ -34,22 +34,30 @@ test_that("full app loads and basic flow works", {
     })()
   ")
   app$click("import-next_correction")
-  app$wait_for_value(input = "main_steps"); expect_equal(app$get_value(input="main_steps"), "tab_correct")
-  
+  app$wait_for_js("Shiny.shinyapp && Shiny.shinyapp.$inputValues['main_steps'] === 'tab_correct'")
+  expect_equal(app$get_value(input = "main_steps"), "tab_correct")
+
   # minimal correction
-  app$wait_for_value(output="correct-correctionMethod")
+  app$wait_for_value(output = "correct-correctionMethod")
   cor_id <- app$get_js("let s=document.querySelector('#correct-correctionMethod select'); s && s.id")
   cor_val <- app$get_js("let s=document.querySelector('#correct-correctionMethod select'); if(!s) null; (Array.from(s.options).find(o=>o.value))?.value")
   if (!is.null(cor_id) && !is.null(cor_val)) do.call(app$set_inputs, setNames(list(cor_val), cor_id))
-  app$click("correct-correct")
+  app$click("correct-correct", wait_ = FALSE)
   app$wait_for_value(output = "correct-cor_data")
+  app$wait_for_value(output = "correct-correlation_slider")
+  app$wait_for_js("
+    (() => {
+      const btn = document.getElementById('correct-next_visualization');
+      return btn !== null && !btn.disabled;
+    })()
+  ")
   app$click("correct-next_visualization")
-  
-  app$wait_for_value(input = "main_steps")
+
+  app$wait_for_js("Shiny.shinyapp && Shiny.shinyapp.$inputValues['main_steps'] === 'tab_visualize'")
   expect_equal(app$get_value(input = "main_steps"), "tab_visualize")
-  
+
   # navigate to export
   app$click("viz-next_export")
-  app$wait_for_value(input = "main_steps")
-  expect_equal(app$get_value(input="main_steps"), "tab_export")
+  app$wait_for_js("Shiny.shinyapp && Shiny.shinyapp.$inputValues['main_steps'] === 'tab_export'")
+  expect_equal(app$get_value(input = "main_steps"), "tab_export")
 })

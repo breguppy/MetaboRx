@@ -102,7 +102,7 @@ ui_control_class_selector <- function(df, ns) {
   htmltools::tagList(
     htmltools::tags$hr(),
     htmltools::tags$h5("Select control class (optional)"),
-    # htmltools::tags$p("If your data includes a control group, select it below. If not, check “No control group”."),
+    # htmltools::tags$p("If your data includes a control group, select it below. If not, check "No control group"."),
     bslib::tooltip(
       shiny::checkboxInput(ns("no_control"), "No control class", FALSE),
       "Check this if the dataset does not have a control class.",
@@ -117,7 +117,7 @@ ui_control_class_selector <- function(df, ns) {
           choices = dropdown_choices,
           selected = ""
         ),
-        "Name of control samples in the class column. This class’s average is used to compute fold changes in the Excel file exported from this app. Fold changes are exported to a separate tab in the corrected-data Excel file.",
+        "Name of control samples in the class column. This class's average is used to compute fold changes in the Excel file exported from this app. Fold changes are exported to a separate tab in the corrected-data Excel file.",
         placement = "right"
       )
     )
@@ -225,7 +225,7 @@ ui_qc_impute <- function(df, metab_cols, ns = identity) {
             ),
             shiny::tags$li(
               shiny::strong("Minimum / half-minimum: "),
-              "Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small."
+              "Common for left-censored LC-MS data. Left-censored data occur when metabolite intensities fall below the instrument's detection limit, so their exact values are unknown but known to be small."
             ),
             shiny::tags$li(
               shiny::strong("KNN: "),
@@ -303,7 +303,7 @@ ui_sample_impute <- function(df, metab_cols, ns = identity) {
           ),
           shiny::tags$li(
             shiny::strong("Minimum / half-minimum: "),
-            "Common for left-censored LC–MS data. Left-censored data occur when metabolite intensities fall below the instrument’s detection limit, so their exact values are unknown but known to be small."
+            "Common for left-censored LC-MS data. Left-censored data occur when metabolite intensities fall below the instrument's detection limit, so their exact values are unknown but known to be small."
           ),
           shiny::tags$li(
             shiny::strong("KNN: "),

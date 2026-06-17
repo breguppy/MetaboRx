@@ -1,5 +1,5 @@
 ---
-title: "QCcorrection: Shiny for QC-based signal drift correction in metabolomics data"
+title: "MetaboRx: Shiny for QC-based signal drift correction in metabolomics data"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{BiocStyle}
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(QCcorrection)
+library(MetaboRx)
 ```
 
 

@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(QCcorrection)
+library(MetaboRx)
 
-test_check("QCcorrection")
+test_check("MetaboRx")

@@ -4,7 +4,7 @@
 #' 1) extracts metabolite columns,
 #' 2) log-transforms and scales them using pooled non-QC samples,
 #' 3) fits a PCA model on pooled non-QC samples with complete data,
-#' 4) computes Hotelling-like T^2 (via 2D Mahalanobis distance in PC1–PC2
+#' 4) computes Hotelling-like T^2 (via 2D Mahalanobis distance in PC1-PC2
 #'    space) for ALL samples (QC and non-QC) with complete data, using the
 #'    non-QC PCA model,
 #' 5) flags outlier samples based on a chi-square cutoff (df = 2),
@@ -64,7 +64,7 @@
 #' @return list
 #'   A list with components:
 #'   - data: original df with added columns:
-#'       * T2: squared Mahalanobis distance in PC1–PC2 space for all samples
+#'       * T2: squared Mahalanobis distance in PC1-PC2 space for all samples
 #'             with complete data (QC and non-QC; NA otherwise)
 #'       * is_outlier_sample: TRUE if sample outside (1 - alpha) ellipse
 #'       * used_in_fit: TRUE if row used to fit the PCA / covariance (non-QC)
@@ -473,7 +473,7 @@ detect_hotelling_nonqc_dual_z <- function(
         ) +
         big_font_theme +
         ggplot2::labs(
-          title = "PCA (PC1–PC2) with Mahalanobis 95% ellipse (fit on non-QC)",
+          title = "PCA (PC1-PC2) with Mahalanobis 95% ellipse (fit on non-QC)",
           color = "Group"
         )
     }

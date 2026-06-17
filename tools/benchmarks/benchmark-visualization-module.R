@@ -1,5 +1,5 @@
 # Visualization-module benchmark.
-# Run with: Rscript inst/benchmarks/benchmark-visualization-module.R
+# Run with: Rscript tools/benchmarks/benchmark-visualization-module.R
 #
 # Suggested workflow:
 # 1. Run this script before an optimization change and save the console output.
@@ -113,7 +113,7 @@ if (
     requireNamespace("ggtext", quietly = TRUE) &&
     requireNamespace("openxlsx", quietly = TRUE)
 ) {
-  out_dir <- tempfile("qccorrection-viz-benchmark-")
+  out_dir <- tempfile("metaborx-viz-benchmark-")
   dir.create(out_dir)
   on.exit(unlink(out_dir, recursive = TRUE, force = TRUE), add = TRUE)
 

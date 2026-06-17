@@ -491,17 +491,17 @@ ui_filter_info <- function(fd, mv_cutoff) {
 
   all_missing_card <- NULL
   if (has_all_missing) {
-    # Create bullet list like: "QC — MetaboliteA"
+    # Create bullet list like: "QC - MetaboliteA"
     pair_items <- apply(
       class_metab_all_missing[, c("class", "metabolite"), drop = FALSE],
       1,
-      function(r) paste0(r[[1]], " — ", r[[2]])
+      function(r) paste0(r[[1]], " - ", r[[2]])
     )
 
     all_missing_card <- warn_card(
       title = "All-missing class/metabolite combinations detected",
       body = paste0(
-        "The following class–metabolite pairs have all values missing. ",
+        "The following class-metabolite pairs have all values missing. ",
         "These values will remain missing if you choose a class-metabolite imputation method."
       ),
       body_tags = shiny::tags$ul(lapply(pair_items, shiny::tags$li))

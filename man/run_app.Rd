@@ -2,10 +2,10 @@
 % Please edit documentation in R/run_app.R
 \name{run_app}
 \alias{run_app}
-\title{Launches QCcorrection Shiny App}
+\title{Launches MetaboRx Shiny App}
 \usage{
 run_app()
 }
 \description{
-Launches QCcorrection Shiny App
+Launches MetaboRx Shiny App
 }

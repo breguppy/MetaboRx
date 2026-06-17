@@ -201,7 +201,7 @@ transform_data <- function(filtered_corrected, transform, withheld_cols, ex_ISTD
       "quotient normalization (PQN). PQN is a sample-based normalization method ",
       "computed in 3 steps:(1) Each metabolite is divided by the median value ",
       "of that metabolite across all samples. (2) For each sample, the median ",
-      "of these quotients is computed as an estimate of the sample’s most ",
+      "of these quotients is computed as an estimate of the sample's most ",
       "probable dilution factor. (3) Post-QC-corrected metabolite intensities ",
       "are divided by this sample-specific median quotient. This normalization ",
       "rescales each sample by its median fold difference relative to a reference ",

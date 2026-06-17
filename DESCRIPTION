@@ -1,10 +1,12 @@
-Package: QCcorrection
+Package: MetaboRx
 Title: QC-Based Signal Drift Correction and Visualization for LC–MS Metabolomics
 Version: 0.0.0.9
 Authors@R: 
     person("Breanna", "Guppy", , "breanna-guppy@uiowa.edu", role = c("aut", "cre"))
 Description: Shiny app to clean, correct, visualize, and export LC-MS metabolomics data using QC-based signal drift correction with batch-wise options.
 License: MIT + file LICENSE
+URL: https://github.com/breguppy/MetaboRx
+BugReports: https://github.com/breguppy/MetaboRx/issues
 Encoding: UTF-8
 LazyData: false
 Depends: R (>= 4.4)
@@ -40,11 +42,13 @@ Suggests:
     corpcor,
     pkgload,
     knitr,
+    pmp
 Remotes:
-    bioc::impute
+    bioc::impute,
+    bioc::pmp
 VignetteBuilder: knitr
 biocViews: Software, ShinyApps, MassSpectrometry, Metabolomics, QualityControl
 Config/testthat/edition: 3
 Config/testthat/parallel: false
 Config/roxygen2/version: 8.0.0
-RoxygenNote: 7.3.3
+RoxygenNote: 8.0.0

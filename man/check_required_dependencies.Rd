@@ -2,7 +2,7 @@
 % Please edit documentation in R/check_required_dependencies.R
 \name{check_required_dependencies}
 \alias{check_required_dependencies}
-\title{Check required QCcorrection dependencies}
+\title{Check required MetaboRx dependencies}
 \usage{
 check_required_dependencies()
 }
@@ -10,15 +10,15 @@ check_required_dependencies()
 Invisibly returns a list of missing require packages
 }
 \description{
-Checks that packages required by QCcorrection are installed
+Checks that packages required by MetaboRx are installed
 }
 \details{
 This function checks that core package dependencies listed in \code{Imports}
 are installed. Core dependencies are installed automatically when
-QCcorrection itself is installed.
+MetaboRx itself is installed.
 }
 \examples{
 \dontrun{
-QCcorrection::check_required_dependencies()
+MetaboRx::check_required_dependencies()
 }
 }

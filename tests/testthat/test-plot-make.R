@@ -38,7 +38,7 @@ make_rsd_export_params <- function(transform = "none") {
 }
 
 with_stubbed_rsd_scatter_plot <- function(code) {
-  ns <- asNamespace("QCcorrection")
+  ns <- asNamespace("MetaboRx")
   old_mk_plot <- get("mk_plot", envir = ns)
   was_locked <- bindingIsLocked("mk_plot", ns)
 
@@ -78,7 +78,7 @@ with_stubbed_rsd_scatter_plot <- function(code) {
 }
 
 with_counted_rsd_results <- function(counter, code) {
-  ns <- asNamespace("QCcorrection")
+  ns <- asNamespace("MetaboRx")
   old_build <- get(".build_rsd_results", envir = ns)
   was_locked <- bindingIsLocked(".build_rsd_results", ns)
 
