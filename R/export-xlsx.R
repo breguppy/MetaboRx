@@ -8,18 +8,12 @@ export_xlsx <- function(p, d, file = NULL) {
   wb <- openxlsx::createWorkbook()
 
   # make column names bold and descriptions with orange backgroud
-  bold <- openxlsx::createStyle(textDecoration = "Bold")
-  note <- openxlsx::createStyle(
-    wrapText = TRUE,
-    valign = "top",
-    fgFill = "#f8cbad"
-  )
+  styles <- .xlsx_export_styles()
+  bold <- styles$bold
+  note <- styles$note
 
   .add_sheet <- function(name) {
-    nm <- gsub("[\\[\\]\\*\\?:/\\\\]", "_", name)
-    nm <- substr(nm, 1L, 31L)
-    openxlsx::addWorksheet(wb, nm)
-    nm
+    .xlsx_add_sheet(wb, name)
   }
 
   qc_rsd_flagged_metabolites <- function(df, rsd_cutoff) {

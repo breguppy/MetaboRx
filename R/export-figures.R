@@ -2,7 +2,11 @@
 #'
 #' @keywords internal
 #' @noRd
-export_figures <- function(p, d, out_dir = tempdir()) {
+export_figures <- function(p,
+                           d,
+                           out_dir = tempdir(),
+                           rsd_export = NULL,
+                           pca_export = NULL) {
   .require_pkg("ggplot2", "write figures")
   fig_dir <- file.path(out_dir, "figures")
   if (dir.exists(fig_dir)) {
@@ -59,6 +63,32 @@ export_figures <- function(p, d, out_dir = tempdir()) {
   cor_cols <- setdiff(names(df_cor_mets), c("sample", "batch", "class", "order"))
   cols <- intersect(raw_cols, cor_cols)
 
+  scatter_meta_cols <- intersect(.scatter_metadata_cols(), names(d$filtered$df))
+  raw_panel_base <- .scatter_panel_df(d$filtered$df[, scatter_meta_cols, drop = FALSE], "Raw")
+  cor_panel_base <- .scatter_panel_df(df_cor_mets[, scatter_meta_cols, drop = FALSE], "Corrected")
+  scatter_batch_ranges <- dplyr::bind_rows(
+    .scatter_batch_ranges(raw_panel_base, "Raw"),
+    .scatter_batch_ranges(cor_panel_base, "Corrected")
+  )
+
+  make_export_scatter_context <- function(metab) {
+    raw_panel <- dplyr::bind_cols(
+      raw_panel_base,
+      d$filtered$df[, metab, drop = FALSE]
+    )
+    cor_panel <- dplyr::bind_cols(
+      cor_panel_base,
+      df_cor_mets[, metab, drop = FALSE]
+    )
+
+    list(
+      data_raw = raw_panel,
+      data_cor = cor_panel,
+      df_all = dplyr::bind_rows(raw_panel, cor_panel),
+      batch_ranges = scatter_batch_ranges
+    )
+  }
+
   n <- length(cols)
   met_paths <- character(0)
   rsd_paths <- character(0)
@@ -67,10 +97,9 @@ export_figures <- function(p, d, out_dir = tempdir()) {
   pca_loadings_xlsx <- character(0)
 
   shiny::withProgress(message = "Creating figures...", value = 0, {
-    rsd_res <- make_all_rsd_plots(p, d)
-    suppressWarnings({
-      pca_res <- make_all_pca_plots(p, d, d$cleaned$meta_df)
-    })
+    rsd_res <- rsd_export %||% make_all_rsd_plots(p, d)
+    pca_res <- pca_export %||%
+      suppressWarnings(make_all_pca_plots(p, d, d$cleaned$meta_df))
 
     total_steps <- length(rsd_res$rsd_plots) +
       length(pca_res$pca_plots) +
@@ -125,7 +154,7 @@ export_figures <- function(p, d, out_dir = tempdir()) {
           d,
           p,
           metab,
-          scatter_context = .scatter_prepare_context(d$filtered$df, df_cor_mets, metab)
+          scatter_context = make_export_scatter_context(metab)
         )
         safe <- gsub("[^A-Za-z0-9_\\-]+", "_", metab)
         path <- file.path(met_dir, sprintf("%s.%s", safe, fmt))

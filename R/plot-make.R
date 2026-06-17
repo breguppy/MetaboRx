@@ -173,7 +173,7 @@ make_rsd_plot <- function(p, d, rsd_results = NULL, compared_to = NULL) {
 
 #' @keywords internal
 #' @noRd
-make_all_rsd_plots <- function(p, d) {
+make_all_rsd_plots <- function(p, d, rsd_cache = NULL) {
   build_name <- function(plot_type, compare, cal) {
     sprintf("rsd_%s_%s_%s", plot_type, compare, cal)
   }
@@ -195,7 +195,7 @@ make_all_rsd_plots <- function(p, d) {
 
   rsd_plots <- vector("list", nrow(specs))
   plot_names <- character(nrow(specs))
-  compare_cache <- list()
+  compare_cache <- rsd_cache %||% list()
 
   for (i in seq_len(nrow(specs))) {
     temp_params <- p

@@ -33,25 +33,25 @@ stub_exporters <- function() {
     openxlsx::addWorksheet(wb, "data")
     wb
   })
-  stab("export_stats_xlsx", function(p, d) {
+  stab("export_stats_xlsx", function(p, d, ...) {
     wb <- openxlsx::createWorkbook()
     openxlsx::addWorksheet(wb, "stats")
     wb
   })
-  stab("export_outliers_xlsx", function(p, d) {
+  stab("export_outliers_xlsx", function(p, d, ...) {
     wb <- openxlsx::createWorkbook()
     openxlsx::addWorksheet(wb, "outliers")
     wb
   })
-  stab("export_figures", function(p, d, out_dir = tempdir()) {
+  stab("export_figures", function(p, d, out_dir = tempdir(), ...) {
     dir <- file.path(out_dir, "figures")
     dir.create(dir, recursive = TRUE, showWarnings = FALSE)
     writeLines("ok", file.path(dir, "dummy.txt"))
     list(fig_dir = dir)
   })
-  stab("render_report", function(p, d, out_dir) {
+  stab("render_report", function(p, d, out_dir, ...) {
     # Return a list with has_pdf so mod_export_server logic still works
-    html_path <- file.path(out_dir, "correction_report.html")
+    html_path <- file.path(out_dir, "quality_report.html")
     pdf_path  <- file.path(out_dir, "correction_report.pdf")
     writeLines("ok",      html_path)
     writeLines("%PDF-1.4", pdf_path)

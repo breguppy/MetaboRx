@@ -4,193 +4,174 @@
 #' @noRd
 export_mv_xlsx <- function(p, d, file = NULL) {
   cleaned_df <- d$cleaned$df
-  
+
   .require_pkg("openxlsx", "write Excel workbooks")
   wb <- openxlsx::createWorkbook()
-  
-  # make column names bold and descriptions with orange background
-  bold <- openxlsx::createStyle(textDecoration = "Bold")
-  note <- openxlsx::createStyle(
-    wrapText = TRUE,
-    valign = "top",
-    fgFill = "#f8cbad"
-  )
-  
-  .add_sheet <- function(name) {
-    nm <- gsub("[\\[\\]\\*\\?:/\\\\]", "_", name)
-    nm <- substr(nm, 1L, 31L)
-    openxlsx::addWorksheet(wb, nm)
-    nm
-  }
-  
+  styles <- .xlsx_export_styles()
+
   shiny::withProgress(message = "Creating missing value summary...", value = 0, {
     meta_cols <- c("sample", "batch", "class", "order")
     metab_cols <- setdiff(names(cleaned_df), meta_cols)
     n_metabs <- length(metab_cols)
-    
-    # count missing values by metabolite (samples + QC)
-    count_missing_by_metabolite <- function(df, metab_cols) {
-      n_samples <- nrow(df)
-      
+
+    missing_mat <- if (n_metabs == 0L) {
+      matrix(FALSE, nrow = nrow(cleaned_df), ncol = 0L)
+    } else {
+      vapply(
+        cleaned_df[, metab_cols, drop = FALSE],
+        function(col) is.na(col) | col <= 0,
+        logical(nrow(cleaned_df))
+      )
+    }
+    if (is.null(dim(missing_mat))) {
+      missing_mat <- matrix(missing_mat, nrow = nrow(cleaned_df))
+    }
+    colnames(missing_mat) <- metab_cols
+
+    count_missing_by_metabolite <- function(row_idx) {
+      n_samples <- length(row_idx)
+      missing_count <- if (n_metabs == 0L) {
+        integer(0)
+      } else {
+        colSums(missing_mat[row_idx, , drop = FALSE])
+      }
+
       tibble::tibble(
         metabolite = metab_cols,
-        missing_count = vapply(
-          df[metab_cols],
-          function(col) sum(is.na(col) | col <= 0),
-          integer(1)
-        ),
-        missing_pct = if (n_samples == 0L) NA_real_ else (missing_count / n_samples) * 100
+        missing_count = as.integer(missing_count),
+        missing_pct = if (n_samples == 0L) {
+          NA_real_
+        } else {
+          (missing_count / n_samples) * 100
+        }
       ) |>
-        dplyr::arrange(dplyr::desc(missing_pct))
+        dplyr::arrange(dplyr::desc(.data$missing_pct))
     }
-    
-    sample_df <- cleaned_df[cleaned_df$class != "QC", , drop = FALSE]
-    qc_df <- cleaned_df[cleaned_df$class == "QC", , drop = FALSE]
-    
-    sample_met_mv <- count_missing_by_metabolite(sample_df, metab_cols)
-    qc_met_mv <- count_missing_by_metabolite(qc_df, metab_cols)
-    
-    sample_renamed <- sample_met_mv |>
-      dplyr::rename(
-        sample_missing_count = missing_count,
-        sample_missing_pct = missing_pct
+
+    sample_idx <- which(cleaned_df[["class"]] != "QC")
+    qc_idx <- which(cleaned_df[["class"]] == "QC")
+
+    sample_renamed <- count_missing_by_metabolite(sample_idx) |>
+      dplyr::transmute(
+        metabolite = .data$metabolite,
+        sample_missing_count = .data$missing_count,
+        sample_missing_pct = .data$missing_pct
       )
-    
-    qc_renamed <- qc_met_mv |>
-      dplyr::rename(
-        qc_missing_count = missing_count,
-        qc_missing_pct = missing_pct
+
+    qc_renamed <- count_missing_by_metabolite(qc_idx) |>
+      dplyr::transmute(
+        metabolite = .data$metabolite,
+        qc_missing_count = .data$missing_count,
+        qc_missing_pct = .data$missing_pct
       )
-    
+
     metab_mv <- sample_renamed |>
       dplyr::inner_join(qc_renamed, by = "metabolite") |>
-      dplyr::filter(!(sample_missing_pct == 0 & qc_missing_pct == 0)) |>
-      dplyr::arrange(dplyr::desc(sample_missing_pct))
-    
-    # sheet 1 Metabolite
-    s1 <- .add_sheet("Metabolite")
-    txt1 <- paste(
-      "Tab Metabolite. Missing value counts (missing_count) and percentages (missing_pct)",
-      "per metabolite are listed here for samples and QC samples. Missing values are",
-      "defined as NA or <= 0. If a metabolite is not listed here, it did not have any missing values."
-    )
-    openxlsx::writeData(wb, s1, x = txt1, startCol = 1, startRow = 1)
-    openxlsx::mergeCells(wb, s1, cols = 1:6, rows = 1)
-    openxlsx::addStyle(wb, s1, style = note, rows = 1, cols = 1, gridExpand = TRUE)
-    openxlsx::setRowHeights(wb, s1, rows = 1, heights = 60)
-    openxlsx::writeData(
+      dplyr::filter(!(.data$sample_missing_pct == 0 & .data$qc_missing_pct == 0)) |>
+      dplyr::arrange(dplyr::desc(.data$sample_missing_pct))
+
+    .xlsx_write_described_sheet(
       wb,
-      s1,
+      sheet_name = "Metabolite",
+      description = paste(
+        "Tab Metabolite. Missing value counts (missing_count) and percentages (missing_pct)",
+        "per metabolite are listed here for samples and QC samples. Missing values are",
+        "defined as NA or <= 0. If a metabolite is not listed here, it did not have any missing values."
+      ),
       x = metab_mv,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
+      merge_cols = 6,
+      styles = styles
     )
     shiny::incProgress(1 / 5, detail = "Saved: missing values by metabolite")
-    
-    # count missing values by sample
-    sample_mv <- cleaned_df |>
-      dplyr::mutate(
-        missing_count = rowSums(dplyr::across(dplyr::all_of(metab_cols), ~ is.na(.x) | .x <= 0)),
-        missing_pct = if (n_metabs == 0L) NA_real_ else (missing_count / n_metabs) * 100
-      ) |>
-      dplyr::select(sample, missing_count, missing_pct) |>
-      dplyr::filter(missing_pct > 0) |>
-      dplyr::arrange(dplyr::desc(missing_pct))
-    
-    # sheet 2 Sample
-    s2 <- .add_sheet("Sample")
-    txt2 <- paste(
-      "Tab Sample. Missing value counts (missing_count) and percentages (missing_pct)",
-      "per sample are listed here. Missing values are defined as NA or <= 0.",
-      "If a sample is not listed here, it did not have any missing values."
-    )
-    openxlsx::writeData(wb, s2, x = txt2, startCol = 1, startRow = 1)
-    openxlsx::mergeCells(wb, s2, cols = 1:6, rows = 1)
-    openxlsx::addStyle(wb, s2, style = note, rows = 1, cols = 1, gridExpand = TRUE)
-    openxlsx::setRowHeights(wb, s2, rows = 1, heights = 60)
-    openxlsx::writeData(
+
+    row_missing_count <- rowSums(missing_mat)
+    sample_mv <- tibble::tibble(
+      sample = cleaned_df[["sample"]],
+      missing_count = row_missing_count,
+      missing_pct = if (n_metabs == 0L) {
+        NA_real_
+      } else {
+        (row_missing_count / n_metabs) * 100
+      }
+    ) |>
+      dplyr::filter(.data$missing_pct > 0) |>
+      dplyr::arrange(dplyr::desc(.data$missing_pct))
+
+    .xlsx_write_described_sheet(
       wb,
-      s2,
+      sheet_name = "Sample",
+      description = paste(
+        "Tab Sample. Missing value counts (missing_count) and percentages (missing_pct)",
+        "per sample are listed here. Missing values are defined as NA or <= 0.",
+        "If a sample is not listed here, it did not have any missing values."
+      ),
       x = sample_mv,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
+      merge_cols = 6,
+      styles = styles
     )
     shiny::incProgress(1 / 5, detail = "Saved: missing values by sample")
-    
-    # count missing values by class
-    class_mv <- cleaned_df |>
-      dplyr::group_by(class) |>
-      dplyr::summarise(
-        n_samples = dplyr::n(),
-        missing_count = sum(unlist(dplyr::across(dplyr::all_of(metab_cols), ~ sum(is.na(.x) | .x <= 0)))),
-        total_values = n_samples * n_metabs,
-        missing_pct = ifelse(total_values == 0, NA_real_, (missing_count / total_values) * 100),
-        .groups = "drop"
+
+    summarize_missing_by <- function(group_col) {
+      tibble::tibble(
+        group_value = cleaned_df[[group_col]],
+        row_missing_count = row_missing_count
       ) |>
-      dplyr::select(class, missing_count, missing_pct) |>
-      dplyr::filter(missing_pct > 0) |>
-      dplyr::arrange(dplyr::desc(missing_pct))
-    
-    # sheet 3 Class
-    s3 <- .add_sheet("Class")
-    txt3 <- paste(
-      "Tab Class. Missing value counts (missing_count) and percentages (missing_pct)",
-      "per sample class are listed here. Missing values are defined as NA or <= 0.",
-      "If a sample class is not listed here, it did not have any missing values."
-    )
-    openxlsx::writeData(wb, s3, x = txt3, startCol = 1, startRow = 1)
-    openxlsx::mergeCells(wb, s3, cols = 1:6, rows = 1)
-    openxlsx::addStyle(wb, s3, style = note, rows = 1, cols = 1, gridExpand = TRUE)
-    openxlsx::setRowHeights(wb, s3, rows = 1, heights = 60)
-    openxlsx::writeData(
+        dplyr::group_by(.data$group_value) |>
+        dplyr::summarise(
+          n_samples = dplyr::n(),
+          missing_count = sum(.data$row_missing_count),
+          .groups = "drop"
+        ) |>
+        dplyr::mutate(
+          total_values = .data$n_samples * n_metabs,
+          missing_pct = dplyr::if_else(
+            .data$total_values == 0,
+            NA_real_,
+            (.data$missing_count / .data$total_values) * 100
+          )
+        ) |>
+        dplyr::transmute(
+          "{group_col}" := .data$group_value,
+          missing_count = .data$missing_count,
+          missing_pct = .data$missing_pct
+        ) |>
+        dplyr::filter(.data$missing_pct > 0) |>
+        dplyr::arrange(dplyr::desc(.data$missing_pct))
+    }
+
+    class_mv <- summarize_missing_by("class")
+
+    .xlsx_write_described_sheet(
       wb,
-      s3,
+      sheet_name = "Class",
+      description = paste(
+        "Tab Class. Missing value counts (missing_count) and percentages (missing_pct)",
+        "per sample class are listed here. Missing values are defined as NA or <= 0.",
+        "If a sample class is not listed here, it did not have any missing values."
+      ),
       x = class_mv,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
+      merge_cols = 6,
+      styles = styles
     )
     shiny::incProgress(1 / 5, detail = "Saved: missing values by class")
-    
-    # count missing by batch
-    batch_mv <- cleaned_df |>
-      dplyr::group_by(batch) |>
-      dplyr::summarise(
-        n_samples = dplyr::n(),
-        missing_count = sum(unlist(dplyr::across(dplyr::all_of(metab_cols), ~ sum(is.na(.x) | .x <= 0)))),
-        total_values = n_samples * n_metabs,
-        missing_pct = ifelse(total_values == 0, NA_real_, (missing_count / total_values) * 100),
-        .groups = "drop"
-      ) |>
-      dplyr::select(batch, missing_count, missing_pct) |>
-      dplyr::filter(missing_pct > 0) |>
-      dplyr::arrange(dplyr::desc(missing_pct))
-    
-    # sheet 4 Batch
-    s4 <- .add_sheet("Batch")
-    txt4 <- paste(
-      "Tab Batch. Missing value counts (missing_count) and percentages (missing_pct)",
-      "per batch are listed here. Missing values are defined as NA or <= 0.",
-      "If a batch is not listed here, it did not have any missing values."
-    )
-    openxlsx::writeData(wb, s4, x = txt4, startCol = 1, startRow = 1)
-    openxlsx::mergeCells(wb, s4, cols = 1:6, rows = 1)
-    openxlsx::addStyle(wb, s4, style = note, rows = 1, cols = 1, gridExpand = TRUE)
-    openxlsx::setRowHeights(wb, s4, rows = 1, heights = 60)
-    openxlsx::writeData(
+
+    batch_mv <- summarize_missing_by("batch")
+
+    .xlsx_write_described_sheet(
       wb,
-      s4,
+      sheet_name = "Batch",
+      description = paste(
+        "Tab Batch. Missing value counts (missing_count) and percentages (missing_pct)",
+        "per batch are listed here. Missing values are defined as NA or <= 0.",
+        "If a batch is not listed here, it did not have any missing values."
+      ),
       x = batch_mv,
-      startRow = 3,
-      startCol = 1,
-      headerStyle = bold
+      merge_cols = 6,
+      styles = styles
     )
     shiny::incProgress(1 / 5, detail = "Saved: missing values by batch")
-    
-    # class-metabolite summary
-    class_metab_missing_summary <- if (length(metab_cols) == 0L) {
+
+    class_metab_missing_summary <- if (n_metabs == 0L) {
       data.frame(
         class = character(0),
         metabolite = character(0),
@@ -200,61 +181,53 @@ export_mv_xlsx <- function(p, d, file = NULL) {
         all_missing = logical(0)
       )
     } else {
-      do.call(
-        rbind,
-        lapply(sort(unique(cleaned_df$class)), function(cl) {
-          idx <- which(cleaned_df$class == cl)
-          n_in_class <- length(idx)
-          
-          do.call(
-            rbind,
-            lapply(metab_cols, function(met) {
-              x <- cleaned_df[idx, met]
-              miss <- is.na(x) | x <= 0
-              
-              data.frame(
-                class = cl,
-                metabolite = met,
-                n_rows_in_class = n_in_class,
-                missing_count = sum(miss),
-                missing_pct = if (n_in_class == 0L) NA_real_ else (sum(miss) / n_in_class) * 100,
-                all_missing = if (n_in_class == 0L) TRUE else all(miss),
-                row.names = NULL
-              )
-            })
-          )
-        })
-      )
+      class_summaries <- lapply(sort(unique(cleaned_df[["class"]])), function(class_value) {
+        idx <- which(cleaned_df[["class"]] == class_value)
+        n_in_class <- length(idx)
+        missing_count <- colSums(missing_mat[idx, , drop = FALSE])
+
+        data.frame(
+          class = class_value,
+          metabolite = metab_cols,
+          n_rows_in_class = n_in_class,
+          missing_count = as.integer(missing_count),
+          missing_pct = (missing_count / n_in_class) * 100,
+          all_missing = missing_count == n_in_class,
+          row.names = NULL,
+          check.names = FALSE
+        )
+      })
+
+      dplyr::bind_rows(class_summaries)
     }
-    
+
     if (nrow(class_metab_missing_summary) > 0L) {
-      s5 <- .add_sheet("Class-Met Missing")
-      txt5 <- paste(
-        "Tab Class-Met Missing. Missing value counts and percentages are listed",
-        "for each class-metabolite pair. Missing values are defined as NA or <= 0.",
-        "The column all_missing indicates whether all values for that metabolite",
-        "within the class are missing."
-      )
-      openxlsx::writeData(wb, s5, x = txt5, startCol = 1, startRow = 1)
-      openxlsx::mergeCells(wb, s5, cols = 1:6, rows = 1)
-      openxlsx::addStyle(wb, s5, style = note, rows = 1, cols = 1, gridExpand = TRUE)
-      openxlsx::setRowHeights(wb, s5, rows = 1, heights = 75)
-      
       class_metab_missing_export <- class_metab_missing_summary |>
-        dplyr::arrange(dplyr::desc(all_missing), dplyr::desc(missing_pct), class, metabolite)
-      
-      openxlsx::writeData(
+        dplyr::arrange(
+          dplyr::desc(.data$all_missing),
+          dplyr::desc(.data$missing_pct),
+          .data$class,
+          .data$metabolite
+        )
+
+      .xlsx_write_described_sheet(
         wb,
-        s5,
+        sheet_name = "Class-Met Missing",
+        description = paste(
+          "Tab Class-Met Missing. Missing value counts and percentages are listed",
+          "for each class-metabolite pair. Missing values are defined as NA or <= 0.",
+          "The column all_missing indicates whether all values for that metabolite",
+          "within the class are missing."
+        ),
         x = class_metab_missing_export,
-        startRow = 3,
-        startCol = 1,
-        headerStyle = bold
+        merge_cols = 6,
+        styles = styles,
+        note_row_height = 75
       )
     }
-    
+
     shiny::incProgress(1 / 5, detail = "Saved: missing values by class and metabolite")
   })
-  
-  return(wb)
+
+  .xlsx_save_or_return(wb, file)
 }
