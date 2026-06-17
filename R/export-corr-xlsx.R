@@ -27,6 +27,56 @@ export_corr_xlsx <- function(all_corr, file = NULL) {
     )
   }
 
+  write_correlation_sheet <- function(sheet_name, description, x) {
+    sheet <- .xlsx_add_sheet(wb, sheet_name)
+
+    openxlsx::writeData(
+      wb,
+      sheet,
+      x = description,
+      startCol = 1,
+      startRow = 1
+    )
+    openxlsx::mergeCells(wb, sheet, cols = 1:10, rows = 1)
+    openxlsx::addStyle(
+      wb,
+      sheet,
+      style = styles$note,
+      rows = 1,
+      cols = 1,
+      gridExpand = TRUE
+    )
+    openxlsx::setRowHeights(wb, sheet, rows = 1, heights = 60)
+
+    openxlsx::writeData(
+      wb,
+      sheet,
+      x = data.frame(t(names(x)), check.names = FALSE),
+      startRow = 3,
+      startCol = 1,
+      colNames = FALSE
+    )
+    openxlsx::addStyle(
+      wb,
+      sheet,
+      style = styles$bold,
+      rows = 3,
+      cols = seq_along(x),
+      gridExpand = TRUE
+    )
+
+    openxlsx::writeData(
+      wb,
+      sheet,
+      x = x,
+      startRow = 4,
+      startCol = 1,
+      colNames = FALSE
+    )
+
+    invisible(sheet)
+  }
+
   shiny::withProgress(message = "Creating metabolite correlation summary...", value = 0, {
     if (all_corr$transformed_included) {
       N <- 3
@@ -35,35 +85,26 @@ export_corr_xlsx <- function(all_corr, file = NULL) {
     }
 
     # sheet 1  Raw Data Metabolite Correlations
-    .xlsx_write_described_sheet(
-      wb,
+    write_correlation_sheet(
       sheet_name = "Raw Data",
       description = correlation_description("Raw Data"),
-      x = corr_export$raw,
-      merge_cols = 10,
-      styles = styles
+      x = corr_export$raw
     )
     shiny::incProgress(1 / N, detail = "Saved: Raw Data Metabolite Correlations.")
 
     # Sheet 2: Corrected Data Metabolite Correlations
-    .xlsx_write_described_sheet(
-      wb,
+    write_correlation_sheet(
       sheet_name = "Corrected Data",
       description = correlation_description("Corrected Data"),
-      x = corr_export$corrected,
-      merge_cols = 10,
-      styles = styles
+      x = corr_export$corrected
     )
     shiny::incProgress(1 / N, detail = "Saved: Corrected Date Correlations")
 
     if (all_corr$transformed_included) {
-      .xlsx_write_described_sheet(
-        wb,
+      write_correlation_sheet(
         sheet_name = "Transformed Data",
         description = correlation_description("Transformed and Corrected Data"),
-        x = corr_export$transformed,
-        merge_cols = 10,
-        styles = styles
+        x = corr_export$transformed
       )
       shiny::incProgress(1 / N, detail = "Saved: Transformed and Corrected Date Correlations")
     }

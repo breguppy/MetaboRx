@@ -133,7 +133,12 @@ test_that("export_corr_xlsx preserves correlation workbook labels", {
 
   expect_setequal(openxlsx::getSheetNames(file), c("Raw Data", "Corrected Data", "Transformed Data"))
 
-  transformed <- openxlsx::read.xlsx(file, sheet = "Transformed Data", startRow = 3)
+  transformed <- openxlsx::read.xlsx(
+    file,
+    sheet = "Transformed Data",
+    startRow = 3,
+    check.names = FALSE
+  )
   expect_equal(names(transformed), c("Metabolite 1", "Metabolite 2", "Pearson's r", "n_complete"))
   expect_equal(transformed[["Pearson's r"]], 0.7)
 })
