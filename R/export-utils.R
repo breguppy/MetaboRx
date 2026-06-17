@@ -109,6 +109,88 @@
   df
 }
 
+.xlsx_safe_sheet_name <- function(name) {
+  nm <- gsub("[\\[\\]\\*\\?:/\\\\]", "_", name)
+  substr(nm, 1L, 31L)
+}
+
+.xlsx_add_sheet <- function(wb, name) {
+  sheet_name <- .xlsx_safe_sheet_name(name)
+  openxlsx::addWorksheet(wb, sheet_name)
+  sheet_name
+}
+
+.xlsx_export_styles <- function() {
+  list(
+    bold = openxlsx::createStyle(textDecoration = "Bold"),
+    note = openxlsx::createStyle(
+      wrapText = TRUE,
+      valign = "top",
+      fgFill = "#f8cbad"
+    )
+  )
+}
+
+.xlsx_write_described_sheet <- function(wb,
+                                        sheet_name,
+                                        description,
+                                        x,
+                                        merge_cols,
+                                        styles,
+                                        start_row_data = 3L,
+                                        start_col_data = 1L,
+                                        note_row_height = 60) {
+  sheet <- .xlsx_add_sheet(wb, sheet_name)
+
+  openxlsx::writeData(
+    wb,
+    sheet,
+    x = description,
+    startCol = 1,
+    startRow = 1
+  )
+
+  if (!is.null(merge_cols) && merge_cols >= 1L) {
+    openxlsx::mergeCells(wb, sheet, cols = 1:merge_cols, rows = 1)
+    openxlsx::addStyle(
+      wb,
+      sheet,
+      style = styles$note,
+      rows = 1,
+      cols = 1,
+      gridExpand = TRUE
+    )
+    openxlsx::setRowHeights(wb, sheet, rows = 1, heights = note_row_height)
+  }
+
+  openxlsx::writeData(
+    wb,
+    sheet,
+    x = x,
+    startRow = start_row_data,
+    startCol = start_col_data,
+    headerStyle = styles$bold
+  )
+
+  invisible(sheet)
+}
+
+.xlsx_save_or_return <- function(wb, file) {
+  if (is.null(file)) {
+    return(wb)
+  }
+
+  openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+  normalizePath(file, winslash = "/")
+}
+
+.rename_correlation_export_cols <- function(x) {
+  names(x)[names(x) == "col1"] <- "Metabolite 1"
+  names(x)[names(x) == "col2"] <- "Metabolite 2"
+  names(x)[names(x) == "cor"] <- "Pearson's r"
+  x
+}
+
 #--------- Report text helper for popovers and HTML report
 
 #' text for data structure and information requirements

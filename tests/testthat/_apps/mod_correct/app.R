@@ -56,8 +56,11 @@ server <- function(input, output, session) {
   })
   output$transformed_n <- renderText({
     tr <- mod$transformed()
-    if (is.null(tr) || is.null(tr$df)) return(NA_integer_)
-    as.character(nrow(tr$df))
+    if (is.null(tr)) return(NA_integer_)
+    df <- tr$df_no_mv
+    if (is.null(df)) df <- tr$df_mv
+    if (is.null(df)) return(NA_integer_)
+    as.character(nrow(df))
   })
   outputOptions(output, "correct_params_json", suspendWhenHidden = FALSE)
   outputOptions(output, "transformed_n",      suspendWhenHidden = FALSE)

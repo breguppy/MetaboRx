@@ -6,7 +6,10 @@ render_report <- function(
   p,
   d,
   out_dir,
-  template = system.file("app", "report_templates", "report.Rmd", package = "QCcorrection")
+  template = system.file("app", "report_templates", "report.Rmd", package = "QCcorrection"),
+  rsd_plot_data = NULL,
+  pca_pair = NULL,
+  hotelling_res = NULL
 ) {
   .require_pkg("rmarkdown", "render reports")
 
@@ -22,7 +25,7 @@ render_report <- function(
 
     met1_plot <- make_met_scatter(d, p, met_candidates[1])
     met2_plot <- make_met_scatter(d, p, met_candidates[2])
-    rsd_plot_data <- .get_rsd_plot_data(p, d)
+    rsd_plot_data <- rsd_plot_data %||% .get_rsd_plot_data(p, d)
     rsd_plot <- make_rsd_plot(
       p,
       d,
@@ -33,7 +36,7 @@ render_report <- function(
     pca_compare_data <- get_pca_compare_data(
       p = p,
       d = d,
-      pca_compare = p$pca_compare
+      pca_compare = p$pca_compare %||% "filtered_cor_data"
     )
 
     meta_df <- NULL
@@ -44,16 +47,17 @@ render_report <- function(
       meta_cols <- unique(c("sample", setdiff(names(meta_df), "sample")))
     }
 
-    pca_pair <- compute_pca_pair(
-      before = pca_compare_data$before,
-      after = pca_compare_data$after,
-      p = p,
-      before_label = "Before",
-      after_label = "After",
-      meta_cols = meta_cols,
-      meta_df = meta_df,
-      sample_col = "sample"
-    )
+    pca_pair <- pca_pair %||%
+      compute_pca_pair(
+        before = pca_compare_data$before,
+        after = pca_compare_data$after,
+        p = p,
+        before_label = "Before",
+        after_label = "After",
+        meta_cols = meta_cols,
+        meta_df = meta_df,
+        sample_col = "sample"
+      )
 
     pca_plot <- plot_pca_from_result(
       p = p,
@@ -66,7 +70,11 @@ render_report <- function(
       compared_to = pca_compare_data$compared_to
     )
 
-    hotelling_pca_plot <- d$hotelling_res$pca_plot
+    hotelling_res <- hotelling_res %||% d$hotelling_res
+    if (is.null(hotelling_res)) {
+      hotelling_res <- detect_hotelling_nonqc_dual_z(d$filtered_corrected$df_no_mv, p)
+    }
+    hotelling_pca_plot <- hotelling_res$pca_plot
 
     shiny::incProgress(1 / 3, detail = "Saved: plots for report")
 

@@ -26,7 +26,13 @@ test_that("full app loads and basic flow works", {
   )
   app$set_inputs("import-mv_cutoff" = 20)
   app$wait_for_value(output = "import-filter_info")
-  app$wait_for_js("!document.getElementById('import-next_correction').disabled")
+  app$wait_for_value(output = "import-next_correction_ui")
+  app$wait_for_js("
+    (() => {
+      const btn = document.getElementById('import-next_correction');
+      return btn !== null && !btn.disabled;
+    })()
+  ")
   app$click("import-next_correction")
   app$wait_for_value(input = "main_steps"); expect_equal(app$get_value(input="main_steps"), "tab_correct")
   

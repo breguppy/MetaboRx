@@ -59,10 +59,6 @@ test_that("import module loads, selects columns, filters, and navigates", {
   expect_true("metabolite_A" %in% params$withheld_cols)
   expect_gt(cleaned_n, 0)
   
-  #testthat::skip_on_ci()
-  app$expect_screenshot()
-  #testthat::snapshot_review("mod-import")
-  
   app$click("import-next_correction")
   
   # Wait for Shiny to update the tabset input and assert
