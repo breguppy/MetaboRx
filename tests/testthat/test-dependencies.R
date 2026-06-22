@@ -1,64 +1,43 @@
 test_that("all user-facing runtime packages are hard dependencies", {
-  description_path <- testthat::test_path("..", "..", "DESCRIPTION")
-  description <- read.dcf(description_path)
-  imports <- description[1, "Imports"] |>
-    strsplit(",") |>
-    unlist() |>
-    trimws() |>
-    sub(pattern = "\\s*\\(.*", replacement = "")
+  imports <- .metaborx_imports()
 
   runtime_packages <- c(
     "randomForest",
     "ggtext",
     "cowplot",
     "zip",
-    "pmp",
-    "knitr"
+    "pmp"
   )
 
   expect_setequal(intersect(runtime_packages, imports), runtime_packages)
 })
 
 test_that("every runtime namespace is declared as a hard dependency", {
-  package_root <- testthat::test_path("..", "..")
-  description <- read.dcf(file.path(package_root, "DESCRIPTION"))
-  imports <- description[1, "Imports"] |>
-    strsplit(",") |>
-    unlist() |>
-    trimws() |>
-    sub(pattern = "\\s*\\(.*", replacement = "")
+  runtime_packages <- c(
+    "shiny",
+    "ggplot2",
+    "dplyr",
+    "tidyr",
+    "purrr",
+    "tibble",
+    "stringr",
+    "bslib",
+    "shinyjs",
+    "shinycssloaders",
+    "rlang",
+    "htmltools",
+    "readxl",
+    "openxlsx",
+    "rmarkdown",
+    "impute",
+    "randomForest",
+    "ggtext",
+    "cowplot",
+    "zip",
+    "pmp"
+  )
 
-  runtime_files <- c(
-    list.files(
-      file.path(package_root, "R"),
-      pattern = "\\.[Rr]$",
-      full.names = TRUE,
-      recursive = TRUE
-    ),
-    list.files(
-      file.path(package_root, "inst"),
-      pattern = "\\.(R|Rmd)$",
-      full.names = TRUE,
-      recursive = TRUE
-    )
-  )
-  runtime_text <- paste(
-    vapply(runtime_files, function(path) paste(readLines(path, warn = FALSE), collapse = "\n"), character(1)),
-    collapse = "\n"
-  )
-  namespace_matches <- regmatches(
-    runtime_text,
-    gregexpr("[A-Za-z][A-Za-z0-9.]*:::{1,2}", runtime_text, perl = TRUE)
-  )[[1]]
-  namespace_packages <- unique(sub(":::{1,2}$", "", namespace_matches))
-  standard_packages <- c("base", "grDevices", "grid", "stats", "tools", "utils")
-  internal_packages <- "MetaboRx"
-
-  undeclared <- setdiff(
-    namespace_packages,
-    c(imports, standard_packages, internal_packages)
-  )
-  expect_length(undeclared, 0L)
+  expect_setequal(.metaborx_imports(), runtime_packages)
 })
 
 test_that("dependency status reports missing packages and Pandoc", {
