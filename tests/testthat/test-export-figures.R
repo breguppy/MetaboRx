@@ -58,3 +58,47 @@ test_that("export_figures preserves returned file groups and names", {
   testthat::expect_true(all(grepl("\\.png$", c(res$rsd, res$pca, res$pca_loadings_plots, res$metabolite))))
   testthat::expect_true(grepl("pca_loadings\\.xlsx$", res$pca_loadings_xlsx))
 })
+
+test_that("PDF export uses base PDF when Cairo is unavailable", {
+  expect_identical(
+    .pdf_export_device(cairo_available = FALSE),
+    .base_pdf_export_device
+  )
+  expect_identical(
+    .pdf_export_device(cairo_available = TRUE),
+    grDevices::cairo_pdf
+  )
+})
+
+test_that("export_figures writes nonempty PDF files", {
+  out_dir <- tempfile("figures-pdf-test-")
+  dir.create(out_dir)
+  on.exit(unlink(out_dir, recursive = TRUE, force = TRUE), add = TRUE)
+
+  p <- list(
+    remove_imputed = FALSE,
+    transform = "none",
+    fig_format = "pdf",
+    qcImputeM = "median",
+    samImputeM = "median"
+  )
+  old_options <- options(MetaboRx.cairo_available = FALSE)
+  on.exit(options(old_options), add = TRUE)
+
+  session <- shiny::MockShinySession$new()
+  expect_warning(
+    res <- shiny::withReactiveDomain(
+      session,
+      export_figures(p = p, d = make_export_figures_data(), out_dir = out_dir)
+    ),
+    NA
+  )
+  figure_paths <- unlist(
+    res[c("rsd", "pca", "pca_loadings_plots", "metabolite")],
+    use.names = FALSE
+  )
+
+  expect_true(all(grepl("\\.pdf$", figure_paths)))
+  expect_true(all(file.exists(figure_paths)))
+  expect_true(all(file.size(figure_paths) > 0L))
+})

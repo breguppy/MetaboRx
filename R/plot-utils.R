@@ -128,7 +128,7 @@ blk <- function(col,
 #' @noRd
 circle <- function(col, ptsize = 12) {
   sprintf(
-    "<span style='color:%s; font-size:%dpt'>&#9679;</span>",
+    "<span style='color:%s; font-size:%dpt; font-weight:bold'>o</span>",
     col,
     ptsize
   )
