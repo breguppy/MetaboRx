@@ -1,12 +1,12 @@
 #' Install optional MetaboRx dependencies
 #'
-#' Installs optional packages used by MetaboRx for advanced correction,
-#' outlier detection, reporting, and testing.
+#' Installs optional packages used to develop and test MetaboRx.
 #'
 #' @details
-#' This function installs packages intended for optional functionality, not the
-#' core package dependencies listed in \code{Imports}. Core dependencies are
-#' installed automatically when MetaboRx itself is installed.
+#' Normal MetaboRx users do not need to call this function. Every package used
+#' by the app's analysis and export features is listed in \code{Imports} and is
+#' installed with MetaboRx. This helper installs packages used by contributors
+#' for automated tests, browser tests, benchmarks, and package development.
 #'
 #' @return
 #' Invisibly returns a list with character vectors of missing CRAN and
@@ -19,20 +19,12 @@
 #' @export
 install_optional_dependencies <- function() {
   cran_pkgs <- c(
-    "randomForest",
-    "robustbase",
-    "outliers",
-    "EnvStats",
-    "ggtext",
     "httpuv",
-    "cowplot",
     "jsonlite",
-    "zip",
     "testthat",
     "shinytest2",
-    "corpcor",
-    "pkgload",
-    "knitr"
+    "chromote",
+    "pkgload"
   )
 
   installed <- rownames(installed.packages())
@@ -47,7 +39,7 @@ install_optional_dependencies <- function() {
   }
 
   if (length(cran_missing) == 0L) {
-    message("All optional MetaboRx dependencies already installed.")
+    message("All MetaboRx development dependencies are already installed.")
   }
 
   invisible(list(

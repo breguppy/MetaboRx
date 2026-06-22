@@ -26,23 +26,20 @@ Imports:
     readxl,
     openxlsx,
     rmarkdown,
-    impute
-Suggests:
+    impute,
     randomForest,
-    robustbase,
-    outliers,
-    EnvStats,
     ggtext,
-    httpuv,
     cowplot,
-    jsonlite,
     zip,
+    pmp,
+    knitr
+Suggests:
+    httpuv,
+    jsonlite,
     testthat (>= 3.0.0),
     shinytest2,
-    corpcor,
-    pkgload,
-    knitr,
-    pmp
+    chromote,
+    pkgload
 Remotes:
     bioc::impute,
     bioc::pmp

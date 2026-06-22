@@ -7,15 +7,19 @@
 check_required_dependencies()
 }
 \value{
-Invisibly returns a list of missing require packages
+Invisibly returns a list containing missing packages, Pandoc availability,
+and an overall readiness flag. Stops with repair instructions when the
+installation is incomplete.
 }
 \description{
-Checks that packages required by MetaboRx are installed
+Checks that MetaboRx is ready to run
 }
 \details{
-This function checks that core package dependencies listed in \code{Imports}
-are installed. Core dependencies are installed automatically when
-MetaboRx itself is installed.
+This function derives the runtime package list from the package's
+\code{Imports} field, checks that every package is installed, and verifies
+that Pandoc is available for the HTML quality report included in Download
+All. Core dependencies are installed automatically with MetaboRx. RStudio
+Desktop includes Pandoc.
 }
 \examples{
 \dontrun{
