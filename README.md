@@ -2,7 +2,7 @@
 
 MetaboRx is an interactive application for metabolomics data quality assessment, signal drift correction, normalization, visualization, and export. It runs in a web browser, but your data stays in the R session running on your computer.
 
-You do not need prior programming experience. You do not need Git or a command-line terminal. The only R commands required are provided below for you to copy and paste into RStudio.
+You do not need prior programming experience or a command-line terminal. The standard public installation below does not require Git: `remotes::install_github()` downloads a source archive from GitHub, and MetaboRx does not use Git submodules. Some computers may still need platform build tools when a precompiled package is unavailable; on Windows that means Rtools, which is separate from Git.
 
 ## Before you begin
 
@@ -122,6 +122,7 @@ You can then repeat the installation instructions above.
 
 - Restart RStudio with Session > Restart R and repeat the full installation block.
 - Confirm that your R version is 4.4 or newer by running `R.version.string`.
+- Use the installation block above rather than cloning the repository. MetaboRx itself does not require Git. If an error explicitly asks for Git, save the complete message because it identifies which installer or dependency made that request.
 - On Windows, install the matching version of [Rtools](https://cran.r-project.org/bin/windows/Rtools/) if an error says that build tools are required.
 - On macOS, follow the compiler-tool guidance on the [R for macOS tools page](https://mac.r-project.org/tools/).
 - On Linux, follow the system dependency guidance for your distribution on [R for Linux](https://cran.r-project.org/bin/linux/).
