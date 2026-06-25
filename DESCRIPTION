@@ -26,26 +26,20 @@ Imports:
     readxl,
     openxlsx,
     rmarkdown,
-    impute
-Suggests:
+    impute,
     randomForest,
-    robustbase,
-    outliers,
-    EnvStats,
     ggtext,
-    httpuv,
     cowplot,
-    jsonlite,
     zip,
+    pmp
+Suggests:
+    httpuv,
+    jsonlite,
+    knitr,
     testthat (>= 3.0.0),
     shinytest2,
-    corpcor,
-    pkgload,
-    knitr,
-    pmp
-Remotes:
-    bioc::impute,
-    bioc::pmp
+    chromote,
+    pkgload
 VignetteBuilder: knitr
 biocViews: Software, ShinyApps, MassSpectrometry, Metabolomics, QualityControl
 Config/testthat/edition: 3

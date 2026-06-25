@@ -98,7 +98,10 @@ render_report <- function(
     html_out <- rmarkdown::render(
       input = template,
       output_format = "html_document",
-      output_file = file.path(out_dir, "quality_report.html"),
+      output_file = "quality_report.html",
+      output_dir = out_dir,
+      intermediates_dir = out_dir,
+      knit_root_dir = out_dir,
       params = params,
       envir = env,
       quiet = TRUE

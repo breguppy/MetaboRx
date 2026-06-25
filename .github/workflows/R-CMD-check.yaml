@@ -1,21 +1,43 @@
 name: R-CMD-check
 
-on:
+"on":
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   R-CMD-check:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.config.label }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - label: Ubuntu (R 4.4, PNG export)
+            os: ubuntu-latest
+            r: "4.4"
+            fig-format: png
+          - label: Ubuntu (R release, PDF export)
+            os: ubuntu-latest
+            r: release
+            fig-format: pdf
+          - label: Windows (R release, PDF export)
+            os: windows-latest
+            r: release
+            fig-format: pdf
+          - label: macOS (R release, PNG export)
+            os: macos-latest
+            r: release
+            fig-format: png
 
     env:
-      R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
+      _R_CHECK_FORCE_SUGGESTS_: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -24,16 +46,86 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: "4.4"
+          r-version: ${{ matrix.config.r }}
           use-public-rspm: true
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
+            any::devtools
             any::rcmdcheck
-            pmp=?ignore
+            any::remotes
           needs: check
 
+      - name: Verify clean-library installation
+        shell: Rscript {0}
+        run: |
+          existing_libraries <- .libPaths()
+          clean_library <- tempfile("metaborx-library-")
+          dir.create(clean_library)
+          install_status <- system2(
+            file.path(R.home("bin"), "R"),
+            c(
+              "CMD",
+              "INSTALL",
+              paste0("--library=", clean_library),
+              "."
+            )
+          )
+          stopifnot(identical(install_status, 0L))
+          .libPaths(c(clean_library, existing_libraries))
+          library(MetaboRx, lib.loc = clean_library)
+          status <- MetaboRx::check_required_dependencies()
+          stopifnot(isTRUE(status[["ready"]]))
+
       - uses: r-lib/actions/check-r-package@v2
+
+      - name: Verify complete export archive
+        shell: Rscript {0}
         env:
-          _R_CHECK_FORCE_SUGGESTS_: false
+          METABORX_RUN_EXPORT_INTEGRATION: "true"
+          METABORX_TEST_FIG_FORMAT: ${{ matrix.config.fig-format }}
+        run: |
+          devtools::test(
+            filter = "export-bundle",
+            reporter = "summary",
+            stop_on_failure = TRUE
+          )
+
+  full-app-smoke-test:
+    name: Full Shiny app smoke test
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
+      _R_CHECK_FORCE_SUGGESTS_: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::devtools
+            any::rcmdcheck
+            any::remotes
+          needs: check
+
+      - name: Run full Shiny app smoke test
+        shell: Rscript {0}
+        env:
+          METABORX_RUN_BROWSER_TESTS: "true"
+        run: |
+          devtools::test(
+            filter = "full-app",
+            reporter = "summary",
+            stop_on_failure = TRUE
+          )

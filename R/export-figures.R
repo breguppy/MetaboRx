@@ -1,3 +1,24 @@
+#' Select the most portable available PDF graphics device
+#'
+#' @keywords internal
+#' @noRd
+.base_pdf_export_device <- function(filename, ...) {
+  grDevices::pdf(file = filename, useDingbats = FALSE, ...)
+}
+
+.pdf_export_device <- function(
+  cairo_available = getOption(
+    "MetaboRx.cairo_available",
+    capabilities("cairo")
+  )
+) {
+  if (isTRUE(cairo_available)) {
+    grDevices::cairo_pdf
+  } else {
+    .base_pdf_export_device
+  }
+}
+
 #' exports figures and returns file path for zip folder
 #'
 #' @keywords internal
@@ -40,14 +61,30 @@ export_figures <- function(p,
         bg = "white"
       )
     } else {
-      ggplot2::ggsave(
-        filename = path,
-        plot = plot,
-        width = w,
-        height = h,
-        units = "in",
-        device = grDevices::cairo_pdf
-      )
+      pdf_device <- .pdf_export_device()
+      save_pdf <- function() {
+        ggplot2::ggsave(
+          filename = path,
+          plot = plot,
+          width = w,
+          height = h,
+          units = "in",
+          device = pdf_device
+        )
+      }
+
+      if (identical(pdf_device, .base_pdf_export_device)) {
+        withCallingHandlers(
+          save_pdf(),
+          warning = function(warning) {
+            if (grepl("conversion failure.*mbcsToSbcs", conditionMessage(warning))) {
+              invokeRestart("muffleWarning")
+            }
+          }
+        )
+      } else {
+        save_pdf()
+      }
     }
     normalizePath(path, winslash = "/", mustWork = TRUE)
   }
