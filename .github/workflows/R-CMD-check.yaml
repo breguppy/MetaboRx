@@ -60,18 +60,23 @@ jobs:
       - name: Verify clean-library installation
         shell: Rscript {0}
         run: |
+          existing_libraries <- .libPaths()
           clean_library <- tempfile("metaborx-library-")
           dir.create(clean_library)
-          remotes::install_local(
-            ".",
-            lib = clean_library,
-            dependencies = NA,
-            upgrade = "never",
-            quiet = TRUE
+          install_status <- system2(
+            file.path(R.home("bin"), "R"),
+            c(
+              "CMD",
+              "INSTALL",
+              paste0("--library=", clean_library),
+              "."
+            )
           )
+          stopifnot(identical(install_status, 0L))
+          .libPaths(c(clean_library, existing_libraries))
           library(MetaboRx, lib.loc = clean_library)
           status <- MetaboRx::check_required_dependencies()
-          stopifnot(isTRUE(status$ready))
+          stopifnot(isTRUE(status[["ready"]]))
 
       - uses: r-lib/actions/check-r-package@v2
 
