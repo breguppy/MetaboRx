@@ -331,6 +331,95 @@ compute_pca_pair <- function(
   )
 }
 
+.pca_color_palette <- function() {
+  c(
+    "#F3C300", "#875692", "#ee7733", "#A1CAF1", "#BE0032",
+    "#C2B280", "#555555", "#008856", "#E68FAC", "#0067A5",
+    "#F99379", "#332288", "#F6A600", "#B3446C", "#DCD300",
+    "#882D17", "#8DB600", "#654522", "#E25822", "#2B3D26",
+    "#bbbbbb", "#000000", "#33bbee", "#ccddaa", "#225555"
+  )
+}
+
+.pca_shapes <- function() {
+  c(
+    16, 17, 15, 18, 1, 2, 0, 5, 6, 3, 7, 8,
+    9, 10, 11, 12, 13, 14, 4, 19, 20, 21, 22, 23, 24, 25
+  )
+}
+
+.pca_non_missing_values <- function(x) {
+  x[!is.na(x)]
+}
+
+.pca_as_numeric_like <- function(x) {
+  if (is.numeric(x) || is.integer(x)) {
+    return(as.numeric(x))
+  }
+
+  suppressWarnings(as.numeric(trimws(as.character(x))))
+}
+
+.pca_is_numeric_like <- function(x) {
+  if (is.numeric(x) || is.integer(x)) {
+    return(TRUE)
+  }
+
+  values <- trimws(as.character(.pca_non_missing_values(x)))
+  values <- values[nzchar(values)]
+
+  if (length(values) == 0L) {
+    return(FALSE)
+  }
+
+  parsed <- suppressWarnings(as.numeric(values))
+  all(!is.na(parsed))
+}
+
+.pca_group_levels <- function(x, numeric_like = .pca_is_numeric_like(x)) {
+  values <- .pca_non_missing_values(x)
+
+  if (length(values) == 0L) {
+    return(character(0))
+  }
+
+  if (isTRUE(numeric_like)) {
+    return(as.character(sort(unique(.pca_as_numeric_like(values)))))
+  }
+
+  sort(unique(as.character(values)))
+}
+
+.pca_valid_color_choices <- function(meta_df) {
+  candidates <- setdiff(names(meta_df), "sample")
+  candidates[vapply(
+    candidates,
+    function(col) {
+      values <- meta_df[[col]]
+
+      if (.pca_is_numeric_like(values)) {
+        return(length(.pca_group_levels(values, numeric_like = TRUE)) > 0L)
+      }
+
+      group_count <- length(.pca_group_levels(values, numeric_like = FALSE))
+      group_count > 0L && group_count <= length(.pca_color_palette())
+    },
+    logical(1)
+  )]
+}
+
+.pca_valid_shape_choices <- function(meta_df) {
+  candidates <- setdiff(names(meta_df), c("sample", "order"))
+  candidates[vapply(
+    candidates,
+    function(col) {
+      group_count <- length(.pca_group_levels(meta_df[[col]]))
+      group_count > 0L && group_count <= length(.pca_shapes())
+    },
+    logical(1)
+  )]
+}
+
 
 #' Build PCA score plot from precomputed PCA results
 #'
@@ -368,18 +457,8 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   var_raw <- 100 * pca_pair$before$explained_variance$explained_variance[1:2]
   var_cor <- 100 * pca_pair$after$explained_variance$explained_variance[1:2]
 
-  cbPalette <- c(
-    "#F3C300", "#875692", "#ee7733", "#A1CAF1", "#BE0032",
-    "#C2B280", "#555555", "#008856", "#E68FAC", "#0067A5",
-    "#F99379", "#332288", "#F6A600", "#B3446C", "#DCD300",
-    "#882D17", "#8DB600", "#654522", "#E25822", "#2B3D26",
-    "#bbbbbb", "#000000", "#33bbee", "#ccddaa", "#225555"
-  )
-
-  pca_shapes <- c(
-    16, 17, 15, 18, 1, 2, 0, 5, 6, 3, 7, 8,
-    9, 10, 11, 12, 13, 14, 4, 19, 20, 21, 22, 23, 24, 25
-  )
+  cbPalette <- .pca_color_palette()
+  pca_shapes <- .pca_shapes()
 
   col <- as.character(p$color_col %||% "class")
   shape_col <- as.character(p$shape_col %||% "none")
@@ -400,12 +479,8 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
     }
   }
 
-  is_numeric_like <- function(x) {
-    is.numeric(x) || is.integer(x)
-  }
-
-  before_is_numeric <- is_numeric_like(before_df[[col]])
-  after_is_numeric <- is_numeric_like(after_df[[col]])
+  before_is_numeric <- .pca_is_numeric_like(before_df[[col]])
+  after_is_numeric <- .pca_is_numeric_like(after_df[[col]])
 
   if (before_is_numeric != after_is_numeric) {
     stop(sprintf(
@@ -419,9 +494,13 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   legend_rel_width <- 0.32
 
   if (use_gradient) {
-    combined[[col]] <- as.numeric(combined[[col]])
-    before_df[[col]] <- as.numeric(before_df[[col]])
-    after_df[[col]] <- as.numeric(after_df[[col]])
+    combined[[col]] <- .pca_as_numeric_like(combined[[col]])
+    before_df[[col]] <- .pca_as_numeric_like(before_df[[col]])
+    after_df[[col]] <- .pca_as_numeric_like(after_df[[col]])
+
+    if (!any(!is.na(combined[[col]]))) {
+      stop(sprintf("Column '%s' contains no non-missing values.", col))
+    }
 
     color_range <- range(combined[[col]], na.rm = TRUE)
     legend_rel_width <- 0.32
@@ -435,10 +514,25 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       )
     }
   } else {
-    lvls <- sort(unique(as.character(c(before_df[[col]], after_df[[col]]))))
+    lvls <- .pca_group_levels(
+      c(before_df[[col]], after_df[[col]]),
+      numeric_like = FALSE
+    )
+
+    if (length(lvls) == 0L) {
+      stop(sprintf("Column '%s' contains no non-missing values.", col))
+    }
 
     if (length(lvls) > length(cbPalette)) {
-      stop("Too many groups for palette.")
+      stop(sprintf(
+        paste(
+          "Too many groups for PCA color palette in column '%s'.",
+          "Found %d groups, but only %d colors are available."
+        ),
+        col,
+        length(lvls),
+        length(cbPalette)
+      ))
     }
 
     cols <- stats::setNames(cbPalette[seq_along(lvls)], lvls)
@@ -465,8 +559,8 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
   shape_legend_ncol <- 1L
 
   if (isTRUE(use_shape)) {
-    before_shape_is_numeric <- is_numeric_like(before_df[[shape_col]])
-    after_shape_is_numeric <- is_numeric_like(after_df[[shape_col]])
+    before_shape_is_numeric <- .pca_is_numeric_like(before_df[[shape_col]])
+    after_shape_is_numeric <- .pca_is_numeric_like(after_df[[shape_col]])
 
     if (before_shape_is_numeric != after_shape_is_numeric) {
       stop(sprintf(
@@ -475,20 +569,11 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
       ))
     }
 
-    if (before_shape_is_numeric && after_shape_is_numeric) {
-      shape_lvls <- sort(unique(as.numeric(c(
-        before_df[[shape_col]],
-        after_df[[shape_col]]
-      ))))
-      shape_lvls <- as.character(shape_lvls)
-    } else {
-      shape_lvls <- sort(unique(as.character(c(
-        before_df[[shape_col]],
-        after_df[[shape_col]]
-      ))))
-    }
-
-    shape_lvls <- shape_lvls[!is.na(shape_lvls)]
+    shape_is_numeric <- before_shape_is_numeric && after_shape_is_numeric
+    shape_lvls <- .pca_group_levels(
+      c(before_df[[shape_col]], after_df[[shape_col]]),
+      numeric_like = shape_is_numeric
+    )
 
     if (length(shape_lvls) == 0L) {
       stop(sprintf("Shape column '%s' contains no non-missing values.", shape_col))
@@ -508,15 +593,17 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
 
     shape_values <- stats::setNames(pca_shapes[seq_along(shape_lvls)], shape_lvls)
 
-    before_df[[shape_aes_col]] <- factor(
-      as.character(before_df[[shape_col]]),
-      levels = shape_lvls
-    )
+    if (isTRUE(shape_is_numeric)) {
+      before_shape_values <- as.character(.pca_as_numeric_like(before_df[[shape_col]]))
+      after_shape_values <- as.character(.pca_as_numeric_like(after_df[[shape_col]]))
+    } else {
+      before_shape_values <- as.character(before_df[[shape_col]])
+      after_shape_values <- as.character(after_df[[shape_col]])
+    }
 
-    after_df[[shape_aes_col]] <- factor(
-      as.character(after_df[[shape_col]]),
-      levels = shape_lvls
-    )
+    before_df[[shape_aes_col]] <- factor(before_shape_values, levels = shape_lvls)
+
+    after_df[[shape_aes_col]] <- factor(after_shape_values, levels = shape_lvls)
 
     if (length(shape_lvls) > 8L) {
       shape_legend_ncol <- 2L
@@ -1251,12 +1338,12 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
 
   if (is.null(meta_df)) {
     color_choices <- c("batch", "class", "order")
-    shape_choices <- c("batch", "class")
+    shape_choices <- c("batch", "class", "none")
     meta_cols <- c("sample", "batch", "class", "order")
   } else {
-    color_choices <- setdiff(names(meta_df), "sample")
-    shape_choices <- setdiff(names(meta_df), c("sample", "order"))
-    meta_cols <- c("sample", color_choices)
+    color_choices <- .pca_valid_color_choices(meta_df)
+    shape_choices <- c(.pca_valid_shape_choices(meta_df), "none")
+    meta_cols <- unique(c("sample", setdiff(names(meta_df), "sample")))
   }
 
   specs <- expand.grid(
