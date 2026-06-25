@@ -788,8 +788,8 @@ ui_rsd_eval <- function(ns) {
 #' @keywords internal
 #' @noRd
 ui_pca_eval <- function(meta_df, ns) {
-  color_options <- setdiff(names(meta_df), "sample")
-  shape_options <- setdiff(names(meta_df), c("sample", "order"))
+  color_options <- .pca_valid_color_choices(meta_df)
+  shape_options <- .pca_valid_shape_choices(meta_df)
 
   # optional prioritization
   priority <- c("batch", "class", "order")
@@ -801,6 +801,12 @@ ui_pca_eval <- function(meta_df, ns) {
     intersect(c("batch", "class"), shape_options),
     setdiff(shape_options, c("batch", "class"))
   )
+  shape_choices <- c("No shapes" = "none", stats::setNames(shape_options, shape_options))
+  selected_shape <- if (length(shape_options) > 0L) {
+    shape_options[1]
+  } else {
+    "none"
+  }
 
   tagList(
     radioButtons(
@@ -821,8 +827,8 @@ ui_pca_eval <- function(meta_df, ns) {
     radioButtons(
       ns("shape_col"),
       "Sample shape defined by",
-      choices = stats::setNames(shape_options, shape_options),
-      selected = shape_options[1]
+      choices = shape_choices,
+      selected = selected_shape
     )
   )
 }

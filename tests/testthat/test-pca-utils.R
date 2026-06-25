@@ -33,6 +33,39 @@ make_pca_pair <- function() {
   )
 }
 
+make_large_pca_pair <- function(n = 30L) {
+  explained_variance <- data.frame(
+    PC = c("PC1", "PC2"),
+    explained_variance = c(0.6, 0.3),
+    cumulative_explained_variance = c(0.6, 0.9)
+  )
+
+  before_scores <- data.frame(
+    PC1 = seq(-1, 1, length.out = n),
+    PC2 = seq(1, -1, length.out = n),
+    sample = paste0("b", seq_len(n)),
+    class = rep(c("QC", "sample"), length.out = n),
+    many_colors = paste0("c", seq_len(n)),
+    many_shapes = paste0("s", seq_len(n)),
+    check.names = FALSE
+  )
+
+  after_scores <- data.frame(
+    PC1 = seq(-0.5, 0.5, length.out = n),
+    PC2 = seq(0.5, -0.5, length.out = n),
+    sample = paste0("a", seq_len(n)),
+    class = rep(c("QC", "sample"), length.out = n),
+    many_colors = paste0("c", seq_len(n) + n),
+    many_shapes = paste0("s", seq_len(n) + n),
+    check.names = FALSE
+  )
+
+  list(
+    before = list(scores = before_scores, explained_variance = explained_variance),
+    after = list(scores = after_scores, explained_variance = explained_variance)
+  )
+}
+
 test_that("plot_pca_from_result accepts factor-valued shape settings from expand.grid", {
   testthat::skip_if_not_installed("cowplot")
 
@@ -48,6 +81,103 @@ test_that("plot_pca_from_result accepts factor-valued shape settings from expand
   )
 
   testthat::expect_s3_class(plot, "ggplot")
+})
+
+test_that("PCA color choices keep numeric-like columns regardless of group count", {
+  meta_df <- data.frame(
+    sample = paste0("s", seq_len(30)),
+    order_text = as.character(seq_len(30)),
+    too_many_groups = paste0("g", seq_len(30)),
+    check.names = FALSE
+  )
+
+  choices <- .pca_valid_color_choices(meta_df)
+
+  testthat::expect_true("order_text" %in% choices)
+  testthat::expect_false("too_many_groups" %in% choices)
+})
+
+test_that("PCA shape choices exclude columns with too many groups", {
+  meta_df <- data.frame(
+    sample = paste0("s", seq_len(30)),
+    batch = rep(c("b1", "b2"), length.out = 30),
+    too_many_shapes = paste0("s", seq_len(30)),
+    check.names = FALSE
+  )
+
+  choices <- .pca_valid_shape_choices(meta_df)
+
+  testthat::expect_true("batch" %in% choices)
+  testthat::expect_false("too_many_shapes" %in% choices)
+})
+
+test_that("plot_pca_from_result uses gradient for numeric-like color columns", {
+  testthat::skip_if_not_installed("cowplot")
+
+  pca_pair <- make_pca_pair()
+  pca_pair$before$scores$order_text <- as.character(pca_pair$before$scores$order)
+  pca_pair$after$scores$order_text <- as.character(pca_pair$after$scores$order)
+
+  plot <- plot_pca_from_result(
+    p = list(color_col = "order_text", shape_col = "none"),
+    pca_pair = pca_pair,
+    compared_to = "Corrected Data"
+  )
+
+  testthat::expect_s3_class(plot, "ggplot")
+})
+
+test_that("plot_pca_from_result errors for forced over-limit color and shape groups", {
+  pca_pair <- make_large_pca_pair()
+
+  testthat::expect_error(
+    plot_pca_from_result(
+      p = list(color_col = "many_colors", shape_col = "none"),
+      pca_pair = pca_pair,
+      compared_to = "Corrected Data"
+    ),
+    "Too many groups for PCA color palette"
+  )
+
+  testthat::expect_error(
+    plot_pca_from_result(
+      p = list(color_col = "class", shape_col = "many_shapes"),
+      pca_pair = pca_pair,
+      compared_to = "Corrected Data"
+    ),
+    "Too many groups for point shapes"
+  )
+})
+
+test_that("plot_pca_from_result accepts explicit no-shape option", {
+  testthat::skip_if_not_installed("cowplot")
+
+  plot <- plot_pca_from_result(
+    p = list(color_col = "class", shape_col = "none"),
+    pca_pair = make_pca_pair(),
+    compared_to = "Corrected Data"
+  )
+
+  testthat::expect_s3_class(plot, "ggplot")
+})
+
+test_that("PCA UI offers no-shape choice and filters over-limit columns", {
+  meta_df <- data.frame(
+    sample = paste0("s", seq_len(30)),
+    batch = rep(c("b1", "b2"), length.out = 30),
+    order_text = as.character(seq_len(30)),
+    too_many_groups = paste0("g", seq_len(30)),
+    too_many_shapes = paste0("s", seq_len(30)),
+    check.names = FALSE
+  )
+
+  rendered <- htmltools::renderTags(ui_pca_eval(meta_df, ns = identity))$html
+
+  testthat::expect_match(rendered, "value=\"none\"", fixed = TRUE)
+  testthat::expect_match(rendered, "No shapes", fixed = TRUE)
+  testthat::expect_match(rendered, "value=\"order_text\"", fixed = TRUE)
+  testthat::expect_false(grepl("value=\"too_many_groups\"", rendered, fixed = TRUE))
+  testthat::expect_false(grepl("value=\"too_many_shapes\"", rendered, fixed = TRUE))
 })
 
 make_pca_export_data <- function(drop_corrected_met_c = FALSE) {
