@@ -1,18 +1,35 @@
-library(testthat)
-library(shinytest2)
-
 test_that("full app loads and basic flow works", {
   options(shiny.port = NULL, shiny.launch.browser = FALSE)
   Sys.unsetenv("SHINY_PORT")
+  smoke_test_packages <- c("httpuv", "shinytest2")
+  missing_packages <- smoke_test_packages[
+    !purrr::map_lgl(smoke_test_packages, requireNamespace, quietly = TRUE)
+  ]
+  if (length(missing_packages) > 0 && identical(Sys.getenv("CI"), "true")) {
+    testthat::fail(
+      paste(
+        "Full app smoke test dependencies are missing in CI:",
+        paste(missing_packages, collapse = ", ")
+      )
+    )
+  }
+  testthat::skip_if(
+    length(missing_packages) > 0,
+    paste(
+      "Full app smoke test dependencies are not installed:",
+      paste(missing_packages, collapse = ", ")
+    )
+  )
 
-  app <- AppDriver$new(
+  app <- shinytest2::AppDriver$new(
     test_path("_apps/full_app"),
     name = "full_app_smoke",
-    variant = platform_variant(),
+    variant = shinytest2::platform_variant(),
     shiny_args = list(host = "127.0.0.1", port = httpuv::randomPort()),
     view = "none",
     load_timeout = 20000
   )
+  on.exit(app$stop(), add = TRUE)
 
   # upload small fixture and drive across tabs
   csv <- test_path("fixtures/raw_small.csv")
@@ -41,7 +58,9 @@ test_that("full app loads and basic flow works", {
   app$wait_for_value(output = "correct-correctionMethod")
   cor_id <- app$get_js("let s=document.querySelector('#correct-correctionMethod select'); s && s.id")
   cor_val <- app$get_js("let s=document.querySelector('#correct-correctionMethod select'); if(!s) null; (Array.from(s.options).find(o=>o.value))?.value")
-  if (!is.null(cor_id) && !is.null(cor_val)) do.call(app$set_inputs, setNames(list(cor_val), cor_id))
+  if (!is.null(cor_id) && !is.null(cor_val)) {
+    do.call(app$set_inputs, stats::setNames(list(cor_val), cor_id))
+  }
   app$click("correct-correct", wait_ = FALSE)
   app$wait_for_value(output = "correct-cor_data")
   app$wait_for_value(output = "correct-correlation_slider")
