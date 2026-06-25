@@ -1,7 +1,5 @@
-library(testthat)
-library(shinytest2)
-
 testthat::skip_on_cran()
+skip_unless_browser_tests_enabled()
 testthat::skip_if_not_installed("shinytest2")
 testthat::skip_if_not_installed("chromote")
 
@@ -10,16 +8,17 @@ test_that("import module loads, selects columns, filters, and navigates", {
   options(shiny.port = NULL)
   Sys.unsetenv("SHINY_PORT")
 
-  app <- AppDriver$new(
+  app <- shinytest2::AppDriver$new(
     test_path("_apps/mod_import"),
     name = "mod_import_basic",
     seed = 123,
-    variant = platform_variant(),
+    variant = shinytest2::platform_variant(),
     options = list(shiny.testmode = TRUE),
     shiny_args = list(host = "127.0.0.1", port = httpuv::randomPort()), # not 0
     view = "none",
     load_timeout = 20000
   )
+  on.exit(app$stop(), add = TRUE)
 
   options(shiny.port = NULL)
   Sys.unsetenv("SHINY_PORT")

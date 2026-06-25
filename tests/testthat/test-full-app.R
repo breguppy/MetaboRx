@@ -1,6 +1,7 @@
 test_that("full app loads and basic flow works", {
   options(shiny.port = NULL, shiny.launch.browser = FALSE)
   Sys.unsetenv("SHINY_PORT")
+  skip_unless_browser_tests_enabled()
   smoke_test_packages <- c("httpuv", "shinytest2")
   missing_packages <- smoke_test_packages[
     !purrr::map_lgl(smoke_test_packages, requireNamespace, quietly = TRUE)
