@@ -180,6 +180,45 @@ test_that("PCA UI offers no-shape choice and filters over-limit columns", {
   testthat::expect_false(grepl("value=\"too_many_shapes\"", rendered, fixed = TRUE))
 })
 
+test_that("PCA export excludes over-limit metadata columns from PCA matrix", {
+  testthat::skip_if_not_installed("cowplot")
+
+  raw_df <- data.frame(
+    sample = paste0("s", seq_len(30)),
+    batch = rep(c("b1", "b2"), length.out = 30),
+    class = rep(c("QC", "sample"), length.out = 30),
+    order = seq_len(30),
+    over_limit_group = paste0("g", seq_len(30)),
+    met_a = seq(10, 39),
+    met_b = seq(20, 49),
+    met_c = c(seq(30, 44), seq(46, 60)),
+    check.names = FALSE
+  )
+
+  corrected_df <- dplyr::mutate(
+    raw_df,
+    met_a = .data$met_a / mean(.data$met_a),
+    met_b = .data$met_b / mean(.data$met_b),
+    met_c = .data$met_c / mean(.data$met_c)
+  )
+
+  d <- list(
+    cleaned = list(meta_df = raw_df[c("sample", "batch", "class", "order", "over_limit_group")]),
+    filtered = list(df = raw_df),
+    filtered_corrected = list(df_no_mv = corrected_df, df_mv = corrected_df),
+    transformed = list(df_no_mv = corrected_df, df_mv = corrected_df)
+  )
+
+  pca_res <- suppressWarnings(make_all_pca_plots(
+    p = list(remove_imputed = FALSE, transform = "none"),
+    d = d,
+    meta_df = d$cleaned$meta_df
+  ))
+
+  testthat::expect_false(any(grepl("over_limit_group", pca_res$plot_names, fixed = TRUE)))
+  testthat::expect_false("over_limit_group" %in% pca_res$pca_pairs$filtered_cor_data$before$metab_cols)
+})
+
 make_pca_export_data <- function(drop_corrected_met_c = FALSE) {
   raw_df <- data.frame(
     sample = paste0("s", seq_len(6)),

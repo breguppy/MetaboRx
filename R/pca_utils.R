@@ -1343,7 +1343,7 @@ make_all_pca_plots <- function(p, d, meta_df = NULL) {
   } else {
     color_choices <- .pca_valid_color_choices(meta_df)
     shape_choices <- c(.pca_valid_shape_choices(meta_df), "none")
-    meta_cols <- unique(c("sample", color_choices, setdiff(shape_choices, "none")))
+    meta_cols <- unique(c("sample", setdiff(names(meta_df), "sample")))
   }
 
   specs <- expand.grid(
