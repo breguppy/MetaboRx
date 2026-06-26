@@ -52,6 +52,20 @@ test_that("dependency status reports missing packages and Pandoc", {
   expect_false(status$ready)
 })
 
+test_that("dependency status treats Pandoc as unavailable when rmarkdown is missing", {
+  status <- .dependency_status(
+    imports = c("shiny", "rmarkdown"),
+    namespace_available = function(package) identical(package, "shiny"),
+    pandoc_available = function() {
+      stop("pandoc check should not run without rmarkdown", call. = FALSE)
+    }
+  )
+
+  expect_identical(status$missing_packages, "rmarkdown")
+  expect_false(status$pandoc_available)
+  expect_false(status$ready)
+})
+
 test_that("dependency errors tell beginners how to repair the installation", {
   status <- list(
     missing_packages = c("pmp", "zip"),

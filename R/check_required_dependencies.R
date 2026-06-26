@@ -23,7 +23,8 @@
 ) {
   installed <- vapply(imports, namespace_available, logical(1))
   missing_packages <- imports[!installed]
-  has_pandoc <- isTRUE(pandoc_available())
+  has_rmarkdown <- !("rmarkdown" %in% imports) || isTRUE(installed[["rmarkdown"]])
+  has_pandoc <- has_rmarkdown && isTRUE(pandoc_available())
 
   list(
     missing_packages = missing_packages,
