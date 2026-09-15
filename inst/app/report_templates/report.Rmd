@@ -42,14 +42,15 @@ MetaboRx:::ui_basic_info(params$d$cleaned)
 
 ### Filter Missing Values in Raw Data
 ```{r}
+MetaboRx:::ui_filter_info(params$d$filtered)
+```
+### Blank Threshold Filtering
+```{r}
 MetaboRx:::ui_blank_threshold_info(params$d$filtered$blank_threshold_result, 
                                        params$d$cleaned$blank_df,
                                        params$d$filtered$blank_threshold,
                                        params$d$filtered$remove_blank_threshold_cols,
                                        params$d$filtered$removed_blank_threshold_cols)
-
-MetaboRx:::ui_filter_info(params$d$filtered, 
-                              params$d$filtered$mv_cutoff)
 #MetaboRx:::report_text_mv_filter()
 ```
 

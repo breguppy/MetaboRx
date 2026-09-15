@@ -180,17 +180,53 @@ ui_blank_threshold_controls <- function(ns = identity,
   )
 }
 
-#' missing value filter slider
+#' Missing value filter controls
+#'
 #' @keywords internal
 #' @noRd
 ui_filter_slider <- function(ns) {
-  tooltip(
-    sliderInput(ns("mv_cutoff"), "Acceptable % missing per metabolite", 0, 100, 20),
-    "Metabolites with missing % above this threshold for at least 1 class are removed.",
-    placement = "right"
+  shiny::tagList(
+    tooltip(
+      sliderInput(
+        ns("mv_cutoff"),
+        "Acceptable % missing in study samples",
+        min = 0,
+        max = 100,
+        value = 20
+      ),
+      paste0(
+        "Metabolite missingness is calculated separately within each ",
+        "study sample class."
+      ),
+      placement = "right"
+    ),
+    
+    radioButtons(
+      ns("mv_filter_rule"),
+      "Remove metabolite when:",
+      choices = c(
+        "At least one study class exceeds the cutoff" = "any",
+        "All study classes exceed the cutoff" = "all"
+      ),
+      selected = "any"
+    ),
+    
+    tooltip(
+      sliderInput(
+        ns("qc_mv_cutoff"),
+        "Acceptable % missing in QC samples",
+        min = 0,
+        max = 100,
+        value = 20
+      ),
+      paste0(
+        "Metabolites with QC missingness above this threshold are removed ",
+        "independently of the study-sample missingness rule."
+      ),
+      placement = "right"
+    )
   )
 }
-
 #---------- 2.1 Choose Correction Settings inputs
 #' Impute missing QC value options
 #' @keywords internal

@@ -94,6 +94,9 @@ make_complete_export_fixture <- function(fig_format) {
     batch_col = "batch",
     class_col = "class",
     order_col = "order",
+    mv_cutoff = 20,
+    qc_mv_cutoff = 40,
+    filter_rule = "all",
     remove_imputed = FALSE,
     rsd_cutoff = 30,
     rsd_filter_threshold = 30,
@@ -121,14 +124,20 @@ make_complete_export_fixture <- function(fig_format) {
   d <- list(
     cleaned = list(
       df = raw_df,
-      meta_df = raw_df[c("sample", "batch", "class", "order")],
+      meta_df = raw_df[
+        c("sample", "batch", "class", "order")
+      ],
       replacement_counts = list(
         non_numeric_replaced = 0L,
         zero_replaced = 0L
       ),
       non_numeric_cols = character(0),
+      all_missing_zero_non_qc_cols = character(0),
       all_missing_zero_qc_cols = character(0),
-      duplicate_mets = data.frame(col1 = character(0), col2 = character(0)),
+      duplicate_mets = data.frame(
+        col1 = character(0),
+        col2 = character(0)
+      ),
       duplicate_col_names = character(0),
       blank_df = raw_df[0, , drop = FALSE],
       below_blank_threshold_ex_ISTD = character(0),
@@ -137,9 +146,18 @@ make_complete_export_fixture <- function(fig_format) {
     filtered = list(
       df = raw_df,
       mv_cutoff = 20,
+      qc_mv_cutoff = 40,
+      filter_rule = "all",
       mv_removed_cols = character(0),
+      study_mv_removed_cols = character(0),
+      qc_mv_removed_cols = character(0),
       qc_missing_mets = character(0),
-      class_metab_all_missing = character(0),
+      class_metab_all_missing = data.frame(
+        class = character(0),
+        metabolite = character(0),
+        n_rows_in_class = integer(0),
+        stringsAsFactors = FALSE
+      ),
       blank_threshold = 3,
       remove_blank_threshold_cols = FALSE,
       removed_blank_threshold_cols = character(0),
@@ -205,6 +223,57 @@ if (identical(Sys.getenv("METABORX_RUN_EXPORT_INTEGRATION"), "true")) {
     expect_gt(file.size(result$file), 0L)
 
     contents <- utils::unzip(result$file, list = TRUE)
+    corrected_workbook <- contents$Name[
+      grepl(
+        "^corrected_data_.*\\.xlsx$",
+        contents$Name
+      )
+    ]
+    
+    expect_length(corrected_workbook, 1L)
+    
+    extract_dir <- tempfile("complete-export-")
+    dir.create(extract_dir)
+    
+    on.exit(
+      unlink(extract_dir, recursive = TRUE, force = TRUE),
+      add = TRUE
+    )
+    
+    utils::unzip(
+      result$file,
+      files = corrected_workbook,
+      exdir = extract_dir
+    )
+    
+    settings <- openxlsx::read.xlsx(
+      file.path(extract_dir, corrected_workbook),
+      sheet = "1. Correction Settings",
+      colNames = FALSE
+    )
+    
+    settings_values <- as.character(
+      unlist(settings, use.names = FALSE)
+    )
+    
+    expect_true(
+      "Study Missing Value Threshold (%)" %in%
+        settings_values
+    )
+    
+    expect_true(
+      "QC Missing Value Threshold (%)" %in%
+        settings_values
+    )
+    
+    expect_true(
+      "Study Missing Value Filter Rule" %in%
+        settings_values
+    )
+    
+    expect_true("20%" %in% settings_values)
+    expect_true("40%" %in% settings_values)
+    expect_true("all" %in% settings_values)
     archived_files <- contents[!grepl("/$", contents$Name), , drop = FALSE]
     expect_true(all(archived_files$Length > 0L))
     expect_true(any(grepl("^missing_value_counts_.*\\.xlsx$", contents$Name)))

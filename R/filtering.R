@@ -190,24 +190,50 @@ apply_blank_threshold_filter <- function(df,
 #'
 #' @keywords internal
 #' @noRd
-filter_by_missing <- function(df, metab_cols, mv_cutoff) {
+filter_by_missing <- function(
+    df,
+    metab_cols,
+    mv_cutoff,
+    qc_mv_cutoff = Inf,
+    filter_rule = c("any", "all")
+) {
+  filter_rule <- match.arg(filter_rule)
+  
   if (!"class" %in% names(df)) {
     stop("`df` must contain a 'class' column.")
   }
-
+  
   cutoff_for_filter <- mv_cutoff %||% Inf
-
-  # get metadata columns
+  qc_cutoff_for_filter <- qc_mv_cutoff %||% Inf
+  
+  # Get metadata columns.
   meta_cols <- setdiff(names(df), metab_cols)
-
-  # classes used for group-wise missingness checks
-  classes_seen <- sort(unique(df[["class"]]))
-
+  
+  # Identify study classes and QC rows separately.
+  study_classes <- sort(
+    unique(
+      df[["class"]][
+        !is.na(df[["class"]]) &
+          df[["class"]] != "QC"
+      ]
+    )
+  )
+  
+  qc_idx <- which(
+    !is.na(df[["class"]]) &
+      df[["class"]] == "QC"
+  )
+  
+  # Handle case where there are no metabolite columns.
   if (length(metab_cols) == 0L) {
     return(list(
       df = df[, meta_cols, drop = FALSE],
       mv_cutoff = mv_cutoff,
+      qc_mv_cutoff = qc_mv_cutoff,
+      filter_rule = filter_rule,
       mv_removed_cols = character(0),
+      study_mv_removed_cols = character(0),
+      qc_mv_removed_cols = character(0),
       qc_missing_mets = character(0),
       class_metab_all_missing = data.frame(
         class = character(0),
@@ -216,104 +242,263 @@ filter_by_missing <- function(df, metab_cols, mv_cutoff) {
       )
     ))
   }
-
-  missing_df <- is.na(df[, metab_cols, drop = FALSE]) |
+  
+  # Missing-like values are defined as NA or <= 0.
+  missing_df <-
+    is.na(df[, metab_cols, drop = FALSE]) |
     df[, metab_cols, drop = FALSE] <= 0
+  
   missing_mat <- as.matrix(missing_df)
   colnames(missing_mat) <- metab_cols
-  rows_by_class <- split(seq_len(nrow(df)), df[["class"]])
-
-  # compute class-specific missing percentages for each metabolite
-  # missing is defined as NA or <= 0
-  missing_pct_mat <- matrix(
+  
+  rows_by_class <- split(
+    seq_len(nrow(df)),
+    df[["class"]]
+  )
+  
+  # ---------------------------------------------------------------------------
+  # Study-sample missingness
+  # ---------------------------------------------------------------------------
+  
+  study_missing_pct_mat <- matrix(
     NA_real_,
     nrow = length(metab_cols),
-    ncol = length(classes_seen),
-    dimnames = list(metab_cols, classes_seen)
+    ncol = length(study_classes),
+    dimnames = list(
+      metab_cols,
+      study_classes
+    )
   )
-
-  for (cl in classes_seen) {
+  
+  for (cl in study_classes) {
     idx <- rows_by_class[[cl]]
-
-    missing_pct_mat[, cl] <- if (length(idx) == 0L) {
+    
+    study_missing_pct_mat[, cl] <- if (length(idx) == 0L) {
       100
     } else {
-      colMeans(missing_mat[idx, , drop = FALSE]) * 100
+      colMeans(
+        missing_mat[idx, , drop = FALSE]
+      ) * 100
     }
   }
-
-  # remove metabolite if any class exceeds mv_cutoff
-  missing_over_cutoff <- missing_pct_mat > cutoff_for_filter
-  dim(missing_over_cutoff) <- dim(missing_pct_mat)
-  dimnames(missing_over_cutoff) <- dimnames(missing_pct_mat)
-  mv_keep_cols <- metab_cols[rowSums(missing_over_cutoff) == 0L]
-
-  # list columns removed due to missing value %
-  mv_removed_cols <- setdiff(metab_cols, mv_keep_cols)
-
+  
+  # Determine which metabolites fail the study-sample filter.
+  if (length(study_classes) == 0L) {
+    study_remove <- rep(
+      FALSE,
+      length(metab_cols)
+    )
+  } else {
+    study_over_cutoff <-
+      study_missing_pct_mat > cutoff_for_filter
+    
+    dim(study_over_cutoff) <- dim(study_missing_pct_mat)
+    dimnames(study_over_cutoff) <- dimnames(study_missing_pct_mat)
+    
+    study_remove <- switch(
+      filter_rule,
+      
+      any = rowSums(
+        study_over_cutoff
+      ) > 0L,
+      
+      all = rowSums(
+        study_over_cutoff
+      ) == ncol(study_over_cutoff)
+    )
+  }
+  
+  names(study_remove) <- metab_cols
+  
+  # ---------------------------------------------------------------------------
+  # QC missingness
+  # ---------------------------------------------------------------------------
+  
+  if (length(qc_idx) == 0L) {
+    qc_missing_pct <- rep(
+      NA_real_,
+      length(metab_cols)
+    )
+    
+    names(qc_missing_pct) <- metab_cols
+    
+    qc_remove <- rep(
+      FALSE,
+      length(metab_cols)
+    )
+  } else {
+    qc_missing_pct <- colMeans(
+      missing_mat[
+        qc_idx,
+        ,
+        drop = FALSE
+      ]
+    ) * 100
+    
+    qc_remove <-
+      qc_missing_pct > qc_cutoff_for_filter
+  }
+  
+  names(qc_remove) <- metab_cols
+  
+  # ---------------------------------------------------------------------------
+  # Combine study and QC filtering
+  # ---------------------------------------------------------------------------
+  
+  remove_metabolite <-
+    study_remove | qc_remove
+  
+  mv_removed_cols <- metab_cols[
+    remove_metabolite
+  ]
+  
+  mv_keep_cols <- metab_cols[
+    !remove_metabolite
+  ]
+  
+  # Keep separate lists so the UI can report why metabolites were removed.
+  study_mv_removed_cols <- metab_cols[
+    study_remove
+  ]
+  
+  qc_mv_removed_cols <- metab_cols[
+    qc_remove
+  ]
+  
+  # ---------------------------------------------------------------------------
   # Get all class-metabolite pairs where all values are missing-like
-  # among retained metabolites. Missing-like means NA or <= 0.
-  class_metab_all_missing <- if (length(classes_seen) == 0L || length(mv_keep_cols) == 0L) {
+  # among retained metabolites.
+  # ---------------------------------------------------------------------------
+  
+  classes_seen <- sort(
+    unique(
+      df[["class"]][
+        !is.na(df[["class"]])
+      ]
+    )
+  )
+  
+  class_metab_all_missing <- if (
+    length(classes_seen) == 0L ||
+    length(mv_keep_cols) == 0L
+  ) {
     data.frame(
       class = character(0),
       metabolite = character(0),
       n_rows_in_class = integer(0)
     )
   } else {
-    out <- vector("list", length(classes_seen))
+    out <- vector(
+      "list",
+      length(classes_seen)
+    )
+    
     names(out) <- classes_seen
-
-    keep_idx <- match(mv_keep_cols, metab_cols)
-
+    
+    keep_idx <- match(
+      mv_keep_cols,
+      metab_cols
+    )
+    
     for (cl in classes_seen) {
       idx <- rows_by_class[[cl]]
       n_in_class <- length(idx)
-
+      
       if (n_in_class == 0L) {
-        miss_all <- rep(TRUE, length(mv_keep_cols))
+        miss_all <- rep(
+          TRUE,
+          length(mv_keep_cols)
+        )
       } else {
-        miss_all <- colSums(missing_mat[idx, keep_idx, drop = FALSE]) == n_in_class
+        miss_all <- colSums(
+          missing_mat[
+            idx,
+            keep_idx,
+            drop = FALSE
+          ]
+        ) == n_in_class
       }
-
-      mets <- mv_keep_cols[miss_all]
+      
+      mets <- mv_keep_cols[
+        miss_all
+      ]
+      
       out[[cl]] <- if (length(mets) == 0L) {
         NULL
       } else {
         data.frame(
-          class = rep(cl, length(mets)),
+          class = rep(
+            cl,
+            length(mets)
+          ),
           metabolite = mets,
-          n_rows_in_class = rep(n_in_class, length(mets)),
+          n_rows_in_class = rep(
+            n_in_class,
+            length(mets)
+          ),
           row.names = NULL
         )
       }
     }
-
-    do.call(rbind, Filter(Negate(is.null), out)) %||%
+    
+    do.call(
+      rbind,
+      Filter(
+        Negate(is.null),
+        out
+      )
+    ) %||%
       data.frame(
         class = character(0),
         metabolite = character(0),
         n_rows_in_class = integer(0)
       )
   }
-
-  # filter data by metabolite missing value
-  df_filtered <- df[, c(meta_cols, mv_keep_cols), drop = FALSE]
-
-  # Get retained metabolites that have QC missing-like values
-  qc_idx <- rows_by_class[["QC"]] %||% integer(0)
-  if (length(mv_keep_cols) == 0L || length(qc_idx) == 0L) {
+  
+  # ---------------------------------------------------------------------------
+  # Filter dataframe
+  # ---------------------------------------------------------------------------
+  
+  df_filtered <- df[
+    ,
+    c(meta_cols, mv_keep_cols),
+    drop = FALSE
+  ]
+  
+  # ---------------------------------------------------------------------------
+  # Retained metabolites with at least one missing-like QC value
+  # ---------------------------------------------------------------------------
+  
+  if (
+    length(mv_keep_cols) == 0L ||
+    length(qc_idx) == 0L
+  ) {
     qc_missing_mets <- character(0)
   } else {
-    keep_idx <- match(mv_keep_cols, metab_cols)
+    keep_idx <- match(
+      mv_keep_cols,
+      metab_cols
+    )
+    
     qc_missing_mets <- mv_keep_cols[
-      colSums(missing_mat[qc_idx, keep_idx, drop = FALSE]) > 0L
+      colSums(
+        missing_mat[
+          qc_idx,
+          keep_idx,
+          drop = FALSE
+        ]
+      ) > 0L
     ]
   }
-
+  
   return(list(
     df = df_filtered,
     mv_cutoff = mv_cutoff,
+    qc_mv_cutoff = qc_mv_cutoff,
+    filter_rule = filter_rule,
     mv_removed_cols = mv_removed_cols,
+    study_mv_removed_cols = study_mv_removed_cols,
+    qc_mv_removed_cols = qc_mv_removed_cols,
     qc_missing_mets = qc_missing_mets,
     class_metab_all_missing = class_metab_all_missing
   ))

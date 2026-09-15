@@ -176,12 +176,8 @@ ui_basic_info <- function(cleaned) {
   nonnum_card <- NULL
 
   removed_non_numeric <- sort(unique(non_numeric_cols))
-  removed_all_zero_qc <- sort(unique(all_missing_zero_qc_cols))
 
-  if (
-    length(removed_non_numeric) > 0 ||
-      length(removed_all_zero_qc) > 0
-  ) {
+  if (length(removed_non_numeric) > 0) {
     section_tag <- function(title, values) {
       if (length(values) == 0) {
         return(NULL)
@@ -201,15 +197,11 @@ ui_basic_info <- function(cleaned) {
 
     nonnum_card <- warn_card(
       title = "Removed metabolite columns",
-      body = "The following metabolite columns were removed prior to processing:",
+      body = "The following columns were removed prior to processing:",
       body_tags = tags$div(
         section_tag(
           "Non-numerical columns:",
           removed_non_numeric
-        ),
-        section_tag(
-          "All values missing or zero for QC samples:",
-          removed_all_zero_qc
         )
       )
     )
@@ -382,7 +374,7 @@ ui_blank_threshold_info <- function(blank_threshold_result,
       shiny::tags$p(
         style = "margin-top: 8px; margin-bottom: 0;",
         sprintf(
-          "%d metabolite column(s) were removed before missing-value filtering.",
+          "%d metabolite column(s) were removed after missing-value filtering.",
           length(removed_blank_threshold_cols)
         )
       )
@@ -410,106 +402,482 @@ ui_blank_threshold_info <- function(blank_threshold_result,
 }
 
 # Filter info for section 1.4 Filter Raw Data
-ui_filter_info <- function(fd, mv_cutoff) {
-  mv_removed <- fd$mv_removed_cols
-  qc_missing_mets <- fd$qc_missing_mets
+ui_filter_info <- function(fd) {
+  mv_cutoff <- fd$mv_cutoff
+  qc_mv_cutoff <- fd$qc_mv_cutoff
+  filter_rule <- fd$filter_rule %||% "any"
+  
+  mv_removed <- fd$mv_removed_cols %||% character(0)
+  study_mv_removed <- fd$study_mv_removed_cols %||% character(0)
+  qc_mv_removed <- fd$qc_mv_removed_cols %||% character(0)
+  
+  qc_missing_mets <- fd$qc_missing_mets %||% character(0)
   class_metab_all_missing <- fd$class_metab_all_missing
+  
+  not_detected_mets <- fd$not_detected_mets %||% character(0)
+  all_missing_zero_non_qc_cols <-
+    fd$all_missing_zero_non_qc_cols %||% character(0)
+  all_missing_zero_qc_cols <-
+    fd$all_missing_zero_qc_cols %||% character(0)
+  
   df <- fd$df
-
-  metab_cols <- setdiff(names(df), c("sample", "batch", "class", "order"))
+  
+  metab_cols <- setdiff(
+    names(df),
+    c("sample", "batch", "class", "order")
+  )
+  
   n_metab <- length(metab_cols)
-  n_missv <- sum(is.na(df[, metab_cols]))
-  n_qcs <- sum(df$class == "QC")
-  n_samp <- sum(df$class != "QC")
-  perc_missv <- round(100 * (n_missv / ((n_samp + n_qcs) * n_metab)), digits = 2)
-
-
-  left_col <- if (length(mv_removed) == 0) {
+  
+  n_missv <- sum(
+    is.na(df[, metab_cols, drop = FALSE])
+  )
+  
+  n_qcs <- sum(
+    df$class == "QC",
+    na.rm = TRUE
+  )
+  
+  n_samp <- sum(
+    df$class != "QC",
+    na.rm = TRUE
+  )
+  
+  perc_missv <- if (
+    n_metab > 0L &&
+    (n_samp + n_qcs) > 0L
+  ) {
+    round(
+      100 * (
+        n_missv /
+          ((n_samp + n_qcs) * n_metab)
+      ),
+      digits = 2
+    )
+  } else {
+    0
+  }
+  
+  # ===========================================================================
+  # Helper: dynamically arrange non-NULL cards into columns
+  # ===========================================================================
+  
+  dynamic_columns <- function(...) {
+    cards <- Filter(
+      Negate(is.null),
+      list(...)
+    )
+    
+    n_cards <- length(cards)
+    
+    if (n_cards == 0L) {
+      return(NULL)
+    }
+    
     tags$div(
-      style = "flex: 1; padding-right: 10px;",
-      tags$span(
-        style = "color:darkgreen;font-weight:bold;",
+      style = paste0(
+        "display: grid; ",
+        "grid-template-columns: repeat(",
+        n_cards,
+        ", minmax(0, 1fr)); ",
+        "gap: 16px; ",
+        "align-items: start;"
+      ),
+      cards
+    )
+  }
+  
+  # ===========================================================================
+  # Metabolites not detected
+  # ===========================================================================
+  
+  not_detected_dataset_col <- NULL
+  
+  if (length(not_detected_mets) > 0L) {
+    not_detected_dataset_col <- tags$div(
+      tags$strong(
+        "Metabolites not detected in this dataset"
+      ),
+      tags$p(
         paste0(
-          "No metabolites with missing value percentage above ",
-          mv_cutoff,
-          "%."
+          length(not_detected_mets),
+          " metabolite(s) are all missing or zero in both ",
+          "study and QC samples."
+        )
+      ),
+      tags$ul(
+        lapply(
+          not_detected_mets,
+          tags$li
         )
       )
     )
-  } else {
-    tags$div(
-      style = "flex: 1; padding-right: 10px;",
-      tags$span(
-        style = "color:darkorange;font-weight:bold;",
+  }
+  
+  not_detected_study_col <- NULL
+  
+  if (length(all_missing_zero_non_qc_cols) > 0L) {
+    not_detected_study_col <- tags$div(
+      tags$strong(
+        "Metabolites not detected in study samples"
+      ),
+      tags$p(
         paste0(
-          length(mv_removed),
-          " metabolite(s) removed based on missing value percentage above ",
-          mv_cutoff,
-          "%."
+          length(all_missing_zero_non_qc_cols),
+          " metabolite(s) are all missing or zero in ",
+          "study samples."
         )
       ),
-      tags$ul(lapply(mv_removed, tags$li))
+      tags$ul(
+        lapply(
+          all_missing_zero_non_qc_cols,
+          tags$li
+        )
+      )
     )
   }
-
-  right_col <- if (length(qc_missing_mets) == 0) {
+  
+  not_detected_qc_col <- NULL
+  
+  if (length(all_missing_zero_qc_cols) > 0L) {
+    not_detected_qc_col <- tags$div(
+      tags$strong(
+        "Metabolites not detected in QC samples"
+      ),
+      tags$p(
+        paste0(
+          length(all_missing_zero_qc_cols),
+          " metabolite(s) are all missing or zero in ",
+          "QC samples."
+        )
+      ),
+      tags$ul(
+        lapply(
+          all_missing_zero_qc_cols,
+          tags$li
+        )
+      )
+    )
+  }
+  
+  not_detected_columns <- dynamic_columns(
+    not_detected_dataset_col,
+    not_detected_study_col,
+    not_detected_qc_col
+  )
+  
+  not_detected_card <- if (is.null(not_detected_columns)) {
+    NULL
+  } else {
+    tags$div(
+      class = "alert alert-warning",
+      style = "margin-bottom: 16px;",
+      tags$h5(
+        style = "font-weight: bold; margin-top: 0;",
+        "Metabolites not detected"
+      ),
+      not_detected_columns
+    )
+  }
+  
+  # ===========================================================================
+  # Missing-value filter criteria
+  # ===========================================================================
+  
+  study_rule_text <- switch(
+    filter_rule,
+    
+    any = paste0(
+      "A metabolite is removed if at least one study class has more than ",
+      mv_cutoff,
+      "% missing values."
+    ),
+    
+    all = paste0(
+      "A metabolite is removed if all study classes have more than ",
+      mv_cutoff,
+      "% missing values."
+    ),
+    
+    paste0(
+      "Study-sample missing-value cutoff: ",
+      mv_cutoff,
+      "%."
+    )
+  )
+  
+  qc_rule_text <- if (is.null(qc_mv_cutoff)) {
+    "No QC missing-value threshold was applied."
+  } else {
+    paste0(
+      "A metabolite is also removed if more than ",
+      qc_mv_cutoff,
+      "% of QC values are missing."
+    )
+  }
+  
+  filter_criteria_card <- tags$div(
+    class = "alert alert-info",
+    style = "margin-bottom: 16px;",
+    tags$strong(
+      "Missing-value filter criteria"
+    ),
+    tags$ul(
+      tags$li(study_rule_text),
+      tags$li(qc_rule_text)
+    )
+  )
+  
+  # ===========================================================================
+  # Separate removal reasons
+  # ===========================================================================
+  
+  removed_both <- intersect(
+    study_mv_removed,
+    qc_mv_removed
+  )
+  
+  removed_study_only <- setdiff(
+    study_mv_removed,
+    qc_mv_removed
+  )
+  
+  removed_qc_only <- setdiff(
+    qc_mv_removed,
+    study_mv_removed
+  )
+  
+  # ---------------------------------------------------------------------------
+  # Study missingness column
+  # ---------------------------------------------------------------------------
+  
+  study_removed_card <- NULL
+  
+  if (length(removed_study_only) > 0L) {
+    study_removed_card <- warn_card(
+      title = paste0(
+        length(removed_study_only),
+        " metabolite(s) removed for study-sample missingness"
+      ),
+      body = study_rule_text,
+      body_tags = tags$ul(
+        lapply(
+          removed_study_only,
+          tags$li
+        )
+      )
+    )
+  }
+  
+  # ---------------------------------------------------------------------------
+  # Failed-both column
+  # ---------------------------------------------------------------------------
+  
+  removed_both_card <- NULL
+  
+  if (length(removed_both) > 0L) {
+    removed_both_card <- warn_card(
+      title = paste0(
+        length(removed_both),
+        " metabolite(s) failed both missing-value criteria"
+      ),
+      body = paste0(
+        "The following metabolites exceeded both the study-sample ",
+        "criterion and the QC missingness criterion."
+      ),
+      body_tags = tags$ul(
+        lapply(
+          removed_both,
+          tags$li
+        )
+      )
+    )
+  }
+  
+  # ---------------------------------------------------------------------------
+  # QC-related column
+  # ---------------------------------------------------------------------------
+  
+  qc_removed_card <- NULL
+  
+  if (length(removed_qc_only) > 0L) {
+    qc_removed_card <- warn_card(
+      title = paste0(
+        length(removed_qc_only),
+        " metabolite(s) removed for QC missingness"
+      ),
+      body = qc_rule_text,
+      body_tags = tags$ul(
+        lapply(
+          removed_qc_only,
+          tags$li
+        )
+      )
+    )
+  }
+  
+  qc_missing_card <- if (length(qc_missing_mets) == 0L) {
     tags$div(
       class = "alert alert-success",
       style = "margin-bottom: 10px;",
-      # tags$span(style = "color:darkgreen; font-weight:bold;",
-      tags$strong("No metabolites have missing values in QC samples after filtering.")
+      tags$strong(
+        "No retained metabolites have missing values in QC samples."
+      )
     )
   } else {
     tags$div(
       class = "alert alert-warning",
       style = "margin-bottom: 10px;",
-      # tags$span(style = "color:darkorange; font-weight:bold;",
-      tags$strong(paste0(
-        length(qc_missing_mets),
-        " metabolite(s) with at least one QC missing value after filtering."
-      )),
-      tags$ul(lapply(qc_missing_mets, tags$li))
+      tags$strong(
+        paste0(
+          length(qc_missing_mets),
+          " retained metabolite(s) have at least one missing QC value."
+        )
+      ),
+      tags$p(
+        paste0(
+          "These metabolites remain because their QC missingness does not ",
+          "exceed the ",
+          qc_mv_cutoff,
+          "% QC cutoff."
+        )
+      ),
+      tags$ul(
+        lapply(
+          qc_missing_mets,
+          tags$li
+        )
+      )
     )
   }
-  right_col1 <- tags$div(
-    style = "flex: 1; min-width: 250px;",
-    right_col,
-    tags$div(
-      style = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;",
-      metric_card("Metabolites", n_metab),
-      metric_card("Missing Values", paste0(n_missv, " (", perc_missv, "%)"))
+  
+  # ---------------------------------------------------------------------------
+  # Dataset metrics
+  # ---------------------------------------------------------------------------
+  
+  metrics <- tags$div(
+    style = paste0(
+      "display: grid; ",
+      "grid-template-columns: repeat(2, minmax(0, 1fr)); ",
+      "gap: 10px;"
+    ),
+    metric_card(
+      "Metabolites",
+      n_metab
+    ),
+    metric_card(
+      "Missing Values",
+      paste0(
+        n_missv,
+        " (",
+        perc_missv,
+        "%)"
+      )
     )
   )
-  summary_row <- tags$div(
-    style = "display:flex; gap:16px; align-items:flex-start;",
-    left_col, right_col1
+  
+  # ---------------------------------------------------------------------------
+  # Assemble QC column
+  # ---------------------------------------------------------------------------
+  
+  qc_column_items <- Filter(
+    Negate(is.null),
+    list(
+      qc_removed_card,
+      qc_missing_card,
+      metrics
+    )
   )
-
-  has_all_missing <- !is.null(class_metab_all_missing) &&
+  
+  qc_column <- if (length(qc_column_items) == 0L) {
+    NULL
+  } else {
+    tags$div(
+      style = "min-width: 0;",
+      qc_column_items
+    )
+  }
+  
+  # ---------------------------------------------------------------------------
+  # Missing-value removal section
+  # ---------------------------------------------------------------------------
+  
+  removal_columns <- dynamic_columns(
+    study_removed_card,
+    removed_both_card,
+    qc_column
+  )
+  
+  no_removals_card <- NULL
+  
+  if (
+    length(mv_removed) == 0L &&
+    is.null(removal_columns)
+  ) {
+    no_removals_card <- tags$div(
+      class = "alert alert-success",
+      style = "margin-bottom: 10px;",
+      tags$strong(
+        "No metabolites were removed by the missing-value filters."
+      )
+    )
+  }
+  
+  missing_value_section <- tags$div(
+    filter_criteria_card,
+    no_removals_card,
+    removal_columns
+  )
+  
+  # ===========================================================================
+  # Class/metabolite combinations that remain completely missing
+  # ===========================================================================
+  
+  has_all_missing <-
+    !is.null(class_metab_all_missing) &&
     is.data.frame(class_metab_all_missing) &&
     nrow(class_metab_all_missing) > 0L
-
+  
   all_missing_card <- NULL
+  
   if (has_all_missing) {
-    # Create bullet list like: "QC - MetaboliteA"
     pair_items <- apply(
-      class_metab_all_missing[, c("class", "metabolite"), drop = FALSE],
+      class_metab_all_missing[
+        ,
+        c("class", "metabolite"),
+        drop = FALSE
+      ],
       1,
-      function(r) paste0(r[[1]], " - ", r[[2]])
+      function(r) {
+        paste0(
+          r[[1]],
+          " - ",
+          r[[2]]
+        )
+      }
     )
-
+    
     all_missing_card <- warn_card(
       title = "All-missing class/metabolite combinations detected",
       body = paste0(
-        "The following class-metabolite pairs have all values missing. ",
-        "These values will remain missing if you choose a class-metabolite imputation method."
+        "The following class-metabolite pairs have all values missing. "
       ),
-      body_tags = shiny::tags$ul(lapply(pair_items, shiny::tags$li))
+      body_tags = tags$ul(
+        lapply(
+          pair_items,
+          tags$li
+        )
+      )
     )
   }
-
+  
+  # ===========================================================================
+  # Final UI
+  # ===========================================================================
+  
   shiny::tagList(
-    summary_row,
+    not_detected_card,
+    missing_value_section,
     all_missing_card
   )
 }

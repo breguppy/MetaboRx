@@ -39,69 +39,259 @@ make_df_for_rsd <- function(tgt = c(15, 25, NA_real_, 60)) {
   )
 }
 
-test_that("filter_by_missing applies class-wise missing filtering and reports outputs correctly", {
+test_that("filter_by_missing applies separate study and QC filtering", {
   df <- make_df()
   metab_cols <- c("A", "B", "C", "D")
-
-  out <- filter_by_missing(df, metab_cols, mv_cutoff = 50)
-
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols,
+    mv_cutoff = 50
+  )
+  
   expect_named(
     out,
-    c("df", "mv_cutoff", "mv_removed_cols", "qc_missing_mets", "class_metab_all_missing")
+    c(
+      "df",
+      "mv_cutoff",
+      "qc_mv_cutoff",
+      "filter_rule",
+      "mv_removed_cols",
+      "study_mv_removed_cols",
+      "qc_mv_removed_cols",
+      "qc_missing_mets",
+      "class_metab_all_missing"
+    )
   )
+  
   expect_equal(out$mv_cutoff, 50)
-
-  # Class-wise missing-like percentages:
-  # A: QC = 0%, sample = 66.67% -> removed
-  # B: QC = 33.33%, sample = 66.67% -> removed
-  # C: QC = 33.33%, sample = 0% -> kept
-  # D: 100% -> removed
-  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "C"))
-  expect_setequal(out$mv_removed_cols, c("A", "B", "D"))
-
-  # Among retained metabolites, QC rows for C are 0, 3, 5, so C has a QC missing-like value
+  expect_equal(out$qc_mv_cutoff, Inf)
+  expect_identical(out$filter_rule, "any")
+  
+  # Study-sample missing-like percentages:
+  # A: sample = 66.67% -> removed by study threshold
+  # B: sample = 66.67% -> removed by study threshold
+  # C: sample = 0%     -> retained
+  # D: sample = 100%   -> removed by study threshold
+  #
+  # The default QC cutoff is Inf, so QC missingness does not remove
+  # any additional metabolites.
+  expect_setequal(
+    names(out$df),
+    c("sample", "batch", "class", "order", "C")
+  )
+  
+  expect_setequal(
+    out$study_mv_removed_cols,
+    c("A", "B", "D")
+  )
+  
+  expect_identical(
+    out$qc_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_setequal(
+    out$mv_removed_cols,
+    c("A", "B", "D")
+  )
+  
+  # Among retained metabolites, C has one missing-like QC value because
+  # its QC values are 0, 3, and 5.
   expect_identical(out$qc_missing_mets, "C")
-
-  # No retained class-metabolite pair is entirely missing-like
-  expect_s3_class(out$class_metab_all_missing, "data.frame")
-  expect_named(out$class_metab_all_missing, c("class", "metabolite", "n_rows_in_class"))
-  expect_equal(nrow(out$class_metab_all_missing), 0L)
+  
+  expect_s3_class(
+    out$class_metab_all_missing,
+    "data.frame"
+  )
+  
+  expect_named(
+    out$class_metab_all_missing,
+    c("class", "metabolite", "n_rows_in_class")
+  )
+  
+  expect_equal(
+    nrow(out$class_metab_all_missing),
+    0L
+  )
 })
 
-test_that("filter_by_missing removes metabolites when any class exceeds the cutoff", {
+test_that("filter_by_missing combines study and QC threshold removals", {
   df <- make_df()
   metab_cols <- c("A", "B", "C", "D")
-
-  out <- filter_by_missing(df, metab_cols, mv_cutoff = 33.33)
-
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols,
+    mv_cutoff = 33.33,
+    qc_mv_cutoff = 33.33
+  )
+  
+  # Study filtering:
   # A: sample = 66.67% -> removed
   # B: sample = 66.67% -> removed
-  # C: QC = 33.333...% which is > 33.33 -> removed
-  # D: removed
-  expect_setequal(names(out$df), c("sample", "batch", "class", "order"))
-  expect_setequal(out$mv_removed_cols, c("A", "B", "C", "D"))
-  expect_identical(out$qc_missing_mets, character(0))
-  expect_equal(nrow(out$class_metab_all_missing), 0L)
+  # C: sample = 0%     -> retained by study filtering
+  # D: sample = 100%   -> removed
+  expect_setequal(
+    out$study_mv_removed_cols,
+    c("A", "B", "D")
+  )
+  
+  # QC filtering:
+  # A: QC = 0%         -> retained by QC filtering
+  # B: QC = 33.333...% -> removed
+  # C: QC = 33.333...% -> removed
+  # D: QC = 100%       -> removed
+  expect_setequal(
+    out$qc_mv_removed_cols,
+    c("B", "C", "D")
+  )
+  
+  # The union of the study and QC removal lists contains all metabolites.
+  expect_setequal(
+    out$mv_removed_cols,
+    c("A", "B", "C", "D")
+  )
+  
+  expect_setequal(
+    names(out$df),
+    c("sample", "batch", "class", "order")
+  )
+  
+  expect_identical(
+    out$qc_missing_mets,
+    character(0)
+  )
+  
+  expect_equal(
+    nrow(out$class_metab_all_missing),
+    0L
+  )
 })
 
 test_that("filter_by_missing reports retained class-metabolite pairs with all missing-like values", {
   df <- data.frame(
     sample = paste0("s", 1:6),
     batch = 1L,
-    class = c("QC", "QC", "sample", "sample", "sample", "sample"),
+    class = c(
+      "QC",
+      "QC",
+      "sample",
+      "sample",
+      "sample",
+      "sample"
+    ),
     order = 1:6,
-    A = c(1, 2, NA, NA, NA, NA), # retained at cutoff 100, but all missing-like in sample class
+    A = c(1, 2, NA, NA, NA, NA),
     B = c(1, 2, 3, 4, 5, 6),
     stringsAsFactors = FALSE
   )
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols = c("A", "B"),
+    mv_cutoff = 100
+  )
+  
+  expect_setequal(
+    names(out$df),
+    c("sample", "batch", "class", "order", "A", "B")
+  )
+  
+  expect_identical(
+    out$study_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$mv_removed_cols,
+    character(0)
+  )
+  
+  expect_equal(
+    nrow(out$class_metab_all_missing),
+    1L
+  )
+  
+  expect_identical(
+    out$class_metab_all_missing$class,
+    "sample"
+  )
+  
+  expect_identical(
+    out$class_metab_all_missing$metabolite,
+    "A"
+  )
+  
+  expect_identical(
+    out$class_metab_all_missing$n_rows_in_class,
+    4L
+  )
+})
 
-  out <- filter_by_missing(df, metab_cols = c("A", "B"), mv_cutoff = 100)
-
-  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "A", "B"))
-  expect_equal(nrow(out$class_metab_all_missing), 1L)
-  expect_identical(out$class_metab_all_missing$class, "sample")
-  expect_identical(out$class_metab_all_missing$metabolite, "A")
-  expect_identical(out$class_metab_all_missing$n_rows_in_class, 4L)
+test_that("filter_by_missing supports any and all study-class rules", {
+  df <- data.frame(
+    sample = paste0("s", 1:6),
+    batch = 1L,
+    class = c(
+      "QC",
+      "group1",
+      "group1",
+      "group2",
+      "group2",
+      "QC"
+    ),
+    order = 1:6,
+    A = c(1, NA, NA, 2, 3, 1),
+    B = c(1, NA, NA, NA, NA, 1),
+    stringsAsFactors = FALSE
+  )
+  
+  out_any <- filter_by_missing(
+    df,
+    metab_cols = c("A", "B"),
+    mv_cutoff = 50,
+    qc_mv_cutoff = Inf,
+    filter_rule = "any"
+  )
+  
+  out_all <- filter_by_missing(
+    df,
+    metab_cols = c("A", "B"),
+    mv_cutoff = 50,
+    qc_mv_cutoff = Inf,
+    filter_rule = "all"
+  )
+  
+  # A exceeds the threshold only in group1.
+  # B exceeds the threshold in both study groups.
+  expect_setequal(
+    out_any$study_mv_removed_cols,
+    c("A", "B")
+  )
+  
+  expect_identical(
+    out_all$study_mv_removed_cols,
+    "B"
+  )
+  
+  expect_setequal(
+    names(out_any$df),
+    c("sample", "batch", "class", "order")
+  )
+  
+  expect_setequal(
+    names(out_all$df),
+    c("sample", "batch", "class", "order", "A")
+  )
+  
+  expect_identical(out_any$filter_rule, "any")
+  expect_identical(out_all$filter_rule, "all")
 })
 
 test_that("filter_by_missing errors if class column is absent", {
@@ -111,9 +301,13 @@ test_that("filter_by_missing errors if class column is absent", {
     A = c(1, NA, 3),
     stringsAsFactors = FALSE
   )
-
+  
   expect_error(
-    filter_by_missing(df, metab_cols = "A", mv_cutoff = 50),
+    filter_by_missing(
+      df,
+      metab_cols = "A",
+      mv_cutoff = 50
+    ),
     "`df` must contain a 'class' column.",
     fixed = TRUE
   )
@@ -127,17 +321,57 @@ test_that("filter_by_missing handles empty metabolite sets", {
     order = 1:3,
     stringsAsFactors = FALSE
   )
-
-  out <- filter_by_missing(df, metab_cols = character(0), mv_cutoff = 50)
-
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols = character(0),
+    mv_cutoff = 50
+  )
+  
   expect_named(
     out,
-    c("df", "mv_cutoff", "mv_removed_cols", "qc_missing_mets", "class_metab_all_missing")
+    c(
+      "df",
+      "mv_cutoff",
+      "qc_mv_cutoff",
+      "filter_rule",
+      "mv_removed_cols",
+      "study_mv_removed_cols",
+      "qc_mv_removed_cols",
+      "qc_missing_mets",
+      "class_metab_all_missing"
+    )
   )
+  
   expect_equal(out$df, df)
-  expect_identical(out$mv_removed_cols, character(0))
-  expect_identical(out$qc_missing_mets, character(0))
-  expect_equal(nrow(out$class_metab_all_missing), 0L)
+  expect_equal(out$mv_cutoff, 50)
+  expect_equal(out$qc_mv_cutoff, Inf)
+  expect_identical(out$filter_rule, "any")
+  
+  expect_identical(
+    out$mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$study_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_missing_mets,
+    character(0)
+  )
+  
+  expect_equal(
+    nrow(out$class_metab_all_missing),
+    0L
+  )
 })
 
 test_that("filter_by_missing keeps matrix shape with one metabolite and one class", {
@@ -149,15 +383,40 @@ test_that("filter_by_missing keeps matrix shape with one metabolite and one clas
     A = c(1, NA, 3),
     stringsAsFactors = FALSE
   )
-
-  out <- filter_by_missing(df, metab_cols = "A", mv_cutoff = 50)
-
-  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "A"))
-  expect_identical(out$mv_removed_cols, character(0))
-  expect_identical(out$qc_missing_mets, "A")
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols = "A",
+    mv_cutoff = 50
+  )
+  
+  expect_setequal(
+    names(out$df),
+    c("sample", "batch", "class", "order", "A")
+  )
+  
+  expect_identical(
+    out$study_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_missing_mets,
+    "A"
+  )
 })
 
-test_that("filter_by_missing retains metabolites while cutoff is NULL", {
+test_that("filter_by_missing retains metabolites while study cutoff is NULL", {
   df <- data.frame(
     sample = paste0("s", 1:3),
     batch = 1L,
@@ -166,12 +425,35 @@ test_that("filter_by_missing retains metabolites while cutoff is NULL", {
     A = c(1, NA, 3),
     stringsAsFactors = FALSE
   )
-
-  out <- filter_by_missing(df, metab_cols = "A", mv_cutoff = NULL)
-
-  expect_setequal(names(out$df), c("sample", "batch", "class", "order", "A"))
+  
+  out <- filter_by_missing(
+    df,
+    metab_cols = "A",
+    mv_cutoff = NULL
+  )
+  
+  expect_setequal(
+    names(out$df),
+    c("sample", "batch", "class", "order", "A")
+  )
+  
   expect_null(out$mv_cutoff)
-  expect_identical(out$mv_removed_cols, character(0))
+  expect_equal(out$qc_mv_cutoff, Inf)
+  
+  expect_identical(
+    out$study_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$qc_mv_removed_cols,
+    character(0)
+  )
+  
+  expect_identical(
+    out$mv_removed_cols,
+    character(0)
+  )
 })
 
 test_that("detect_blank_threshold returns expected vectorized threshold table", {

@@ -76,8 +76,8 @@ mod_import_ui <- function(id) {
     card(
       layout_sidebar(
         sidebar = ui_sidebar_block(
-          title = "1.3 Raw Data Filtering",
-          shiny::uiOutput(ns("blank_threshold_controls")),
+          title = "1.3 Missing Value Filtering",
+          #shiny::uiOutput(ns("blank_threshold_controls")),
           shiny::tags$div(
             style = "display:flex; align-items:center; justify-content:space-between; gap: 8px; margin-bottom: 8px;",
             shiny::tags$strong("Missing Value Filter"),
@@ -100,17 +100,19 @@ mod_import_ui <- function(id) {
           shiny::uiOutput(ns("mv_filter_slider")),
           width = 400
         ),
-        # shiny::fluidRow(
-        #  shiny::column(
-        #   8,
-        shiny::uiOutput(ns("blank_threshold_info")),
+        #shiny::uiOutput(ns("blank_threshold_info")),
         shiny::uiOutput(ns("filter_info")),
-        # ),
-        # shiny::column(
-        # 4,
         shiny::uiOutput(ns("download_mv_btn"))
-        # )
-        # )
+      )
+    ),
+    card(
+      layout_sidebar(
+        sidebar = ui_sidebar_block(
+          title = "1.4 Blank Threshold Filtering",
+          shiny::uiOutput(ns("blank_threshold_controls"))
+        ),
+        shiny::uiOutput(ns("blank_threshold_info")),
+        width = 400
       )
     ),
     # Next: Choose Correction Settings
@@ -271,117 +273,197 @@ mod_import_server <- function(id) {
     })
 
     #---------- 1.3 Raw Data filtering server
-
+    
     # Show blank threshold controls only when blanks/PBs exist.
     output$blank_threshold_controls <- shiny::renderUI({
       cd <- req(cleaned_r())
-
+      
       blank_df <- cd$blank_df
       has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
-
+      
       if (!has_blanks) {
         return(NULL)
       }
-
+      
       ui_blank_threshold_controls(
         ns = session$ns,
         threshold = input$blank_threshold %||% 3,
         remove_default = isTRUE(input$remove_blank_threshold_cols)
       )
     })
-
-    # Existing missing-value slider.
+    
+    # Missing-value filter controls.
     output$mv_filter_slider <- shiny::renderUI({
       req(cleaned_r())
       ui_filter_slider(ns = session$ns)
     })
-
-    # Dynamic blank-threshold detection.
-    blank_threshold_result_r <- shiny::reactive({
-      cd <- req(cleaned_r())
-
-      blank_df <- cd$blank_df
-      has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
-
-      if (!has_blanks) {
-        return(NULL)
-      }
-
-      metab_cols <- setdiff(
-        names(cd$df),
-        c("sample", "batch", "class", "order")
-      )
-
-      detect_blank_threshold(
-        df = cd$df,
-        blank_df = blank_df,
-        metab_cols = metab_cols,
-        class_col = "class",
-        qc_label = "QC",
-        threshold = input$blank_threshold %||% 3,
-        internal_standard_pattern = "ISTD|ITSD"
-      )
-    })
-
+    
     # Combined raw-data filtering:
-    # 1) optionally remove metabolites below blank threshold
-    # 2) then apply missing-value filter
+    # 1) remove metabolites with no detected signal
+    # 2) apply missing-value filter
+    # 3) detect blank-threshold failures among retained metabolites
+    # 4) optionally remove metabolites below the blank threshold
     filtered_r <- shiny::reactive({
       cd <- req(cleaned_r())
+      
       mv_cutoff <- req(input$mv_cutoff)
-
-      df_for_filtering <- cd$df
-      blank_threshold_result <- blank_threshold_result_r()
-
-      removed_blank_threshold_cols <- character(0)
-
-      if (
-        !is.null(blank_threshold_result) &&
-          isTRUE(input$remove_blank_threshold_cols)
-      ) {
-        blank_filter_result <- apply_blank_threshold_filter(
-          df = df_for_filtering,
-          failed_cols = blank_threshold_result$below_blank_threshold,
-          protect_internal_standards = TRUE,
-          internal_standard_pattern = "ISTD|ITSD"
-        )
-
-        df_for_filtering <- blank_filter_result$df
-        removed_blank_threshold_cols <- blank_filter_result$removed_blank_threshold_cols
-      }
-
+      qc_mv_cutoff <- req(input$qc_mv_cutoff)
+      filter_rule <- req(input$mv_filter_rule)
+      
+      # ---------------------------------------------------------------------------
+      # 1. Remove metabolites with no detected signal
+      # ---------------------------------------------------------------------------
+      
+      # Metabolites that are all missing/zero in both study and QC samples.
+      not_detected_mets <- intersect(
+        cd$all_missing_zero_non_qc_cols,
+        cd$all_missing_zero_qc_cols
+      )
+      
+      # Metabolites all missing/zero in only one sample type.
+      all_missing_zero_non_qc_cols <- setdiff(
+        cd$all_missing_zero_non_qc_cols,
+        not_detected_mets
+      )
+      
+      all_missing_zero_qc_cols <- setdiff(
+        cd$all_missing_zero_qc_cols,
+        not_detected_mets
+      )
+      
+      # Remove all metabolites that are completely absent from study samples,
+      # QC samples, or both before applying percentage-based filtering.
+      drops <- union(
+        cd$all_missing_zero_non_qc_cols,
+        cd$all_missing_zero_qc_cols
+      )
+      
+      df_for_filtering <- cd$df[
+        ,
+        !(names(cd$df) %in% drops),
+        drop = FALSE
+      ]
+      
+      # ---------------------------------------------------------------------------
+      # 2. Missing-value filtering
+      # ---------------------------------------------------------------------------
+      
       metab_cols <- setdiff(
         names(df_for_filtering),
         c("sample", "batch", "class", "order")
       )
-
+      
       mv_filter_result <- filter_by_missing(
-        df_for_filtering,
-        metab_cols,
-        mv_cutoff
+        df = df_for_filtering,
+        metab_cols = metab_cols,
+        mv_cutoff = mv_cutoff,
+        qc_mv_cutoff = qc_mv_cutoff,
+        filter_rule = filter_rule
       )
-
-      mv_filter_result$blank_threshold_result <- blank_threshold_result
-      mv_filter_result$removed_blank_threshold_cols <- removed_blank_threshold_cols
-      mv_filter_result$blank_threshold <- input$blank_threshold %||% 3
-      mv_filter_result$remove_blank_threshold_cols <- isTRUE(input$remove_blank_threshold_cols)
-
+      
+      # At this point, these are the metabolites that survived missing-value
+      # filtering.
+      df_after_missing <- mv_filter_result$df
+      
+      retained_metab_cols <- setdiff(
+        names(df_after_missing),
+        c("sample", "batch", "class", "order")
+      )
+      
+      # ---------------------------------------------------------------------------
+      # 3. Blank-threshold detection
+      # ---------------------------------------------------------------------------
+      
+      blank_df <- cd$blank_df
+      
+      has_blanks <-
+        !is.null(blank_df) &&
+        nrow(blank_df) > 0L
+      
+      blank_threshold_result <- NULL
+      removed_blank_threshold_cols <- character(0)
+      
+      if (
+        has_blanks &&
+        length(retained_metab_cols) > 0L
+      ) {
+        blank_threshold_result <- detect_blank_threshold(
+          df = df_after_missing,
+          blank_df = blank_df,
+          metab_cols = retained_metab_cols,
+          class_col = "class",
+          qc_label = "QC",
+          threshold = input$blank_threshold %||% 3,
+          internal_standard_pattern = "ISTD|ITSD"
+        )
+      }
+      
+      # ---------------------------------------------------------------------------
+      # 4. Optional blank-threshold removal
+      # ---------------------------------------------------------------------------
+      
+      final_df <- df_after_missing
+      
+      if (
+        !is.null(blank_threshold_result) &&
+        isTRUE(input$remove_blank_threshold_cols)
+      ) {
+        blank_filter_result <- apply_blank_threshold_filter(
+          df = df_after_missing,
+          failed_cols = blank_threshold_result$below_blank_threshold,
+          protect_internal_standards = TRUE,
+          internal_standard_pattern = "ISTD|ITSD"
+        )
+        
+        final_df <- blank_filter_result$df
+        
+        removed_blank_threshold_cols <-
+          blank_filter_result$removed_blank_threshold_cols
+      }
+      
+      # ---------------------------------------------------------------------------
+      # 5. Attach reporting information
+      # ---------------------------------------------------------------------------
+      
+      mv_filter_result$df <- final_df
+      
+      mv_filter_result$blank_threshold_result <-
+        blank_threshold_result
+      
+      mv_filter_result$removed_blank_threshold_cols <-
+        removed_blank_threshold_cols
+      
+      mv_filter_result$blank_threshold <-
+        input$blank_threshold %||% 3
+      
+      mv_filter_result$remove_blank_threshold_cols <-
+        isTRUE(input$remove_blank_threshold_cols)
+      
+      mv_filter_result$not_detected_mets <-
+        not_detected_mets
+      
+      mv_filter_result$all_missing_zero_non_qc_cols <-
+        all_missing_zero_non_qc_cols
+      
+      mv_filter_result$all_missing_zero_qc_cols <-
+        all_missing_zero_qc_cols
+      
       mv_filter_result
     })
-
-    # Warning card above missing-value filter info.
+    
+    # Blank-threshold filtering information.
     output$blank_threshold_info <- shiny::renderUI({
       cd <- req(cleaned_r())
-
+      
       blank_df <- cd$blank_df
       has_blanks <- !is.null(blank_df) && nrow(blank_df) > 0L
-
+      
       if (!has_blanks) {
         return(NULL)
       }
-
+      
       fd <- req(filtered_r())
-
+      
       ui_blank_threshold_info(
         blank_threshold_result = fd$blank_threshold_result,
         blank_df = blank_df,
@@ -390,15 +472,11 @@ mod_import_server <- function(id) {
         removed_blank_threshold_cols = fd$removed_blank_threshold_cols
       )
     })
-
-    # Existing missing-value filter info.
+    
+    # Missing-value filter information.
     output$filter_info <- shiny::renderUI({
       fd <- req(filtered_r())
-
-      ui_filter_info(
-        fd,
-        input$mv_cutoff
-      )
+      ui_filter_info(fd)
     })
 
     output$download_mv_btn <- renderUI({
@@ -471,7 +549,9 @@ mod_import_server <- function(id) {
         n_withhold         = input$n_withhold %||% 0,
         no_control         = isTRUE(input$no_control),
         control_class      = input$control_class %||% "",
-        mv_cutoff          = input$mv_cutoff
+        mv_cutoff          = input$mv_cutoff,
+        qc_mv_cutoff       = input$qc_mv_cutoff,
+        filter_rule        = input$filter_rule
       )
     })
 

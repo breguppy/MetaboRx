@@ -434,12 +434,12 @@ detect_hotelling_nonqc_dual_z <- function(
         stringsAsFactors = FALSE
       )
 
-      plot_df$group <- "Non-QC inlier"
+      plot_df$group <- "Study Sample"
       plot_df$group[plot_df$is_qc] <- "QC"
-      plot_df$group[plot_df$is_out] <- "Outside ellipse"
+      plot_df$group[plot_df$is_out] <- "Potential Outlier"
       plot_df$group <- factor(
         plot_df$group,
-        levels = c("QC", "Non-QC inlier", "Outside ellipse")
+        levels = c("QC", "Study Sample", "Potential Outlier")
       )
 
       ellipse_df <- .make_hotelling_ellipse(
@@ -456,7 +456,7 @@ detect_hotelling_nonqc_dual_z <- function(
         ggplot2::geom_point(
           ggplot2::aes(color = group),
           alpha = 0.8,
-          size = 2
+          size = 3
         ) +
         ggplot2::geom_path(
           data = ellipse_df,
@@ -466,9 +466,9 @@ detect_hotelling_nonqc_dual_z <- function(
         ) +
         ggplot2::scale_color_manual(
           values = c(
-            "QC" = "#999999",
-            "Non-QC inlier" = "#1f78b4",
-            "Outside ellipse" = "#e31a1c"
+            "QC" = "#bbbbbb",
+            "Study Sample" = "#1f78b4",
+            "Potential Outlier" = "#BE0032"
           )
         ) +
         big_font_theme +
