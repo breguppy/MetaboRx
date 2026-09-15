@@ -85,7 +85,9 @@ clean_data <- function(df,
       df[, metab_candidates, drop = FALSE],
       FUN = function(col) {
         vals <- col[!is.na(col)]
-        all(is.na(suppressWarnings(as.numeric(vals))))
+        
+        length(vals) > 0L &&
+          all(is.na(suppressWarnings(as.numeric(vals))))
       },
       FUN.VALUE = logical(1L)
     )

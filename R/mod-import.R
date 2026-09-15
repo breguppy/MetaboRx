@@ -549,7 +549,9 @@ mod_import_server <- function(id) {
         n_withhold         = input$n_withhold %||% 0,
         no_control         = isTRUE(input$no_control),
         control_class      = input$control_class %||% "",
-        mv_cutoff          = input$mv_cutoff
+        mv_cutoff          = input$mv_cutoff,
+        qc_mv_cutoff       = input$qc_mv_cutoff,
+        filter_rule        = input$filter_rule
       )
     })
 

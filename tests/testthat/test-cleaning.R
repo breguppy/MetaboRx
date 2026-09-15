@@ -514,4 +514,50 @@ test_that("repair_duplicate_column_names avoids generated-name collisions", {
   expect_identical(names(out), c("a", "a_1", "a_2"))
 })
 
-
+test_that("clean_data classifies all-NA metabolites as undetected rather than non-numeric", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:6),
+    BatchID = 1L,
+    Type = c(
+      "QC",
+      "sample",
+      "sample",
+      "sample",
+      "sample",
+      "QC"
+    ),
+    Injection = 1:6,
+    met_all_na = rep(NA_real_, 6),
+    met_numeric = 1:6,
+    stringsAsFactors = FALSE
+  )
+  
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "BatchID",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+  
+  expect_false(
+    "met_all_na" %in% out$non_numeric_cols
+  )
+  
+  expect_true(
+    "met_all_na" %in% out$all_missing_zero_non_qc_cols
+  )
+  
+  expect_true(
+    "met_all_na" %in% out$all_missing_zero_qc_cols
+  )
+  
+  # The column is retained for removal during the later filtering step.
+  expect_true(
+    "met_all_na" %in% names(out$df)
+  )
+  
+  expect_true(is.numeric(out$df$met_all_na))
+  expect_true(all(is.na(out$df$met_all_na)))
+})

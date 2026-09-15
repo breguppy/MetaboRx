@@ -113,7 +113,9 @@ export_xlsx <- function(p, d, file = NULL) {
           "Batch Column Name",
           "Class Column Name",
           "Injection Order Column Name",
-          "Missing Value Threshold",
+          "Study Missing Value Threshold (%)",
+          "QC Missing Value Threshold (%)",
+          "Study Missing Value Filter Rule",
           "QC Imputation",
           "Sample Imputation",
           "Correction Method",
@@ -133,6 +135,8 @@ export_xlsx <- function(p, d, file = NULL) {
           p$class_col,
           p$order_col,
           sprintf("%s%%", d$filtered$mv_cutoff),
+          sprintf("%s%%", d$filtered$qc_mv_cutoff),
+          d$filtered$filter_rule,
           d$imputed$qc_str,
           d$imputed$sam_str,
           d$corrected$str,
@@ -322,8 +326,14 @@ export_xlsx <- function(p, d, file = NULL) {
       )
       cur_col <- add_settings_table(
         cur_col,
-        d$filtered$mv_removed_cols,
-        "Missing-Value Filtered Metabolites"
+        d$filtered$study_mv_removed_cols,
+        "Study Missing-Value Filtered Metabolites"
+      )
+      
+      cur_col <- add_settings_table(
+        cur_col,
+        d$filtered$qc_mv_removed_cols,
+        "QC Missing-Value Filtered Metabolites"
       )
       cur_col <- add_settings_table(
         cur_col,

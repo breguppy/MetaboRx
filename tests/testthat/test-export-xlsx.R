@@ -18,6 +18,9 @@ make_export_xlsx_fixture <- function() {
     batch_col = "batch",
     class_col = "class",
     order_col = "order",
+    mv_cutoff = 20,
+    qc_mv_cutoff = 40,
+    filter_rule = "all",
     remove_imputed = FALSE,
     rsd_cutoff = Inf,
     rsd_filter_threshold = 30,
@@ -46,7 +49,14 @@ make_export_xlsx_fixture <- function() {
     filtered = list(
       df = raw_df,
       mv_cutoff = 20,
-      mv_removed_cols = "missing_removed",
+      qc_mv_cutoff = 40,
+      filter_rule = "all",
+      mv_removed_cols = c(
+        "study_missing_removed",
+        "qc_missing_removed"
+      ),
+      study_mv_removed_cols = "study_missing_removed",
+      qc_mv_removed_cols = "qc_missing_removed",
       qc_missing_mets = "qc_missing_after_filter",
       blank_threshold = 3,
       remove_blank_threshold_cols = FALSE,
@@ -91,6 +101,44 @@ export_xlsx_fixture <- function(fixture, file) {
     export_xlsx(fixture$p, fixture$d, file = file)
   )
 }
+expect_export_setting <- function(settings, label, expected_value) {
+  settings_matrix <- as.matrix(settings)
+  location <- which(settings_matrix == label, arr.ind = TRUE)
+  
+  expect_equal(
+    nrow(location),
+    1L,
+    info = paste("Expected exactly one exported setting named:", label)
+  )
+  
+  if (nrow(location) != 1L) {
+    return(invisible(NULL))
+  }
+  
+  row_index <- location[1, "row"]
+  col_index <- location[1, "col"]
+  
+  expect_true(
+    col_index < ncol(settings_matrix),
+    info = paste("No value was found beside setting:", label)
+  )
+  
+  if (col_index >= ncol(settings_matrix)) {
+    return(invisible(NULL))
+  }
+  
+  actual_value <- as.character(
+    settings_matrix[row_index, col_index + 1L]
+  )
+  
+  expect_identical(
+    actual_value,
+    as.character(expected_value),
+    info = paste("Unexpected value for setting:", label)
+  )
+  
+  invisible(NULL)
+}
 
 test_that("export_xlsx rounds metabolite values only in non-raw sheets", {
   fixture <- make_export_xlsx_fixture()
@@ -114,29 +162,101 @@ test_that("export_xlsx rounds metabolite values only in non-raw sheets", {
 test_that("export_xlsx writes expanded correction settings audit tables", {
   fixture <- make_export_xlsx_fixture()
   file <- tempfile(fileext = ".xlsx")
-
+  
   export_xlsx_fixture(fixture, file)
-
+  
   settings <- openxlsx::read.xlsx(
     file,
     sheet = "1. Correction Settings",
     colNames = FALSE
   )
-  settings_values <- as.character(unlist(settings, use.names = FALSE))
-
-  expect_true("Blank Threshold Multiplier" %in% settings_values)
-  expect_true("Sample/QC Average Difference Threshold" %in% settings_values)
-  expect_true("All Missing/Zero in QC Metabolites Removed" %in% settings_values)
-  expect_true("Equal/Duplicate Metabolite Pairs Detected" %in% settings_values)
-  expect_true("Blank-Threshold Flagged Metabolites" %in% settings_values)
-  expect_true("Sample/QC Average Flagged Metabolites" %in% settings_values)
-  expect_true("QC-RSD Flagged Metabolites" %in% settings_values)
-  expect_true("QC Missing After Missing-Value Filtering" %in% settings_values)
+  
+  settings_values <- as.character(
+    unlist(settings, use.names = FALSE)
+  )
+  
+  expect_true(
+    "Study Missing Value Threshold (%)" %in% settings_values
+  )
+  
+  expect_true(
+    "QC Missing Value Threshold (%)" %in% settings_values
+  )
+  
+  expect_true(
+    "Study Missing Value Filter Rule" %in% settings_values
+  )
+  
+  expect_true("20%" %in% settings_values)
+  expect_true("40%" %in% settings_values)
+  expect_true("all" %in% settings_values)
+  
+  expect_true(
+    "Blank Threshold Multiplier" %in% settings_values
+  )
+  
+  expect_true(
+    "Sample/QC Average Difference Threshold" %in% settings_values
+  )
+  
+  expect_true(
+    "All Missing/Zero in QC Metabolites Removed" %in%
+      settings_values
+  )
+  
+  expect_true(
+    "Equal/Duplicate Metabolite Pairs Detected" %in%
+      settings_values
+  )
+  
+  expect_true(
+    "Blank-Threshold Flagged Metabolites" %in%
+      settings_values
+  )
+  
+  expect_true(
+    "Sample/QC Average Flagged Metabolites" %in%
+      settings_values
+  )
+  
+  expect_true(
+    "QC-RSD Flagged Metabolites" %in%
+      settings_values
+  )
+  
+  expect_true(
+    "QC Missing After Missing-Value Filtering" %in%
+      settings_values
+  )
+  
   expect_true("blank_flagged" %in% settings_values)
   expect_true("average_flagged" %in% settings_values)
   expect_true("met_b" %in% settings_values)
+  expect_export_setting(
+    settings,
+    "Study Missing Value Threshold (%)",
+    "20%"
+  )
+  
+  expect_export_setting(
+    settings,
+    "QC Missing Value Threshold (%)",
+    "40%"
+  )
+  
+  expect_export_setting(
+    settings,
+    "Study Missing Value Filter Rule",
+    "all"
+  )
+  
+  expect_true("study_missing_removed" %in% settings_values)
+  expect_true("qc_missing_removed" %in% settings_values)
+  expect_false(
+    "Missing-Value Filtered Metabolites" %in%
+      settings_values
+  )
 })
-
 
 test_that("export_xlsx writes QC RSD filtered metabolites when filtering is enabled", {
   fixture <- make_export_xlsx_fixture()
