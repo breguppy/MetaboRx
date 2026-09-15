@@ -29,17 +29,40 @@ test_that("clean_data basic cleaning and outputs", {
     "replacement_counts",
     "withheld_cols",
     "non_numeric_cols",
+    "all_missing_zero_non_qc_cols",
     "all_missing_zero_qc_cols",
     "duplicate_mets",
     "duplicate_col_names",
     "blank_df"
   ))
-  expect_equal(out$withheld_cols, "note")
-  expect_equal(out$all_missing_zero_qc_cols, "met3")
   
-  # columns renamed, withheld removed, order applied
-  expect_setequal(names(out$df),
-                  c("sample", "batch", "class", "order", "met1", "met2"))
+  expect_equal(out$withheld_cols, "note")
+  
+  # met 2 and met3 is entirely zero in both QC and non-QC samples.
+  expect_identical(
+    out$all_missing_zero_non_qc_cols,
+    c("met2", "met3")
+  )
+  
+  expect_identical(
+    out$all_missing_zero_qc_cols,
+    "met3"
+  )
+  
+  # Columns are renamed and withheld columns are removed.
+  # All-missing/zero metabolite columns are retained for later filtering.
+  expect_setequal(
+    names(out$df),
+    c(
+      "sample",
+      "batch",
+      "class",
+      "order",
+      "met1",
+      "met2",
+      "met3"
+    )
+  )
   expect_true(is.unsorted(df$Injection))
   expect_equal(out$df$order, sort(out$df$order))
   
@@ -48,10 +71,20 @@ test_that("clean_data basic cleaning and outputs", {
   expect_identical(out$df$class[1], "QC")
   expect_identical(out$df$class[nrow(out$df)], "QC")
   
-  # numeric coercion + zero→NA
-  expect_true(all(vapply(out$df[c("met1", "met2")], is.numeric, TRUE)))
+  # numeric coercion + zero -> NA
+  expect_true(
+    all(
+      vapply(
+        out$df[c("met1", "met2", "met3")],
+        is.numeric,
+        logical(1L)
+      )
+    )
+  )
+  
   expect_true(any(is.na(out$df$met1)))
   expect_true(any(is.na(out$df$met2)))
+  expect_true(all(is.na(out$df$met3)))
   
   # replacement counts
   rc <- out$replacement_counts
@@ -61,6 +94,97 @@ test_that("clean_data basic cleaning and outputs", {
   # met2: one non-numeric ("foo"), one zero
   expect_equal(rc$non_numeric_replaced[rc$metabolite == "met2"], 1)
   expect_equal(unname(rc$zero_replaced[rc$metabolite == "met2"]), 1)
+  # met3: all six values are zero
+  expect_equal(
+    unname(
+      rc$zero_replaced[rc$metabolite == "met3"]
+    ),
+    6
+  )
+})
+
+test_that("clean_data excludes HP and blank-like rows from the non-QC missing-zero check", {
+  df <- data.frame(
+    SampleID = paste0("s", 1:8),
+    BatchID = 1,
+    Type = c(
+      "QC",
+      "HP",
+      "blank",
+      "sample",
+      "sample",
+      "PB",
+      "processing blank",
+      "QC"
+    ),
+    Injection = 1:8,
+    met_non_qc_missing = c(
+      10,  # QC
+      20,  # HP: excluded from non-QC calculation
+      30,  # blank: excluded
+      0,   # biological sample
+      NA,  # biological sample
+      40,  # PB: excluded
+      50,  # processing blank: excluded
+      10   # QC
+    ),
+    met_qc_missing = c(
+      0,   # QC
+      20,  # HP
+      30,  # blank
+      5,   # biological sample
+      6,   # biological sample
+      40,  # PB
+      50,  # processing blank
+      NA   # QC
+    ),
+    met_present = c(
+      1, 2, 3, 4, 5, 6, 7, 8
+    ),
+    stringsAsFactors = FALSE
+  )
+  
+  out <- clean_data(
+    df,
+    sample = "SampleID",
+    batch = "BatchID",
+    class = "Type",
+    order = "Injection",
+    withheld_cols = character()
+  )
+  
+  expect_identical(
+    out$all_missing_zero_non_qc_cols,
+    "met_non_qc_missing"
+  )
+  
+  expect_identical(
+    out$all_missing_zero_qc_cols,
+    "met_qc_missing"
+  )
+  
+  # Identified columns are retained for later filtering.
+  expect_true(
+    all(
+      c(
+        "met_non_qc_missing",
+        "met_qc_missing",
+        "met_present"
+      ) %in% names(out$df)
+    )
+  )
+  
+  # HP and blank-like rows are removed from the cleaned biological/QC data.
+  expect_false(any(out$df$class == "HP"))
+  
+  expect_false(
+    any(
+      tolower(trimws(out$df$class)) %in%
+        c("blank", "pb", "processing blank")
+    )
+  )
+  
+  expect_equal(nrow(out$blank_df), 3L)
 })
 
 test_that("clean_data errors when first sample after sort is not QC", {
