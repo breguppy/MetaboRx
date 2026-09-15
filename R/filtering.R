@@ -194,7 +194,7 @@ filter_by_missing <- function(
     df,
     metab_cols,
     mv_cutoff,
-    qc_mv_cutoff,
+    qc_mv_cutoff = Inf,
     filter_rule = c("any", "all")
 ) {
   filter_rule <- match.arg(filter_rule)
