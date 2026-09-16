@@ -179,7 +179,8 @@ mod_correct_ui <- function(id) {
         div(style = "margin:12px 0 0 0;", withSpinner(uiOutput(
           ns("corr_spinner")
         ), color = "#404040")),
-        uiOutput(ns("corr_range_info"))
+        uiOutput(ns("corr_range_info"),
+                 class = "manuscript-summary")
       ), column(4, uiOutput(
         ns("download_corr_btn")
       )))
