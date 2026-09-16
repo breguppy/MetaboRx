@@ -46,7 +46,8 @@ mod_correct_ui <- function(id) {
         )), width = 400),
         fluidRow(
           column(
-            6, uiOutput(ns("post_cor_filter_info")) |> withSpinner(color = "#404040")
+            6, uiOutput(ns("post_cor_filter_info"),
+                        class = "manuscript-summary") |> withSpinner(color = "#404040")
           ),
           column(
             6,
@@ -69,7 +70,8 @@ mod_correct_ui <- function(id) {
                 )
               )
             ),
-            uiOutput(ns("rsd_comparison_stats")),
+            uiOutput(ns("rsd_comparison_stats"),
+                     class = "manuscript-summary"),
             uiOutput(ns("download_cor_rsd_btn")),
           )
         )
@@ -101,7 +103,8 @@ mod_correct_ui <- function(id) {
       fluidRow(
         column(
           width = 7,
-          uiOutput(ns("outliers_table"))
+          uiOutput(ns("outliers_table"),
+                   class = "manuscript-summary")
         ),
         column(
           width = 5,
@@ -141,7 +144,8 @@ mod_correct_ui <- function(id) {
               )
             )
           ),
-          uiOutput(ns("post_transform_rsd_compare")),
+          uiOutput(ns("post_transform_rsd_compare"),
+                   class = "manuscript-summary"),
           uiOutput(ns("download_tc_rsd_btn"))
         )
       ),
@@ -170,11 +174,13 @@ mod_correct_ui <- function(id) {
       ),
       fluidRow(column(
         8,
-        uiOutput(ns("compute_corr_ui")),
+        uiOutput(ns("compute_corr_ui"),
+                 class = "manuscript-summary"),
         div(style = "margin:12px 0 0 0;", withSpinner(uiOutput(
           ns("corr_spinner")
         ), color = "#404040")),
-        uiOutput(ns("corr_range_info"))
+        uiOutput(ns("corr_range_info"),
+                 class = "manuscript-summary")
       ), column(4, uiOutput(
         ns("download_corr_btn")
       )))
