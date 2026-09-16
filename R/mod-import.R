@@ -70,7 +70,8 @@ mod_import_ui <- function(id) {
         uiOutput(ns("ui_control_class_selector")),
         width = 400
       ),
-      uiOutput(ns("basic_info")) |> withSpinner(color = "#404040")
+      uiOutput(ns("basic_info"),
+               class = "manuscript-summary") |> withSpinner(color = "#404040")
     )),
     # 1.3 Raw data filtering
     card(
@@ -101,7 +102,8 @@ mod_import_ui <- function(id) {
           width = 400
         ),
         #shiny::uiOutput(ns("blank_threshold_info")),
-        shiny::uiOutput(ns("filter_info")),
+        shiny::uiOutput(ns("filter_info"),
+                        class = "manuscript-summary"),
         shiny::uiOutput(ns("download_mv_btn"))
       )
     ),
@@ -111,7 +113,8 @@ mod_import_ui <- function(id) {
           title = "1.4 Blank Threshold Filtering",
           shiny::uiOutput(ns("blank_threshold_controls"))
         ),
-        shiny::uiOutput(ns("blank_threshold_info")),
+        shiny::uiOutput(ns("blank_threshold_info"),
+                        class = "manuscript-summary"),
         width = 400
       )
     ),
