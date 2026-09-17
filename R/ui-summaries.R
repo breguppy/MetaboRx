@@ -459,31 +459,79 @@ ui_filter_info <- function(fd) {
   }
   
   # ===========================================================================
-  # Helper: dynamically arrange non-NULL cards into columns
+  # Helpers: responsive card grids and balanced metabolite lists
   # ===========================================================================
   
-  dynamic_columns <- function(...) {
+  dynamic_columns <- function(...,
+                              min_width = 320L,
+                              gap = 16L) {
     cards <- Filter(
       Negate(is.null),
       list(...)
     )
     
-    n_cards <- length(cards)
-    
-    if (n_cards == 0L) {
+    if (length(cards) == 0L) {
       return(NULL)
     }
     
     tags$div(
-      style = paste0(
-        "display: grid; ",
-        "grid-template-columns: repeat(",
-        n_cards,
-        ", minmax(0, 1fr)); ",
-        "gap: 16px; ",
-        "align-items: start;"
+      style = sprintf(
+        paste0(
+          "display: grid; ",
+          "grid-template-columns: repeat(",
+          "auto-fit, minmax(min(100%%, %dpx), 1fr)",
+          "); ",
+          "gap: %dpx; ",
+          "align-items: stretch; ",
+          "margin-bottom: 16px;"
+        ),
+        min_width,
+        gap
       ),
-      cards
+      lapply(
+        cards,
+        function(card) {
+          tags$div(
+            style = paste0(
+              "min-width: 0; ",
+              "height: 100%;"
+            ),
+            card
+          )
+        }
+      )
+    )
+  }
+  
+  balanced_list <- function(items,
+                            min_column_width = 220L,
+                            max_columns = 3L) {
+    items <- as.character(items)
+    items <- items[!is.na(items) & nzchar(items)]
+    
+    if (length(items) == 0L) {
+      return(NULL)
+    }
+    
+    tags$ul(
+      style = sprintf(
+        paste0(
+          "columns: %dpx %d; ",
+          "column-gap: 24px; ",
+          "margin-bottom: 0;"
+        ),
+        min_column_width,
+        max_columns
+      ),
+      lapply(
+        items,
+        function(item) {
+          tags$li(
+            style = "break-inside: avoid;",
+            item
+          )
+        }
+      )
     )
   }
   
@@ -505,12 +553,7 @@ ui_filter_info <- function(fd) {
           "study and QC samples."
         )
       ),
-      tags$ul(
-        lapply(
-          not_detected_mets,
-          tags$li
-        )
-      )
+      balanced_list(not_detected_mets)
     )
   }
   
@@ -528,12 +571,7 @@ ui_filter_info <- function(fd) {
           "study samples."
         )
       ),
-      tags$ul(
-        lapply(
-          all_missing_zero_non_qc_cols,
-          tags$li
-        )
-      )
+      balanced_list(all_missing_zero_non_qc_cols)
     )
   }
   
@@ -551,19 +589,15 @@ ui_filter_info <- function(fd) {
           "QC samples."
         )
       ),
-      tags$ul(
-        lapply(
-          all_missing_zero_qc_cols,
-          tags$li
-        )
-      )
+      balanced_list(all_missing_zero_qc_cols)
     )
   }
   
   not_detected_columns <- dynamic_columns(
     not_detected_dataset_col,
     not_detected_study_col,
-    not_detected_qc_col
+    not_detected_qc_col,
+    min_width = 280L
   )
   
   not_detected_card <- if (is.null(not_detected_columns)) {
@@ -660,12 +694,7 @@ ui_filter_info <- function(fd) {
         " metabolite(s) removed for study-sample missingness"
       ),
       body = study_rule_text,
-      body_tags = tags$ul(
-        lapply(
-          removed_study_only,
-          tags$li
-        )
-      )
+      body_tags = balanced_list(removed_study_only)
     )
   }
   
@@ -685,12 +714,7 @@ ui_filter_info <- function(fd) {
         "The following metabolites exceeded both the study-sample ",
         "criterion and the QC missingness criterion."
       ),
-      body_tags = tags$ul(
-        lapply(
-          removed_both,
-          tags$li
-        )
-      )
+      body_tags = balanced_list(removed_both)
     )
   }
   
@@ -707,19 +731,14 @@ ui_filter_info <- function(fd) {
         " metabolite(s) removed for QC missingness"
       ),
       body = qc_rule_text,
-      body_tags = tags$ul(
-        lapply(
-          removed_qc_only,
-          tags$li
-        )
-      )
+      body_tags = balanced_list(removed_qc_only)
     )
   }
   
   qc_missing_card <- if (length(qc_missing_mets) == 0L) {
     tags$div(
       class = "alert alert-success",
-      style = "margin-bottom: 10px;",
+      style = "margin-bottom: 0; height: 100%;",
       tags$strong(
         "No retained metabolites have missing values in QC samples."
       )
@@ -727,7 +746,7 @@ ui_filter_info <- function(fd) {
   } else {
     tags$div(
       class = "alert alert-warning",
-      style = "margin-bottom: 10px;",
+      style = "margin-bottom: 0; height: 100%;",
       tags$strong(
         paste0(
           length(qc_missing_mets),
@@ -742,12 +761,7 @@ ui_filter_info <- function(fd) {
           "% QC cutoff."
         )
       ),
-      tags$ul(
-        lapply(
-          qc_missing_mets,
-          tags$li
-        )
-      )
+      balanced_list(qc_missing_mets)
     )
   }
   
@@ -777,58 +791,42 @@ ui_filter_info <- function(fd) {
   )
   
   # ---------------------------------------------------------------------------
-  # Assemble QC column
-  # ---------------------------------------------------------------------------
-  
-  qc_column_items <- Filter(
-    Negate(is.null),
-    list(
-      qc_removed_card,
-      qc_missing_card,
-      metrics
-    )
-  )
-  
-  qc_column <- if (length(qc_column_items) == 0L) {
-    NULL
-  } else {
-    tags$div(
-      style = "min-width: 0;",
-      qc_column_items
-    )
-  }
-  
-  # ---------------------------------------------------------------------------
-  # Missing-value removal section
+  # Missing-value removal cards
   # ---------------------------------------------------------------------------
   
   removal_columns <- dynamic_columns(
     study_removed_card,
     removed_both_card,
-    qc_column
+    qc_removed_card,
+    min_width = 320L
   )
   
-  no_removals_card <- NULL
-  
-  if (
-    length(mv_removed) == 0L &&
-    is.null(removal_columns)
-  ) {
-    no_removals_card <- tags$div(
+  no_removals_card <- if (length(mv_removed) == 0L) {
+    tags$div(
       class = "alert alert-success",
-      style = "margin-bottom: 10px;",
+      style = "margin-bottom: 16px;",
       tags$strong(
         "No metabolites were removed by the missing-value filters."
       )
     )
+  } else {
+    NULL
   }
+  
+  # Keep retained-QC status and dataset metrics together in a balanced row.
+  qc_summary_columns <- dynamic_columns(
+    qc_missing_card,
+    metrics,
+    min_width = 360L
+  )
   
   missing_value_section <- tags$div(
     filter_criteria_card,
     no_removals_card,
-    removal_columns
+    removal_columns,
+    qc_summary_columns
   )
-  
+ 
   # ===========================================================================
   # Class/metabolite combinations that remain completely missing
   # ===========================================================================
@@ -862,12 +860,7 @@ ui_filter_info <- function(fd) {
       body = paste0(
         "The following class-metabolite pairs have all values missing. "
       ),
-      body_tags = tags$ul(
-        lapply(
-          pair_items,
-          tags$li
-        )
-      )
+      body_tags = balanced_list(pair_items)
     )
   }
   
