@@ -19,7 +19,7 @@ make_met_scatter <- function(d, p, met_col, scatter_context = NULL) {
 
       if (cor_method %in% c("Random Forest", "Batchwise Random Forest")) {
         met_scatter_rf(df_raw, df_cor, i = met_col, scatter_context = scatter_context)
-      } else if (cor_method %in% c("local polynomial regression", "Batchwise LOESS", "local constant regression", "local linear regression")) {
+      } else if (cor_method %in% c("local polynomial regression", "Batchwise LOESS", "local constant regression", "local linear regression", "none")) {
         met_scatter_loess(
           df_raw,
           df_cor,

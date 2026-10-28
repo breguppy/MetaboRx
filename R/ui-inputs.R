@@ -490,19 +490,22 @@ ui_correction_method <- function(df, ns = identity) {
   # `allowed` controls whether the radio option is enabled.
   method_options <- tibble::tibble(
     label = c(
+      "None",
       "Local constant",
       "Local linear",
       "Local polynomial",
       "Random forest"
     ),
-    value = c("LC", "LL", "LOESS", "RF"),
+    value = c("None", "LC", "LL", "LOESS", "RF"),
     allowed = c(
+      allow_lc,
       allow_lc,
       allow_ll,
       allow_loess,
       allow_rf
     ),
     unavailable_reason = c(
+      "Requires at least 1 QC sample.",
       "Requires at least 1 QC sample.",
       "Requires at least 3 QC samples.",
       "Requires at least 5 QC samples.",
