@@ -2,7 +2,7 @@
 #'
 #' @keywords internal
 #' @noRd
-correct_data <- function(df, metab_cols, corMethod) {
+correct_data <- function(df, metab_cols, corMethod, met_scaling) {
   if (corMethod %in% c("RF", "BW_RF")) {
     if (!requireNamespace("randomForest", quietly = TRUE)) {
       stop("Install 'randomForest' to use RF correction.", call. = FALSE)
@@ -25,7 +25,7 @@ correct_data <- function(df, metab_cols, corMethod) {
   } else if (corMethod == "LC") {
     correction_str <- "local constant regression"
     parameters <- "fits study samples using a Nadaraya-Watson kernel-weighted mean of nearby QC points."
-    df_corrected <- nw_correction(df, metab_cols, span = 0.75)
+    df_corrected <- nw_correction(df, metab_cols, met_scaling, span = 0.75, )
   } else if (corMethod == "LL") {
     correction_str <- "local linear regression"
     parameters <- "fits study samples to the line created by nearby QC points."

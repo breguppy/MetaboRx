@@ -80,6 +80,8 @@
 #'   metabolite columns.
 #' @param metab_cols character vector
 #'   Metabolite column names.
+#' @param met_scaling character scalar
+#'   Scaling factor for metabolite post-correction.
 #' @param span numeric scalar
 #'   Relative smoothing span in (0, 1]. Larger values give smoother fits.
 #' @param min_qc integer scalar
@@ -92,7 +94,7 @@
 #'
 #' @keywords internal
 #' @noRd
-nw_correction <- function(df, metab_cols, span = 0.75, min_qc = 3, kernel = "gaussian") {
+nw_correction <- function(df, metab_cols, met_scaling = "one", span = 0.75, min_qc = 3, kernel = "gaussian") {
   df <- df[order(df$order), , drop = FALSE]
 
   if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC"))) {
@@ -131,10 +133,22 @@ nw_correction <- function(df, metab_cols, span = 0.75, min_qc = 3, kernel = "gau
     pred[!is.finite(pred) | pred <= 0] <- NA_real_
     corr <- as.numeric(df[[metab]]) / pred
 
-    sf <- stats::median(corr[qcid], na.rm = TRUE)
-    if (is.finite(sf) && sf > 0) {
+    if(met_scaling == "one") {
+      sf <- stats::median(corr[qcid], na.rm = TRUE)
+      if (is.finite(sf) && sf > 0) {
       corr <- corr / sf
+      }
+    } else if(met_scaling == "original"){
+      valid_qc <- qc_y[is.finite(qc_y) & qc_y > 0]
+      qc_reference <- stats::median(valid_qc)
+      
+      sf <- stats::median(corr[qcid], na.rm = TRUE)
+      if (is.finite(sf) && sf > 0 && is.finite(qc_reference)) {
+        corr <- (corr / sf) * qc_reference
+      }
     }
+    
+    
 
     corr[!is.finite(corr) | corr < 0] <- NA_real_
     out[[metab]] <- corr
