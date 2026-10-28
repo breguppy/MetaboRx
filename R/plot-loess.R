@@ -62,7 +62,7 @@ met_scatter_loess <- function(
 
     method_key <- tolower(trimws(method))
 
-    if (identical(method_key, "local constant regression")) {
+    if (identical(method_key, "local constant regression") | identical(method_key, "none")) {
       x_grid <- seq(
         min(df_qc$order, na.rm = TRUE),
         max(df_qc$order, na.rm = TRUE),
