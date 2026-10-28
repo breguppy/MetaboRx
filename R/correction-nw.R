@@ -148,8 +148,6 @@ nw_correction <- function(df, metab_cols, met_scaling = "one", span = 0.75, min_
       }
     }
     
-    
-
     corr[!is.finite(corr) | corr < 0] <- NA_real_
     out[[metab]] <- corr
     out[[metab]][zero_mask] <- 0
