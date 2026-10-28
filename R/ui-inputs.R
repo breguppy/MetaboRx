@@ -621,6 +621,51 @@ ui_correction_method <- function(df, ns = identity) {
     )
   )
 }
+ui_met_scaling <- function(df, ns = identity) {
+  stopifnot(is.data.frame(df))
+  label_with_info <- shiny::tagList(
+    shiny::span("Scaling metabolites post-correction"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p(
+          "Choose how metabolites are scaled after signal drift correction."
+        ),
+        shiny::tags$ul(
+          shiny::tags$li(
+            shiny::strong("QC median near 1: "),
+            "Metabolite values will be scaled such that median QC value is near 1."
+          ),
+          shiny::tags$li(
+            shiny::strong("QC median near original intensity: "),
+            "Metabolites values will remain on the scale of the original data."
+          )
+        )
+      ),
+      title = "How metabolites are scaled after correction.",
+      placement = "right",
+      options = list(
+        container = "body",
+        customClass = "popover-responsive"
+      )
+    )
+  )
+  shiny::radioButtons(
+    ns("met_scaling"),
+    label = label_with_info,
+    choices = list(
+      "QC median near 1" = "one",
+      "QC median near original intensity" = "original"
+    ),
+    selected = "one",
+    inline = FALSE
+  )
+}
 
 
 #---------- 2.2 Post-Correction Filtering inputs
