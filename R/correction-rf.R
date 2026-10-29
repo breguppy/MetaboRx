@@ -57,41 +57,125 @@
 
 #' Random forest correction
 #'
+#' @param df Data frame containing class, order, and metabolite columns.
+#' @param metab_cols Character vector of metabolite column names.
+#' @param ntree Number of trees.
+#' @param seed Optional random seed.
+#' @param min_qc Minimum QC count for fitting a random forest.
+#'   Below this threshold, use baseline interpolation.
+#' @param met_scaling Character. If "original", rescale each corrected
+#'   metabolite so its QC median matches its raw QC median.
+#'   Only finite, positive raw QC values with valid corrected values
+#'   are used to calculate the scaling factor.
+#'
 #' @keywords internal
 #' @noRd
-rf_correction <- function(df, metab_cols, ntree = 500, seed = NULL, min_qc = 5) {
+rf_correction <- function(
+    df,
+    metab_cols,
+    ntree = 500,
+    seed = NULL,
+    min_qc = 5,
+    met_scaling = "one"
+) {
   if (!is.null(seed)) set.seed(seed)
-
-  # sort and require QC at start and end
+  
   df <- df[order(df$order), , drop = FALSE]
-  if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC"))) {
+  
+  if (!(identical(df$class[1], "QC") &&
+        identical(df$class[nrow(df)], "QC"))) {
     stop("First and last samples must be QCs.")
   }
-
+  
   out <- df
   qcid <- which(df$class == "QC")
-  if (length(qcid) < 2L) warning("Very few QC rows; falling back to baseline where needed.")
   newx <- df$order
-
+  
+  use_baseline <- length(qcid) < min_qc
+  if (use_baseline) {
+    warning(
+      sprintf(
+        "Fewer than %d QC samples; using baseline interpolation.",
+        min_qc
+      )
+    )
+  }
+  
   for (metab in metab_cols) {
-    zero_mask <- is.finite(df[[metab]]) & df[[metab]] == 0
-    qc_y <- df[[metab]][qcid]
+    raw_y <- as.numeric(df[[metab]])
+    zero_mask <- is.finite(raw_y) & raw_y == 0
+    qc_y <- raw_y[qcid]
+    
     if (all(qc_y <= 0, na.rm = TRUE)) {
       out[[metab]] <- 0
       next
     }
-    if (length(qcid) < min_qc) {
-      warning(paste("Skipping", metab, "- too few QC samples for RF; using baseline interpolation."))
+    
+    pred <- if (use_baseline) {
+      .safe_baseline_predict(
+        qcid = newx[qcid],
+        qc_y = qc_y,
+        newx = newx
+      )
+    } else {
+      .safe_rf_predict(
+        qc_order = newx[qcid],
+        qc_y = qc_y,
+        new_order = newx,
+        ntree = ntree
+      )
     }
-    pred <- .safe_rf_predict(df$order[qcid], qc_y, newx, ntree = ntree)
+    
     pred[!is.finite(pred) | pred <= 0] <- NA_real_
-    corr <- as.numeric(df[[metab]]) / pred
+    
+    corr <- raw_y / pred
     corr[!is.finite(corr) | corr < 0] <- NA_real_
+    
+    valid_qc <- is.finite(corr[qcid]) & corr[qcid] > 0
+    
+    if (any(valid_qc)) {
+      corr <- corr / stats::median(corr[qcid][valid_qc])
+    }
+    
+    if (met_scaling == "original") {
+      corrected_qc <- corr[qcid]
+      
+      # Use the same valid QC rows for both medians.
+      valid_qc <- is.finite(qc_y) &
+        qc_y > 0 &
+        is.finite(corrected_qc) &
+        corrected_qc > 0
+      
+      if (any(valid_qc)) {
+        raw_qc_median <- stats::median(qc_y[valid_qc])
+        corrected_qc_median <- stats::median(
+          corrected_qc[valid_qc]
+        )
+        
+        scale_factor <- raw_qc_median / corrected_qc_median
+        
+        if (is.finite(scale_factor) && scale_factor > 0) {
+          corr <- corr * scale_factor
+        } else {
+          warning(
+            sprintf("Could not preserve QC scale for '%s'.", metab)
+          )
+        }
+      } else {
+        warning(
+          sprintf(
+            "Could not preserve QC scale for '%s': no valid positive QC pairs.",
+            metab
+          )
+        )
+      }
+    }
+    
+    corr[!is.finite(corr) | corr < 0] <- NA_real_
+    corr[zero_mask] <- 0
     out[[metab]] <- corr
-    out[[metab]][zero_mask] <- 0
   }
-
-  # final cleanup: smallest positive per metabolite, else 0
+  
   .cleanup_corrected_metabolites(out, metab_cols)
 }
 
