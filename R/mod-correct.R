@@ -14,12 +14,13 @@ mod_correct_ui <- function(id) {
       tags$h4("2.1 Choose Correction Settings"),
       uiOutput(ns("qc_missing_value_warning")),
       fluidRow(
-        column(3, tags$h5("Impute Missing QC Values"), uiOutput(ns("qcImpute"))),
-        column(3, tags$h5("Impute Missing Sample Values"), uiOutput(ns("sampleImpute"))),
-        column(3, tags$h5("Choose Correction Method"), uiOutput(ns(
+        column(2, tags$h5("Impute Missing QC Values"), uiOutput(ns("qcImpute"))),
+        column(2, tags$h5("Impute Missing Sample Values"), uiOutput(ns("sampleImpute"))),
+        column(2, tags$h5("Choose Correction Method"), uiOutput(ns(
           "correctionMethod"
         ))),
-        column(3, tags$h5("How to choose a correction method"), uiOutput(ns(
+        column(2, tags$h5("Post-Correction Scaling"), uiOutput(ns("met_scaling"))),
+        column(4, tags$h5("How to choose a correction method"), uiOutput(ns(
           "how_to_correct"
         ))),
         actionButton(
@@ -281,11 +282,9 @@ mod_correct_server <- function(id, data, params) {
     output$correctionMethod <- renderUI({
       ui_correction_method(filtered_r()$df, ns = session$ns)
     })
-
-    # output$unavailable_options <- renderUI({
-    #  df <- filtered_r()$df
-    #  ui_unavailable_options(df)
-    # })
+    output$met_scaling <- renderUI({
+      ui_met_scaling(filtered_r()$df, ns = session$ns)
+    })
     output$how_to_correct <- renderUI({
       df <- filtered_r()$df
       ui_how_to_correct(df)
@@ -323,7 +322,10 @@ mod_correct_server <- function(id, data, params) {
     corrected_r <- eventReactive(input$correct, {
       imputed <- isolate(imputed_r())
       mc <- isolate(metab_cols_r())
-      correct_data(imputed$df, mc, isolate(input$corMethod))
+      correct_data(
+        imputed$df, mc, isolate(input$corMethod), isolate(input$met_scaling),
+        reference_df = isolate(filtered_r()$df)
+      )
     })
 
     observeEvent(input$correct, ignoreInit = TRUE, {

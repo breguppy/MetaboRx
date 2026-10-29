@@ -77,7 +77,7 @@ testthat::test_that("correct_data LC returns clean, shaped output", {
   testthat::skip_if_not_installed("impute")
 
   df <- mk_df_single()
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "LC")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "LC")
 
   testthat::expect_type(out, "list")
   testthat::expect_true(all(c("df", "str", "parameters") %in% names(out)))
@@ -97,7 +97,7 @@ testthat::test_that("correct_data LL returns clean, shaped output", {
   testthat::skip_if_not_installed("impute")
 
   df <- mk_df_single()
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "LL")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "LL")
 
   testthat::expect_type(out, "list")
   testthat::expect_true(all(c("df", "str", "parameters") %in% names(out)))
@@ -115,7 +115,7 @@ testthat::test_that("correct_data LOESS returns clean, shaped output", {
   testthat::skip_if_not_installed("impute")
 
   df <- mk_df_single()
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "LOESS")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "LOESS")
 
   testthat::expect_type(out, "list")
   testthat::expect_true(all(c("df", "str", "parameters") %in% names(out)))
@@ -240,7 +240,7 @@ testthat::test_that("correct_data BW_LOESS returns clean, shaped output", {
   testthat::skip_if_not_installed("impute")
 
   df <- mk_df_batches_ok()
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "BW_LOESS")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "BW_LOESS")
 
   testthat::expect_type(out, "list")
   testthat::expect_true(all(c("df", "str", "parameters") %in% names(out)))
@@ -265,12 +265,16 @@ testthat::test_that("correct_data RF equals median across the three RF seeds", {
   dfs <- lapply(
     X = seeds,
     FUN = function(seed) {
-      rf_correction(df, met_cols(df), ntree = 500, seed = seed)
+      rf_correction(df, met_cols(df), ntree = 500, seed = seed, met_scaling = "one")
     }
   )
   mdm <- manual_seed_median(dfs, met_cols(df))
+  mdm <- .finalize_qc_correction(
+    mdm, df, met_cols(df), which(df$class == "QC"), "one",
+    impute_missing = FALSE
+  )
 
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "RF")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "RF")
 
   testthat::expect_equal(out$str, "Random Forest")
   testthat::expect_true(grepl("median value of the 3 models", out$parameters, fixed = TRUE))
@@ -292,7 +296,7 @@ testthat::test_that("correct_data BW_RF equals median across batch-wise RF seeds
   )
   mdm <- manual_seed_median(dfs, met_cols(df))
 
-  out <- correct_data(df, metab_cols = met_cols(df), corMethod = "BW_RF")
+  out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "BW_RF")
 
   ord_out <- order(out$df$batch, out$df$order, out$df$sample)
   ord_mdm <- order(mdm$batch, mdm$order, mdm$sample)
@@ -369,7 +373,7 @@ testthat::test_that("correct_data preserves metadata columns and types for singl
   methods <- c("LC", "LL", "LOESS", "RF")
 
   for (method in methods) {
-    out <- correct_data(df, metab_cols = met_cols(df), corMethod = method)
+    out <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = method)
     testthat::expect_true(all(meta_cols %in% names(out$df)))
     testthat::expect_identical(out$df[meta_cols], df[meta_cols])
   }
@@ -381,8 +385,8 @@ testthat::test_that("correct_data preserves metadata columns for batch-wise meth
 
   df <- mk_df_batches_ok()
 
-  out_bw_loess <- correct_data(df, metab_cols = met_cols(df), corMethod = "BW_LOESS")
-  out_bw_rf <- correct_data(df, metab_cols = met_cols(df), corMethod = "BW_RF")
+  out_bw_loess <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "BW_LOESS")
+  out_bw_rf <- correct_data(df, metab_cols = met_cols(df), met_scaling = "one", corMethod = "BW_RF")
 
   testthat::expect_identical(out_bw_loess$df[meta_cols], df[meta_cols])
   testthat::expect_identical(out_bw_rf$df[meta_cols], df[meta_cols])
@@ -399,13 +403,13 @@ testthat::test_that("correct_data returns numeric non-negative metabolite values
   batch_methods <- c("BW_LOESS", "BW_RF")
 
   for (method in single_methods) {
-    out <- correct_data(single_df, metab_cols = met_cols(single_df), corMethod = method)
+    out <- correct_data(single_df, metab_cols = met_cols(single_df), met_scaling = "one", corMethod = method)
     expect_clean_metabolites(out$df, met_cols(single_df))
     testthat::expect_true(all(as.matrix(out$df[met_cols(single_df)]) >= 0))
   }
 
   for (method in batch_methods) {
-    out <- correct_data(batch_df, metab_cols = met_cols(batch_df), corMethod = method)
+    out <- correct_data(batch_df, metab_cols = met_cols(batch_df), met_scaling = "one", corMethod = method)
     expect_clean_metabolites(out$df, met_cols(batch_df))
     testthat::expect_true(all(as.matrix(out$df[met_cols(batch_df)]) >= 0))
   }
@@ -430,4 +434,245 @@ testthat::test_that("correction cleanup replaces invalid metabolite values only"
   )
   testthat::expect_equal(out$M1, c(10, 10, 10))
   testthat::expect_equal(out$M2, c(0, 0, 0))
+})
+
+# --- Post-correction metabolite scaling ------------------------------------
+# Direct-function tests isolate scaling from orchestration and RF aggregation.
+# Wrapper regression tests above explicitly request met_scaling = "one".
+
+qc_positive_medians <- function(df, metab_cols, rows = which(df$class == "QC")) {
+  vapply(df[metab_cols], function(x) {
+    y <- x[rows]
+    y <- y[is.finite(y) & y > 0]
+    if (length(y)) stats::median(y) else NA_real_
+  }, numeric(1))
+}
+
+scaling_rsd <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) < 2L || mean(x) == 0) return(NA_real_)
+  100 * stats::sd(x) / mean(x)
+}
+
+# Multiple profiles make this fixture suitable for kNN with its default k.
+mk_df_scaling <- function() {
+  df <- mk_df_single(n = 21)
+  for (j in seq_len(12)) {
+    df[[paste0("M", j)]] <-
+      (10^((j %% 4) + 1)) *
+      (1 + 0.02 * df$order + 0.08 * sin(df$order / (j + 1)))
+  }
+  df
+}
+
+# Identical RF seeds ensure these comparisons isolate scaling, not fit noise.
+scaling_correctors <- list(
+  NW = function(df, scaling) {
+    nw_correction(df, met_cols(df), met_scaling = scaling)
+  },
+  LL = function(df, scaling) {
+    loess_correction(df, met_cols(df), degree = 1, met_scaling = scaling)
+  },
+  LOESS = function(df, scaling) {
+    loess_correction(df, met_cols(df), degree = 2, met_scaling = scaling)
+  },
+  RF = function(df, scaling) {
+    rf_correction(
+      df, met_cols(df), ntree = 50, seed = 42, met_scaling = scaling
+    )
+  }
+)
+
+for (method_name in names(scaling_correctors)) {
+  local({
+    method <- method_name
+    correct <- scaling_correctors[[method]]
+
+    testthat::test_that(paste(method, "supports both QC median scaling targets"), {
+      if (method == "RF") testthat::skip_if_not_installed("randomForest")
+
+      df <- mk_df_scaling()
+      cols <- met_cols(df)
+      one <- correct(df, "one")
+      original <- correct(df, "original")
+      target <- qc_positive_medians(df, cols)
+
+      testthat::expect_equal(
+        qc_positive_medians(one, cols),
+        stats::setNames(rep(1, length(cols)), cols),
+        tolerance = 1e-8
+      )
+      testthat::expect_equal(
+        qc_positive_medians(original, cols), target, tolerance = 1e-8
+      )
+
+      for (metab in cols) {
+        testthat::expect_equal(
+          original[[metab]] / target[[metab]],
+          one[[metab]],
+          tolerance = 1e-8
+        )
+        for (rows in list(which(df$class == "QC"), which(df$class != "QC"))) {
+          testthat::expect_equal(
+            scaling_rsd(one[[metab]][rows]),
+            scaling_rsd(original[[metab]][rows]),
+            tolerance = 1e-8
+          )
+        }
+      }
+
+      testthat::expect_identical(one[meta_cols], df[meta_cols])
+      testthat::expect_identical(original[meta_cols], df[meta_cols])
+      expect_clean_metabolites(one, cols)
+      expect_clean_metabolites(original, cols)
+
+      if (method %in% c("LL", "LOESS")) {
+        testthat::expect_identical(
+          attr(one, "loess_diagnostics", exact = TRUE),
+          attr(original, "loess_diagnostics", exact = TRUE)
+        )
+      }
+    })
+
+    testthat::test_that(paste(method, "preserves zeros under both scaling options"), {
+      if (method == "RF") testthat::skip_if_not_installed("randomForest")
+
+      df <- mk_df_scaling()
+      df$M1[c(2, 6)] <- 0
+      df$M2[c(4, 8)] <- 0
+      df$M_zero <- 0
+
+      for (scaling in c("one", "original")) {
+        out <- correct(df, scaling)
+        testthat::expect_equal(out$M1[c(2, 6)], c(0, 0))
+        testthat::expect_equal(out$M2[c(4, 8)], c(0, 0))
+        testthat::expect_equal(out$M_zero, rep(0, nrow(df)))
+        expect_clean_metabolites(out, met_cols(df))
+      }
+    })
+  })
+}
+
+# --- Shared finalization helper --------------------------------------------
+
+testthat::test_that("raw-data finalization scales without removing drift", {
+  df <- mk_df_scaling()
+  cols <- met_cols(df)
+  qcid <- which(df$class == "QC")
+
+  one <- .finalize_qc_correction(df, df, cols, qcid, "one")
+  original <- .finalize_qc_correction(df, df, cols, qcid, "original")
+  target <- qc_positive_medians(df, cols)
+
+  for (metab in cols) {
+    testthat::expect_equal(
+      one[[metab]], df[[metab]] / target[[metab]], tolerance = 1e-8
+    )
+    testthat::expect_equal(original[[metab]], df[[metab]], tolerance = 1e-8)
+    testthat::expect_equal(
+      scaling_rsd(one[[metab]][qcid]),
+      scaling_rsd(df[[metab]][qcid]),
+      tolerance = 1e-8
+    )
+  }
+})
+
+testthat::test_that("finalization imputes on a common scale before final scaling", {
+  testthat::skip_if_not_installed("impute")
+
+  raw <- mk_df_scaling()
+  cols <- met_cols(raw)
+  qcid <- which(raw$class == "QC")
+  raw$M1[c(2, 10)] <- NA_real_
+  raw$M2[6] <- NA_real_
+
+  corrected <- raw
+  for (metab in cols) {
+    corrected[[metab]] <- raw[[metab]] / (1 + 0.02 * raw$order)
+  }
+
+  set.seed(100)
+  one <- .finalize_qc_correction(corrected, raw, cols, qcid, "one")
+  set.seed(100)
+  original <- .finalize_qc_correction(corrected, raw, cols, qcid, "original")
+  target <- qc_positive_medians(raw, cols)
+
+  expect_clean_metabolites(one, cols)
+  expect_clean_metabolites(original, cols)
+
+  # Compare all values, including imputed cells. Scaling before kNN would
+  # generally violate this relationship for these unequal feature scales.
+  for (metab in cols) {
+    testthat::expect_equal(
+      original[[metab]] / target[[metab]],
+      one[[metab]],
+      tolerance = 1e-8
+    )
+  }
+  testthat::expect_identical(one[meta_cols], raw[meta_cols])
+  testthat::expect_identical(original[meta_cols], raw[meta_cols])
+})
+
+testthat::test_that("final scaling excludes zero and newly imputed QC pairs", {
+  testthat::skip_if_not_installed("impute")
+
+  raw <- mk_df_scaling()
+  cols <- met_cols(raw)
+  qcid <- which(raw$class == "QC")
+  raw$M1[qcid[1]] <- 0
+  raw$M1[qcid[2]] <- NA_real_
+  corrected <- raw
+  for (metab in cols) {
+    corrected[[metab]] <- raw[[metab]] / (1 + 0.02 * raw$order)
+  }
+  # A positive raw QC with an invalid prediction is also excluded.
+  corrected$M1[qcid[3]] <- NA_real_
+  reference_rows <- qcid[-c(1, 2, 3)]
+  # The raw target uses every observed positive QC, while the corrected
+  # denominator excludes the QC with a failed prediction.
+  target <- qc_positive_medians(raw, "M1")[[1]]
+
+  for (scaling in c("one", "original")) {
+    out <- .finalize_qc_correction(corrected, raw, cols, qcid, scaling)
+    expect_clean_metabolites(out, cols)
+    testthat::expect_equal(out$M1[qcid[1]], 0)
+    testthat::expect_gt(out$M1[qcid[2]], 0)
+    testthat::expect_gt(out$M1[qcid[3]], 0)
+    testthat::expect_equal(
+      stats::median(out$M1[reference_rows]),
+      if (scaling == "one") 1 else target,
+      tolerance = 1e-8
+    )
+  }
+})
+
+testthat::test_that("finalization handles almost entirely missing metabolites", {
+  raw <- mk_df_scaling()
+  raw$M_missing <- NA_real_
+  raw$M_zero <- 0
+  cols <- met_cols(raw)
+  qcid <- which(raw$class == "QC")
+
+  for (scaling in c("one", "original")) {
+    out <- .finalize_qc_correction(raw, raw, cols, qcid, scaling)
+    testthat::expect_equal(out$M_missing, rep(0, nrow(raw)))
+    testthat::expect_equal(out$M_zero, rep(0, nrow(raw)))
+    expect_clean_metabolites(out, cols)
+  }
+})
+
+testthat::test_that("NW, LOESS, and finalization reject invalid scaling options", {
+  df <- mk_df_single()
+  cols <- met_cols(df)
+  qcid <- which(df$class == "QC")
+
+  testthat::expect_error(
+    nw_correction(df, cols, met_scaling = "invalid"), "arg"
+  )
+  testthat::expect_error(
+    loess_correction(df, cols, degree = 2, met_scaling = "invalid"), "arg"
+  )
+  testthat::expect_error(
+    .finalize_qc_correction(df, df, cols, qcid, "invalid"), "arg"
+  )
 })

@@ -621,6 +621,57 @@ ui_correction_method <- function(df, ns = identity) {
     )
   )
 }
+ui_met_scaling <- function(df, ns = identity) {
+  stopifnot(is.data.frame(df))
+  label_with_info <- shiny::tagList(
+    shiny::span("Scaling metabolites post-correction"),
+    bslib::popover(
+      shiny::tags$button(
+        type = "button",
+        class = "btn btn-link p-0 ms-1",
+        style = "text-decoration:none;",
+        shiny::icon("circle-info")
+      ),
+      shiny::tagList(
+        shiny::tags$p(
+          "Choose how metabolites are scaled after signal drift correction."
+        ),
+        shiny::tags$ul(
+          shiny::tags$li(
+            shiny::strong("QC median eqauls 1: "),
+            "All metabolite values will be scaled such that the median QC value for each metabolite is near 1."
+          ),
+          shiny::tags$li(
+            shiny::strong("QC median equals original intensity: "),
+            "All metabolites values will be scaled such that the median QC value for each metabolite is equal to the median QC value for that metabolite in the raw data."
+          ),
+          shiny::tags$hr(),
+          shiny::tags$p(
+            shiny::tags$b("Caution: ", style = "color: red;"),
+            "Scaling metabolites using QC median equals original intensity retains the difference in metabolite scales.",
+            "This can affect downstream analysis that compare or combine metabolites."
+          )
+        )
+      ),
+      title = "How metabolites are scaled after correction.",
+      placement = "right",
+      options = list(
+        container = "body",
+        customClass = "popover-responsive"
+      )
+    )
+  )
+  shiny::radioButtons(
+    ns("met_scaling"),
+    label = label_with_info,
+    choices = list(
+      "QC median equals 1" = "one",
+      "QC median equals original intensity" = "original"
+    ),
+    selected = "one",
+    inline = FALSE
+  )
+}
 
 
 #---------- 2.2 Post-Correction Filtering inputs

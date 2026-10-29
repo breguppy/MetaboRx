@@ -47,16 +47,86 @@ color_values <- c(
     sheet_label = sheet_label
   )
 }
+#' Calculate RSD changes with numerical tolerance
+#'
+#' Differences within tolerance are treated as zero.
+#' Nonfinite before/after pairs are excluded using NA.
+#'
+#' @keywords internal
+#' @noRd
+.rsd_change_delta <- function(
+    before,
+    after,
+    atol = 1e-8,
+    rtol = 1e-10
+) {
+  if (!is.numeric(before) || !is.numeric(after)) {
+    stop("before and after must be numeric vectors.")
+  }
+  
+  if (length(before) != length(after)) {
+    stop("before and after must have the same length.")
+  }
+  
+  if (!is.numeric(atol) ||
+      length(atol) != 1L ||
+      !is.finite(atol) ||
+      atol < 0) {
+    stop("atol must be a finite, non-negative numeric scalar.")
+  }
+  
+  if (!is.numeric(rtol) ||
+      length(rtol) != 1L ||
+      !is.finite(rtol) ||
+      rtol < 0) {
+    stop("rtol must be a finite, non-negative numeric scalar.")
+  }
+  
+  delta <- rep(NA_real_, length(before))
+  valid <- is.finite(before) & is.finite(after)
+  
+  if (any(valid)) {
+    differences <- after[valid] - before[valid]
+    tolerance <- atol +
+      rtol * pmax(abs(before[valid]), abs(after[valid]))
+    
+    # Exclude differences that overflow despite finite inputs.
+    finite_difference <- is.finite(differences)
+    unchanged <- finite_difference &
+      abs(differences) <= tolerance
+    
+    differences[unchanged] <- 0
+    differences[!finite_difference] <- NA_real_
+    
+    delta[valid] <- differences
+  }
+  
+  delta
+}
 
 #' @keywords internal
 #' @noRd
-.rsd_change_label <- function(before, after) {
+.rsd_change_label <- function(
+    before,
+    after,
+    atol = 1e-8,
+    rtol = 1e-10
+) {
+  delta <- .rsd_change_delta(
+    before = before,
+    after = after,
+    atol = atol,
+    rtol = rtol
+  )
+  
   dplyr::case_when(
-    after > before ~ "Increased",
-    after < before ~ "Decreased",
+    is.na(delta) ~ NA_character_,
+    delta > 0 ~ "Increased",
+    delta < 0 ~ "Decreased",
     TRUE ~ "No Change"
   )
 }
+
 
 #' @keywords internal
 #' @noRd
@@ -195,7 +265,7 @@ class_metabolite_rsd <- function(df,
     ),
     by = "Metabolite"
   )
-
+  
   dplyr::bind_rows(
     df |>
       dplyr::transmute(
@@ -205,8 +275,7 @@ class_metabolite_rsd <- function(df,
         class = NA_character_,
         Metabolite = Metabolite,
         before = QC_before,
-        after = QC_after,
-        delta = QC_after - QC_before
+        after = QC_after
       ),
     df |>
       dplyr::transmute(
@@ -216,16 +285,17 @@ class_metabolite_rsd <- function(df,
         class = NA_character_,
         Metabolite = Metabolite,
         before = Samples_before,
-        after = Samples_after,
-        delta = Samples_after - Samples_before
+        after = Samples_after
       )
   ) |>
     dplyr::mutate(
+      delta = .rsd_change_delta(before, after),
       change = .rsd_change_label(before, after),
       Type = factor(Type, levels = c("Samples", "QC")),
       change = factor(change, levels = lab_levels)
     )
 }
+
 
 #' @keywords internal
 #' @noRd
@@ -239,7 +309,7 @@ class_metabolite_rsd <- function(df,
       analysis = "class_metabolite",
       Type = ifelse(class == "QC", "QC", "Samples"),
       unit_id = paste(class, Metabolite, sep = "::"),
-      delta = after - before,
+      delta = .rsd_change_delta(before, after),
       change = .rsd_change_label(before, after),
       Type = factor(Type, levels = c("Samples", "QC")),
       change = factor(change, levels = lab_levels)
@@ -257,16 +327,33 @@ class_metabolite_rsd <- function(df,
     )
 }
 
+
 #' @keywords internal
 #' @noRd
 .summarize_rsd_comparison <- function(compare_df) {
   compare_df |>
+    dplyr::mutate(
+      delta = .rsd_change_delta(before, after)
+    ) |>
     dplyr::group_by(Type) |>
     dplyr::summarise(
-      avg_delta = mean(delta, na.rm = TRUE),
-      med_delta = stats::median(delta, na.rm = TRUE),
+      avg_delta = if (all(is.na(delta))) {
+        NA_real_
+      } else {
+        mean(delta, na.rm = TRUE)
+      },
+      med_delta = if (all(is.na(delta))) {
+        NA_real_
+      } else {
+        stats::median(delta, na.rm = TRUE)
+      },
       pct_increase = .rsd_pct_increase(delta),
       pct_decrease = .rsd_pct_decrease(delta),
+      pct_unchanged = if (all(is.na(delta))) {
+        NA_real_
+      } else {
+        100 * mean(delta == 0, na.rm = TRUE)
+      },
       .groups = "drop"
     )
 }
@@ -296,5 +383,40 @@ class_metabolite_rsd <- function(df,
       compare = compare_class,
       stats = .summarize_rsd_comparison(compare_class)
     )
+  )
+}
+
+#' @keywords internal
+#' @noRd
+.summarize_rsd_changes <- function(
+    rsd_before,
+    rsd_after,
+    atol = 1e-8,
+    rtol = 1e-10
+) {
+  # This call validates paired inputs and tolerances, even for empty inputs.
+  delta <- .rsd_change_delta(
+    before = rsd_before,
+    after = rsd_after,
+    atol = atol,
+    rtol = rtol
+  )
+  
+  delta <- delta[is.finite(delta)]
+  
+  if (!length(delta)) {
+    return(data.frame(
+      med_delta = NA_real_,
+      pct_increase = NA_real_,
+      pct_decrease = NA_real_,
+      pct_unchanged = NA_real_
+    ))
+  }
+  
+  data.frame(
+    med_delta = stats::median(delta),
+    pct_increase = 100 * mean(delta > 0),
+    pct_decrease = 100 * mean(delta < 0),
+    pct_unchanged = 100 * mean(delta == 0)
   )
 }

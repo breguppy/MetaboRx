@@ -178,19 +178,60 @@
   .annotate_loess_prediction(pred, "linear_interpolation", fallback_reason)
 }
 
-loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 3) {
-  df <- df[order(df$order), , drop = FALSE]
-  if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC"))) {
+#' LOESS QC-based correction
+#'
+#' @param df Data frame containing class, order, and metabolite columns.
+#' @param metab_cols Character vector of metabolite column names.
+#' @param degree Degree of the LOESS polynomial.
+#' @param met_scaling Either "one" or "original". The corrected median
+#'   of valid observed positive QCs is set to 1 or to the median of ALL
+#'   observed positive QCs in the pre-imputation reference, respectively.
+#' @param reference_df Optional pre-imputation data frame, aligned by sample.
+#'   NULL uses df; callers passing imputed df must supply this reference.
+#' @param span Relative smoothing span.
+#' @param min_qc Minimum number of QC rows required.
+#'
+#' @return Corrected data frame with a loess_diagnostics attribute.
+#' @keywords internal
+#' @noRd
+loess_correction <- function(
+    df,
+    metab_cols,
+    degree,
+    met_scaling = "one",
+    span = 0.75,
+    min_qc = 3,
+    reference_df = NULL
+) {
+  met_scaling <- match.arg(met_scaling, c("one", "original"))
+  
+  if (nrow(df) == 0L) {
+    stop("df must contain at least one row.")
+  }
+  
+  x_all <- suppressWarnings(as.numeric(df$order))
+  
+  if (any(!is.finite(x_all))) {
+    stop("order must be numeric and finite.")
+  }
+  
+  ord <- order(x_all)
+  df <- df[ord, , drop = FALSE]
+  x_all <- x_all[ord]
+  
+  if (!(isTRUE(df$class[1] == "QC") &&
+        isTRUE(df$class[nrow(df)] == "QC"))) {
     stop("First and last samples must be QCs.")
   }
-
+  
   qcid <- which(df$class == "QC")
-  if (length(qcid) < min_qc) stop(sprintf("Need at least %d QC rows for LOESS.", min_qc))
-
-  x_all <- suppressWarnings(as.numeric(df$order))
-  if (any(!is.finite(x_all))) stop("order must be numeric and finite after sorting.")
-
+  
+  if (length(qcid) < min_qc) {
+    stop(sprintf("Need at least %d QC rows for LOESS.", min_qc))
+  }
+  
   out <- df
+  
   diagnostics <- data.frame(
     metabolite = metab_cols,
     fit_method = rep(NA_character_, length(metab_cols)),
@@ -199,21 +240,19 @@ loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 3) {
     fit_scale = rep(NA_character_, length(metab_cols)),
     stringsAsFactors = FALSE
   )
-
+  
   for (metab in metab_cols) {
-    zero_mask <- is.finite(df[[metab]]) & df[[metab]] == 0
-    qc_y <- df[[metab]][qcid]
-
-    if (all(qc_y <= 0, na.rm = TRUE)) {
+    raw_y <- as.numeric(df[[metab]])
+    qc_y <- raw_y[qcid]
+    diag_idx <- match(metab, diagnostics$metabolite)
+    
+    if (!any(is.finite(qc_y) & qc_y > 0)) {
       out[[metab]] <- 0
-      diag_idx <- match(metab, diagnostics$metabolite)
-      diagnostics$fit_method[diag_idx] <- "all_nonpositive_qc"
-      diagnostics$fallback_reason[diag_idx] <- "all_nonpositive_qc"
-      diagnostics$fit_family[diag_idx] <- NA_character_
-      diagnostics$fit_scale[diag_idx] <- NA_character_
+      diagnostics$fit_method[diag_idx] <- "no_positive_finite_qc"
+      diagnostics$fallback_reason[diag_idx] <- "no_positive_finite_qc"
       next
     }
-
+    
     pred <- .safe_loess_predict_x(
       qc_x = x_all[qcid],
       qc_y = qc_y,
@@ -221,48 +260,44 @@ loess_correction <- function(df, metab_cols, degree, span = 0.75, min_qc = 3) {
       span = span,
       degree = degree
     )
-
-    diag_idx <- match(metab, diagnostics$metabolite)
-    diagnostics$fit_method[diag_idx] <- attr(pred, "fit_method", exact = TRUE)
-    diagnostics$fallback_reason[diag_idx] <- attr(pred, "fallback_reason", exact = TRUE)
-    diagnostics$fit_family[diag_idx] <- attr(pred, "fit_family", exact = TRUE)
-    diagnostics$fit_scale[diag_idx] <- attr(pred, "fit_scale", exact = TRUE)
-
-    pred[!is.finite(pred) | pred <= 0] <- NA_real_
-    corr <- as.numeric(df[[metab]]) / pred
-
-    sf <- stats::median(corr[qcid], na.rm = TRUE)
-    if (is.finite(sf) && sf > 0) corr <- corr / sf
-
-    corr[!is.finite(corr) | corr < 0] <- NA_real_
-    out[[metab]] <- corr
-    out[[metab]][zero_mask] <- 0
-  }
-
-  # 99% NA fallback
-  if (anyNA(out[metab_cols])) {
-    for (metab in metab_cols) {
-      x <- out[[metab]]
-      if (mean(is.na(x)) >= 0.99) {
-        mp <- suppressWarnings(min(x[x > 0], na.rm = TRUE))
-        x[is.na(x)] <- if (is.finite(mp)) mp else 0
-        out[[metab]] <- x
+    
+    # Missing diagnostic attributes remain NA.
+    for (field in c(
+      "fit_method",
+      "fallback_reason",
+      "fit_family",
+      "fit_scale"
+    )) {
+      value <- attr(pred, field, exact = TRUE)
+      
+      if (length(value) == 1L) {
+        diagnostics[[field]][diag_idx] <- as.character(value)
       }
     }
-    needs_knn <- anyNA(out[metab_cols]) && length(metab_cols) >= 2
-    if (needs_knn) {
-      kn <- impute::impute.knn(t(as.matrix(out[metab_cols])), rowmax = 1, colmax = 1, maxp = 15000)
-      out[metab_cols] <- as.data.frame(t(kn$data))
-    }
+    
+    pred[!is.finite(pred) | pred <= 0] <- NA_real_
+    
+    corr <- raw_y / pred
+    corr[!is.finite(corr) | corr < 0] <- NA_real_
+    
+    out[[metab]] <- corr
   }
-
-  out <- .cleanup_corrected_metabolites(out, metab_cols)
+  
+  out <- .finalize_qc_correction(
+    out = out,
+    raw_df = df,
+    metab_cols = metab_cols,
+    qcid = qcid,
+    met_scaling = met_scaling,
+    reference_df = reference_df
+  )
+  
   attr(out, "loess_diagnostics") <- diagnostics
   out
 }
 
 
-#' Batch-wise LOESS correction (QC-based), using injection order as x
+#' Batch-wise LOESS correction (QC-based), using injection order as x (in development)
 #'
 #' Corrects each metabolite within each batch by dividing by a LOESS-smoothed
 #' QC trend fit against `order` (not row index). Optionally normalizes the
