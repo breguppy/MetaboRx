@@ -46,12 +46,43 @@ correct_data <- function(df, metab_cols, corMethod, met_scaling) {
   } else if (corMethod == "None") {
     correction_str <- "none"
     parameters <- "does not apply any drift correction models."
-    df_corrected <- df
+    if (met_scaling == "original") {
+      df_corrected <- df
+    } else {
+      qcid <- which(df$class == "QC")
+      out <- df
+      
+      for (metab in metab_cols) {
+        x <- df[[metab]]
+        
+        if (!is.numeric(x)) {
+          stop(sprintf("Metabolite '%s' must be numeric.", metab))
+        }
+        
+        qc_y <- x[qcid]
+        valid_qc <- is.finite(qc_y) & qc_y > 0
+        
+        if (!any(valid_qc)) {
+          warning(
+            sprintf(
+              "Skipping scaling for '%s': no finite positive QC values.",
+              metab
+            )
+          )
+          next
+        }
+        
+        out[[metab]] <- x / stats::median(qc_y[valid_qc])
+      }
+      
+      df_corrected <- out
+    }
   }
 
   list(
     df = df_corrected,
     str = correction_str,
-    parameters = parameters
+    parameters = parameters,
+    met_scaling = met_scaling
   )
 }
