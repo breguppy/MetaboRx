@@ -2,7 +2,13 @@
 #'
 #' @keywords internal
 #' @noRd
-correct_data <- function(df, metab_cols, corMethod, met_scaling) {
+correct_data <- function(
+    df, metab_cols, corMethod, met_scaling = "one", reference_df = NULL
+) {
+  met_scaling <- match.arg(met_scaling, c("one", "original"))
+  if (corMethod %in% c("RF", "LOESS", "LC", "LL", "None")) {
+    reference_df <- .align_qc_reference(df, reference_df, metab_cols)
+  }
   if (corMethod %in% c("RF", "BW_RF")) {
     if (!requireNamespace("randomForest", quietly = TRUE)) {
       stop("Install 'randomForest' to use RF correction.", call. = FALSE)
@@ -14,22 +20,30 @@ correct_data <- function(df, metab_cols, corMethod, met_scaling) {
     parameters <- "builds 3 models using seeds 42, 31416, 272. Final corrected data is the median value of the 3 models."
     seeds <- c(42, 31416, 272)
     df_list <- lapply(seeds, function(seed) {
-      rf_correction(df, metab_cols, ntree = 500, seed = seed, met_scaling = met_scaling)
+      rf_correction(df, metab_cols, ntree = 500, seed = seed, met_scaling = met_scaling, reference_df = reference_df)
     })
     metadata_cols <- setdiff(colnames(df), metab_cols)
     df_corrected <- .median_across_models(df_list, metadata_cols)
+    # A pointwise median of scaled RF models need not retain the QC median.
+    # Calibrate the final ensemble against the observed reference once more.
+    sorted_input <- .align_qc_reference(df_corrected, df, metab_cols)
+    df_corrected <- .finalize_qc_correction(
+      df_corrected, raw_df = sorted_input, metab_cols = metab_cols,
+      qcid = which(df_corrected$class == "QC"), met_scaling = met_scaling,
+      reference_df = reference_df, impute_missing = FALSE
+    )
   } else if (corMethod == "LOESS") {
     correction_str <- "local polynomial regression"
     parameters <- "builds local polynomials for QC trends with adaptive safeguards; unstable degree-2 fits fall back to simpler local fits."
-    df_corrected <- loess_correction(df, metab_cols, degree = 2, met_scaling = met_scaling)
+    df_corrected <- loess_correction(df, metab_cols, degree = 2, met_scaling = met_scaling, reference_df = reference_df)
   } else if (corMethod == "LC") {
     correction_str <- "local constant regression"
     parameters <- "fits study samples using a Nadaraya-Watson kernel-weighted mean of nearby QC points."
-    df_corrected <- nw_correction(df, metab_cols, met_scaling = met_scaling, span = 0.75)
+    df_corrected <- nw_correction(df, metab_cols, met_scaling = met_scaling, span = 0.75, reference_df = reference_df)
   } else if (corMethod == "LL") {
     correction_str <- "local linear regression"
     parameters <- "fits study samples to the line created by nearby QC points."
-    df_corrected <- loess_correction(df, metab_cols, degree = 1, met_scaling = met_scaling)
+    df_corrected <- loess_correction(df, metab_cols, degree = 1, met_scaling = met_scaling, reference_df = reference_df)
   } else if (corMethod == "BW_RF") {
     correction_str <- "Batchwise Random Forest"
     parameters <- "3 models using seeds 42, 31416, 272 are built for each metabolite for each batch. Final corrected data is the median value of the 3 models."
@@ -59,7 +73,7 @@ correct_data <- function(df, metab_cols, corMethod, met_scaling) {
           stop(sprintf("Metabolite '%s' must be numeric.", metab))
         }
         
-        qc_y <- x[qcid]
+        qc_y <- reference_df[[metab]][qcid]
         valid_qc <- is.finite(qc_y) & qc_y > 0
         
         if (!any(valid_qc)) {

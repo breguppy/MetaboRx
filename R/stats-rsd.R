@@ -60,29 +60,43 @@ color_values <- c(
     atol = 1e-8,
     rtol = 1e-10
 ) {
-  stopifnot(
-    is.numeric(before),
-    is.numeric(after),
-    length(before) == length(after),
-    length(atol) == 1L,
-    is.finite(atol),
-    atol >= 0,
-    length(rtol) == 1L,
-    is.finite(rtol),
-    rtol >= 0
-  )
+  if (!is.numeric(before) || !is.numeric(after)) {
+    stop("before and after must be numeric vectors.")
+  }
+  
+  if (length(before) != length(after)) {
+    stop("before and after must have the same length.")
+  }
+  
+  if (!is.numeric(atol) ||
+      length(atol) != 1L ||
+      !is.finite(atol) ||
+      atol < 0) {
+    stop("atol must be a finite, non-negative numeric scalar.")
+  }
+  
+  if (!is.numeric(rtol) ||
+      length(rtol) != 1L ||
+      !is.finite(rtol) ||
+      rtol < 0) {
+    stop("rtol must be a finite, non-negative numeric scalar.")
+  }
   
   delta <- rep(NA_real_, length(before))
   valid <- is.finite(before) & is.finite(after)
   
   if (any(valid)) {
     differences <- after[valid] - before[valid]
-    
     tolerance <- atol +
       rtol * pmax(abs(before[valid]), abs(after[valid]))
     
-    differences[abs(differences) <= tolerance] <- 0
-    differences[!is.finite(differences)] <- NA_real_
+    # Exclude differences that overflow despite finite inputs.
+    finite_difference <- is.finite(differences)
+    unchanged <- finite_difference &
+      abs(differences) <= tolerance
+    
+    differences[unchanged] <- 0
+    differences[!finite_difference] <- NA_real_
     
     delta[valid] <- differences
   }
@@ -372,21 +386,25 @@ class_metabolite_rsd <- function(df,
   )
 }
 
+#' @keywords internal
+#' @noRd
 .summarize_rsd_changes <- function(
     rsd_before,
     rsd_after,
     atol = 1e-8,
     rtol = 1e-10
 ) {
-  stopifnot(
-    is.numeric(rsd_before),
-    is.numeric(rsd_after),
-    length(rsd_before) == length(rsd_after)
+  # This call validates paired inputs and tolerances, even for empty inputs.
+  delta <- .rsd_change_delta(
+    before = rsd_before,
+    after = rsd_after,
+    atol = atol,
+    rtol = rtol
   )
   
-  valid <- is.finite(rsd_before) & is.finite(rsd_after)
+  delta <- delta[is.finite(delta)]
   
-  if (!any(valid)) {
+  if (!length(delta)) {
     return(data.frame(
       med_delta = NA_real_,
       pct_increase = NA_real_,
@@ -395,24 +413,10 @@ class_metabolite_rsd <- function(df,
     ))
   }
   
-  before <- rsd_before[valid]
-  after <- rsd_after[valid]
-  
-  delta <- after - before
-  tolerance <- atol + rtol * pmax(abs(before), abs(after))
-  
-  increased <- delta > tolerance
-  decreased <- delta < -tolerance
-  unchanged <- !(increased | decreased)
-  
-  # Treat numerical noise as zero for the median change too.
-  delta[unchanged] <- 0
-  
   data.frame(
     med_delta = stats::median(delta),
-    pct_increase = 100 * mean(increased),
-    pct_decrease = 100 * mean(decreased),
-    pct_unchanged = 100 * mean(unchanged)
+    pct_increase = 100 * mean(delta > 0),
+    pct_decrease = 100 * mean(delta < 0),
+    pct_unchanged = 100 * mean(delta == 0)
   )
 }
-

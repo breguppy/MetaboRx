@@ -183,10 +183,11 @@
 #' @param df Data frame containing class, order, and metabolite columns.
 #' @param metab_cols Character vector of metabolite column names.
 #' @param degree Degree of the LOESS polynomial.
-#' @param met_scaling Either "one" or "original". Final scaling uses
-#'   matched finite, positive raw and corrected QC pairs identified
-#'   before imputation. "one" sets their corrected median to 1;
-#'   "original" sets it to their raw median.
+#' @param met_scaling Either "one" or "original". The corrected median
+#'   of valid observed positive QCs is set to 1 or to the median of ALL
+#'   observed positive QCs in the pre-imputation reference, respectively.
+#' @param reference_df Optional pre-imputation data frame, aligned by sample.
+#'   NULL uses df; callers passing imputed df must supply this reference.
 #' @param span Relative smoothing span.
 #' @param min_qc Minimum number of QC rows required.
 #'
@@ -199,7 +200,8 @@ loess_correction <- function(
     degree,
     met_scaling = "one",
     span = 0.75,
-    min_qc = 3
+    min_qc = 3,
+    reference_df = NULL
 ) {
   met_scaling <- match.arg(met_scaling, c("one", "original"))
   
@@ -286,7 +288,8 @@ loess_correction <- function(
     raw_df = df,
     metab_cols = metab_cols,
     qcid = qcid,
-    met_scaling = met_scaling
+    met_scaling = met_scaling,
+    reference_df = reference_df
   )
   
   attr(out, "loess_diagnostics") <- diagnostics

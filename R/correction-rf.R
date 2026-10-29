@@ -64,9 +64,10 @@
 #' @param min_qc Minimum QC count for fitting a random forest.
 #'   Below this threshold, use baseline interpolation.
 #' @param met_scaling Character. If "original", rescale each corrected
-#'   metabolite so its QC median matches its raw QC median.
-#'   Only finite, positive raw QC values with valid corrected values
-#'   are used to calculate the scaling factor.
+#'   metabolite to the median of all observed positive reference QCs.
+#'   The corrected median uses valid observed positive QC rows.
+#' @param reference_df Optional pre-imputation data frame aligned by sample.
+#'   NULL uses df; callers passing imputed df must supply this reference.
 #'
 #' @keywords internal
 #' @noRd
@@ -76,8 +77,10 @@ rf_correction <- function(
     ntree = 500,
     seed = NULL,
     min_qc = 5,
-    met_scaling = "one"
+    met_scaling = "one",
+    reference_df = NULL
 ) {
+  met_scaling <- match.arg(met_scaling, c("one", "original"))
   if (!is.null(seed)) set.seed(seed)
   
   df <- df[order(df$order), , drop = FALSE]
@@ -130,53 +133,15 @@ rf_correction <- function(
     
     corr <- raw_y / pred
     corr[!is.finite(corr) | corr < 0] <- NA_real_
-    
-    valid_qc <- is.finite(corr[qcid]) & corr[qcid] > 0
-    
-    if (any(valid_qc)) {
-      corr <- corr / stats::median(corr[qcid][valid_qc])
-    }
-    
-    if (met_scaling == "original") {
-      corrected_qc <- corr[qcid]
-      
-      # Use the same valid QC rows for both medians.
-      valid_qc <- is.finite(qc_y) &
-        qc_y > 0 &
-        is.finite(corrected_qc) &
-        corrected_qc > 0
-      
-      if (any(valid_qc)) {
-        raw_qc_median <- stats::median(qc_y[valid_qc])
-        corrected_qc_median <- stats::median(
-          corrected_qc[valid_qc]
-        )
-        
-        scale_factor <- raw_qc_median / corrected_qc_median
-        
-        if (is.finite(scale_factor) && scale_factor > 0) {
-          corr <- corr * scale_factor
-        } else {
-          warning(
-            sprintf("Could not preserve QC scale for '%s'.", metab)
-          )
-        }
-      } else {
-        warning(
-          sprintf(
-            "Could not preserve QC scale for '%s': no valid positive QC pairs.",
-            metab
-          )
-        )
-      }
-    }
-    
-    corr[!is.finite(corr) | corr < 0] <- NA_real_
     corr[zero_mask] <- 0
     out[[metab]] <- corr
   }
   
-  .cleanup_corrected_metabolites(out, metab_cols)
+  .finalize_qc_correction(
+    out, raw_df = df, metab_cols = metab_cols, qcid = qcid,
+    met_scaling = met_scaling, reference_df = reference_df,
+    impute_missing = FALSE
+  )
 }
 
 #' Batch-wise random forest correction

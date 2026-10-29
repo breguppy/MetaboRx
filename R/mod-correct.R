@@ -322,7 +322,10 @@ mod_correct_server <- function(id, data, params) {
     corrected_r <- eventReactive(input$correct, {
       imputed <- isolate(imputed_r())
       mc <- isolate(metab_cols_r())
-      correct_data(imputed$df, mc, isolate(input$corMethod), isolate(input$met_scaling))
+      correct_data(
+        imputed$df, mc, isolate(input$corMethod), isolate(input$met_scaling),
+        reference_df = isolate(filtered_r()$df)
+      )
     })
 
     observeEvent(input$correct, ignoreInit = TRUE, {

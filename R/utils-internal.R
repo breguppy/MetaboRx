@@ -61,6 +61,37 @@
   df
 }
 
+#' Align pre-imputation reference values by unique sample identifier
+#'
+#' NULL means that the supplied correction input is itself the reference.
+#' @keywords internal
+#' @noRd
+.align_qc_reference <- function(df, reference_df, metab_cols) {
+  if (is.null(reference_df)) return(df)
+  required <- c("sample", "class", metab_cols)
+  if (!is.data.frame(reference_df) ||
+      !all(required %in% names(reference_df))) {
+    stop("reference_df must contain sample, class, and metabolite columns.")
+  }
+  if (!all(c("sample", "class") %in% names(df))) {
+    stop("Correction input must contain sample and class columns.")
+  }
+  if (anyNA(df$sample) || anyDuplicated(df$sample) ||
+      anyNA(reference_df$sample) || anyDuplicated(reference_df$sample)) {
+    stop("Sample identifiers must be nonmissing and unique in both data frames.")
+  }
+  idx <- match(df$sample, reference_df$sample)
+  if (anyNA(idx)) stop("reference_df is missing correction samples.")
+  aligned <- reference_df[idx, , drop = FALSE]
+  if (!identical(as.character(aligned$class), as.character(df$class))) {
+    stop("Reference and correction sample classes must agree.")
+  }
+  if (!all(vapply(aligned[metab_cols], is.numeric, logical(1)))) {
+    stop("Reference metabolite columns must be numeric.")
+  }
+  aligned
+}
+
 #' Normalize, impute, clean, and scale corrected metabolites
 #'
 #' @keywords internal
@@ -70,11 +101,16 @@
     raw_df,
     metab_cols,
     qcid,
-    met_scaling
+    met_scaling,
+    reference_df = NULL,
+    impute_missing = TRUE
 ) {
   met_scaling <- match.arg(met_scaling, c("one", "original"))
   
-  # Store observed QC pairs before imputation or cleanup.
+  reference_df <- .align_qc_reference(raw_df, reference_df, metab_cols)
+
+  # Retain observed positive QC rows before correction-stage imputation.
+  # The raw target uses ALL observed positive QCs, even if a fit fails.
   qc_reference <- vector("list", length(metab_cols))
   names(qc_reference) <- metab_cols
   
@@ -84,8 +120,9 @@
     
     corr[!is.finite(corr) | corr < 0] <- NA_real_
     
-    valid_qc <- is.finite(raw_y[qcid]) &
-      raw_y[qcid] > 0 &
+    observed_y <- as.numeric(reference_df[[metab]])
+    observed_qc <- is.finite(observed_y[qcid]) & observed_y[qcid] > 0
+    valid_qc <- observed_qc &
       is.finite(corr[qcid]) &
       corr[qcid] > 0
     
@@ -93,8 +130,8 @@
     
     qc_reference[[metab]] <- list(
       rows = reference_rows,
-      raw_median = if (length(reference_rows) > 0L) {
-        stats::median(raw_y[reference_rows])
+      raw_median = if (any(observed_qc)) {
+        stats::median(observed_y[qcid][observed_qc])
       } else {
         NA_real_
       }
@@ -113,7 +150,7 @@
   }
   
   # Handle almost entirely missing metabolites before kNN.
-  if (anyNA(out[metab_cols])) {
+  if (isTRUE(impute_missing) && anyNA(out[metab_cols])) {
     for (metab in metab_cols) {
       x <- out[[metab]]
       
