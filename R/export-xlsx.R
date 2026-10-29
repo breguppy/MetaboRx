@@ -379,11 +379,12 @@ export_xlsx <- function(p, d, file = NULL) {
         "peak areas in experimental samples, on an individual metabolite basis, against",
         "peak areas in pooled quality control samples. This corrects for normal instrument",
         "drift during the run. It produces relative metabolite level values in arbitrary",
-        "units. For a given metabolite across the entire run, these values average close",
+        "units. For a given metabolite across the entire run, the values are scaled such that the median QC value is equal to",
+        if (d$corrected$met_sclaing == "one") { "1. "} else {"the median QC value for that metabolite in the raw data. "},
         if (add_eq_sheet) {
-          "to 1 for most metabolites. These data are equally weighted on the next tab before being normalized on the following tab."
+         "These data are equally weighted on the next tab before being normalized on the following tab."
         } else {
-          "to 1 for most metabolites. These data are further normalized on the next tab."
+          "These data are further normalized on the next tab."
         }
       )
       openxlsx::writeData(

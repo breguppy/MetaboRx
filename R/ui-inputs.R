@@ -638,12 +638,18 @@ ui_met_scaling <- function(df, ns = identity) {
         ),
         shiny::tags$ul(
           shiny::tags$li(
-            shiny::strong("QC median near 1: "),
-            "Metabolite values will be scaled such that median QC value is near 1."
+            shiny::strong("QC median eqauls 1: "),
+            "All metabolite values will be scaled such that the median QC value for each metabolite is near 1."
           ),
           shiny::tags$li(
-            shiny::strong("QC median near original intensity: "),
-            "Metabolites values will remain on the scale of the original data."
+            shiny::strong("QC median equals original intensity: "),
+            "All metabolites values will be scaled such that the median QC value for each metabolite is equal to the median QC value for that metabolite in the raw data."
+          ),
+          shiny::tags$hr(),
+          shiny::tags$p(
+            shiny::tags$b("Caution: ", style = "color: red;"),
+            "Scaling metabolites using QC median equals original intensity retains the difference in metabolite scales.",
+            "This can affect downstream analysis that compare or combine metabolites."
           )
         )
       ),
@@ -659,8 +665,8 @@ ui_met_scaling <- function(df, ns = identity) {
     ns("met_scaling"),
     label = label_with_info,
     choices = list(
-      "QC median near 1" = "one",
-      "QC median near original intensity" = "original"
+      "QC median equals 1" = "one",
+      "QC median equals original intensity" = "original"
     ),
     selected = "one",
     inline = FALSE

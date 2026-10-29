@@ -675,6 +675,26 @@ report_text_transform_methods <- function() {
         "of non-missing metabolites in the sample (i.e., values become comparable across samples in arbitrary units)."
       ),
       htmltools::tags$li(
+        htmltools::strong("PQN: "),
+        "Probabilistic Quotient Normalization (PQN). PQN is a sample-based normalization method ",
+          "computed in 3 steps:(1) Each metabolite is divided by the median value ",
+          "of that metabolite across all samples. (2) For each sample, the median ",
+          "of these quotients is computed as an estimate of the sample's most ",
+          "probable dilution factor. (3) Post-QC-corrected metabolite intensities ",
+          "are divided by this sample-specific median quotient. This normalization ",
+          "rescales each sample by its median fold difference relative to a reference ",
+          "spectrum, correcting for global dilution or concentration differences ",
+          "while preserving relative biological differences in individual ",
+          "metabolites. Data remain in arbitrary units. Because arbitary units for ",
+          "a given metabolite quantitatively scale across samples, levels of a given ",
+          "metabolite may be quantiatively compared across samples. Because unit ",
+          "scaling is different for each metabolite, different metabolites within ",
+          "in a sample cannot be quantitatively compared. However, because ",
+          "differences in arbitrary unit scaling between samples cancel out by ",
+          "divsion, within-sample metabolite ratios can be quantitatively compared ",
+          "across samples."
+      ),
+      htmltools::tags$li(
         htmltools::strong("None: "),
         "Leaves corrected metabolite values unchanged."
       ),
