@@ -72,56 +72,71 @@
 
 #' Nadaraya-Watson QC-based correction
 #'
-#' Corrects each metabolite by dividing observed values by a
-#' Nadaraya-Watson-smoothed QC trend over injection order.
+#' @param df Data frame containing class, order, and metabolite columns.
+#' @param metab_cols Character vector of metabolite column names.
+#' @param met_scaling Either "one" or "original". Final scaling uses
+#'   matched finite, positive raw and corrected QC pairs identified
+#'   before imputation. "one" sets their corrected median to 1;
+#'   "original" sets it to their raw median.
+#' @param span Relative smoothing span in (0, 1].
+#' @param min_qc Minimum number of QC rows required.
+#' @param kernel Either "gaussian" or "tricube".
 #'
-#' @param df data.frame
-#'   Data frame containing metadata columns `class` and `order`, plus
-#'   metabolite columns.
-#' @param metab_cols character vector
-#'   Metabolite column names.
-#' @param met_scaling character scalar
-#'   Scaling factor for metabolite post-correction.
-#' @param span numeric scalar
-#'   Relative smoothing span in (0, 1]. Larger values give smoother fits.
-#' @param min_qc integer scalar
-#'   Minimum number of QC rows required.
-#' @param kernel character scalar
-#'   Kernel to use. One of "gaussian" or "tricube".
-#'
-#' @return data.frame
-#'   Data frame with corrected metabolite columns.
-#'
+#' @return Corrected data frame.
 #' @keywords internal
 #' @noRd
-nw_correction <- function(df, metab_cols, met_scaling = "one", span = 0.75, min_qc = 3, kernel = "gaussian") {
-  df <- df[order(df$order), , drop = FALSE]
-
-  if (!(identical(df$class[1], "QC") && identical(df$class[nrow(df)], "QC"))) {
+nw_correction <- function(
+    df,
+    metab_cols,
+    met_scaling = "one",
+    span = 0.75,
+    min_qc = 3,
+    kernel = "gaussian"
+) {
+  met_scaling <- match.arg(met_scaling, c("one", "original"))
+  kernel <- match.arg(kernel, c("gaussian", "tricube"))
+  
+  if (nrow(df) == 0L) {
+    stop("df must contain at least one row.")
+  }
+  
+  x_all <- suppressWarnings(as.numeric(df$order))
+  
+  if (any(!is.finite(x_all))) {
+    stop("order must be numeric and finite.")
+  }
+  
+  ord <- order(x_all)
+  df <- df[ord, , drop = FALSE]
+  x_all <- x_all[ord]
+  
+  if (!(isTRUE(df$class[1] == "QC") &&
+        isTRUE(df$class[nrow(df)] == "QC"))) {
     stop("First and last samples must be QCs.")
   }
-
+  
   qcid <- which(df$class == "QC")
+  
   if (length(qcid) < min_qc) {
-    stop(sprintf("Need at least %d QC rows for local constant correction.", min_qc))
+    stop(
+      sprintf(
+        "Need at least %d QC rows for local constant correction.",
+        min_qc
+      )
+    )
   }
-
-  x_all <- suppressWarnings(as.numeric(df$order))
-  if (any(!is.finite(x_all))) {
-    stop("order must be numeric and finite after sorting.")
-  }
-
+  
   out <- df
-
+  
   for (metab in metab_cols) {
-    zero_mask <- is.finite(df[[metab]]) & df[[metab]] == 0
-    qc_y <- df[[metab]][qcid]
-
-    if (all(qc_y <= 0, na.rm = TRUE)) {
+    raw_y <- as.numeric(df[[metab]])
+    qc_y <- raw_y[qcid]
+    
+    if (!any(is.finite(qc_y) & qc_y > 0)) {
       out[[metab]] <- 0
       next
     }
-
+    
     pred <- .safe_nw_predict_x(
       qc_x = x_all[qcid],
       qc_y = qc_y,
@@ -129,51 +144,20 @@ nw_correction <- function(df, metab_cols, met_scaling = "one", span = 0.75, min_
       span = span,
       kernel = kernel
     )
-
-    pred[!is.finite(pred) | pred <= 0] <- NA_real_
-    corr <- as.numeric(df[[metab]]) / pred
-
-    if(met_scaling == "one") {
-      sf <- stats::median(corr[qcid], na.rm = TRUE)
-      if (is.finite(sf) && sf > 0) {
-      corr <- corr / sf
-      }
-    } else if(met_scaling == "original"){
-      valid_qc <- qc_y[is.finite(qc_y) & qc_y > 0]
-      qc_reference <- stats::median(valid_qc)
-      
-      sf <- stats::median(corr[qcid], na.rm = TRUE)
-      if (is.finite(sf) && sf > 0 && is.finite(qc_reference)) {
-        corr <- (corr / sf) * qc_reference
-      }
-    }
     
+    pred[!is.finite(pred) | pred <= 0] <- NA_real_
+    
+    corr <- raw_y / pred
     corr[!is.finite(corr) | corr < 0] <- NA_real_
+    
     out[[metab]] <- corr
-    out[[metab]][zero_mask] <- 0
   }
-
-  if (anyNA(out[metab_cols])) {
-    for (metab in metab_cols) {
-      x <- out[[metab]]
-      if (mean(is.na(x)) >= 0.99) {
-        mp <- suppressWarnings(min(x[x > 0], na.rm = TRUE))
-        x[is.na(x)] <- if (is.finite(mp)) mp else 0
-        out[[metab]] <- x
-      }
-    }
-
-    needs_knn <- anyNA(out[metab_cols]) && length(metab_cols) >= 2
-    if (needs_knn) {
-      kn <- impute::impute.knn(
-        t(as.matrix(out[metab_cols])),
-        rowmax = 1,
-        colmax = 1,
-        maxp = 15000
-      )
-      out[metab_cols] <- as.data.frame(t(kn$data))
-    }
-  }
-
-  .cleanup_corrected_metabolites(out, metab_cols)
+  
+  .finalize_qc_correction(
+    out = out,
+    raw_df = df,
+    metab_cols = metab_cols,
+    qcid = qcid,
+    met_scaling = met_scaling
+  )
 }
