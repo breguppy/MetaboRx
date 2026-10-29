@@ -369,6 +369,7 @@ export_xlsx <- function(p, d, file = NULL) {
       if (!isTRUE(p$keep_corrected_qcs)) {
         df2 <- df2[df2$class != "QC", , drop = FALSE]
       }
+      met_scale_str <- ifelse(d$corrected$met_scaling == "one", "1. ","the median QC value for that metabolite in the raw data. ")
       txt2 <- paste(
         "Tab 2. This tab shows instrument drift corrected values for metabolite levels",
         "in experimental samples. Data is corrected using",
@@ -380,7 +381,7 @@ export_xlsx <- function(p, d, file = NULL) {
         "peak areas in pooled quality control samples. This corrects for normal instrument",
         "drift during the run. It produces relative metabolite level values in arbitrary",
         "units. For a given metabolite across the entire run, the values are scaled such that the median QC value is equal to",
-        if (d$corrected$met_sclaing == "one") { "1. "} else {"the median QC value for that metabolite in the raw data. "},
+        met_scale_str,
         if (add_eq_sheet) {
          "These data are equally weighted on the next tab before being normalized on the following tab."
         } else {

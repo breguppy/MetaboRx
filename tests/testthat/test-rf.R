@@ -112,7 +112,7 @@ test_that("rf_correction warns when < min_qc but still outputs valid data", {
   p <- testthat::evaluate_promise(
     rf_correction(df, metab_cols = c("M1","M2"), ntree = 50, seed = 1, min_qc = 12)
   )
-  expect_true(any(grepl("too few QC samples for RF; using baseline", p$warnings)))
+  expect_true(any(grepl("Fewer than 12 QC samples; using baseline interpolation.", p$warnings)))
   out <- p$result
   mets <- as.matrix(out[c("M1","M2")])
   expect_false(any(!is.finite(mets)))
