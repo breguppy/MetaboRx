@@ -112,9 +112,9 @@ test_that("export_outliers_xlsx reuses supplied Hotelling result", {
     )
   )
 
-  samples <- openxlsx::read.xlsx(file, sheet = "Samples Outside Ellipse", startRow = 3)
-  extremes <- openxlsx::read.xlsx(file, sheet = "Potential Extreme Values", startRow = 3)
-
+  samples <- openxlsx::read.xlsx(file, sheet = "Potential Outlier Samples", startRow = 3)
+  extremes <- openxlsx::read.xlsx(file, sheet = "Study Extreme Values", startRow = 3)
+  
   expect_equal(samples$Sample, "S1")
   expect_equal(extremes$Sample, "S1")
   expect_equal(extremes$Metabolite, "met_a")
