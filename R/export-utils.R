@@ -587,56 +587,61 @@ report_text_rsd_cal <- function() {
     "are removed from the dataset and are listed here."
   )
 }
-#' Extreme value detection description.
+#' Extreme value detection description
 #' @keywords internal
 #' @noRd
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "This step flags potential extreme values using a 2D PCA / Mahalanobis ",
-      "distance on non-QC samples. The squared Mahalanobis distance is computed ",
-      "in the PC1-PC2 space using a PCA model fit on non-QC samples:"
+      "MetaboRx screens for two types of potential outliers in the corrected data. ",
+      "The PCA screen flags samples with unusual metabolite profiles, while ",
+      "the class Z-score screen flags individual metabolite values."
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
-        htmltools::strong("Log and Scale Metabolites for non-QC samples: "),
-        "Applies log2(x + 1), then standardizes using pooled non-QC samples only."
+        htmltools::tags$strong("Log transformation and scaling. "),
+        "By default, MetaboRx applies log2(x + 1) to metabolite intensities ",
+        "and standardizes all samples using the means and standard deviations ",
+        "of pooled study samples."
       ),
       htmltools::tags$li(
-        htmltools::strong("PCA fit (non-QC only): "),
-        "Fits PCA on pooled non-QC rows with complete metabolite data; uses PC1-PC2."
+        htmltools::tags$strong("PCA fit. "),
+        "MetaboRx fits PCA on study samples with complete metabolite data ",
+        "and uses the first two principal components (PC1 and PC2)."
       ),
       htmltools::tags$li(
-        htmltools::strong("Mahalanobis distance in PC space for all samples: "),
-        "Projects all complete rows (QC + non-QC) into PC1-PC2 and computes a squared Mahalanobis distance."
+        htmltools::tags$strong("Squared Mahalanobis distance. "),
+        "MetaboRx projects complete study and QC samples into the PC1–PC2 space ",
+        "and uses their combined scores to estimate the center and covariance ",
+        "for the squared Mahalanobis distances."
       ),
       htmltools::tags$li(
-        htmltools::strong("Ellipse cutoff: "),
-        "Flags samples outside the (1 - alpha) ellipse using a chi^2 cutoff with df = 2 (default alpha = 0.05 -> 95%)."
+        htmltools::tags$strong("Sample outlier cutoff. "),
+        "Study and QC samples are flagged when their squared Mahalanobis ",
+        "distance exceeds the chi-square cutoff with two degrees of freedom ",
+        "(95% ellipse by default)."
       ),
       htmltools::tags$li(
-        htmltools::strong("Dual z-score rule (only for outlier samples): "),
-        "Within samples outside the ellipse, flags metabolite values only when BOTH ",
-        htmltools::strong("|global z| >= 3"),
-        " (pooled non-QC scaling) AND ",
-        htmltools::strong("|class z| >= 3"),
-        " (within that non-QC class)."
+        htmltools::tags$strong("Candidate extreme metabolite values. "),
+        "For each metabolite, MetaboRx computes Z-scores using the mean ",
+        "and standard deviation within each study class and within the QC class. ",
+        "A value is flagged when its ",
+        htmltools::tags$strong("absolute class Z-score exceeds 3"),
+        ", regardless of whether its sample falls outside the ellipse."
       )
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
-      htmltools::strong("Interpretation: "),
-      "Red points are samples outside the ellipse. The table reports the specific metabolite values that also satisfy the dual z-score threshold."
+      htmltools::tags$strong("Reading the results. "),
+      "Red points in the PCA plot mark samples outside the ellipse. ",
+      "The on-screen candidate table shows flagged values from study samples. ",
+      "The Excel export has separate tabs for potential outlier samples, ",
+      "study candidate values, and QC candidate values."
     ),
     htmltools::tags$p(
-      htmltools::tags$b("Caution: ", style = "color: red;"),
-      "Candidate extreme values are displayed for the user's benefit. ",
-      "Further investigation and justification is needed before categorizing an extreme value as an outlier and removing it."
-    ),
-    htmltools::tags$p(
-      htmltools::strong("Note:"),
-      "This is not an exhaustive outlier search. This extreme value detection sections aims to help identify unreasonable ",
-      "metabolite values thats make a sample stand out from the others."
+      htmltools::tags$strong("Review before removal. ", style = "color: red;"),
+      "Investigate flagged samples and values before deciding whether removal ",
+      "is justified."
     )
   )
 }

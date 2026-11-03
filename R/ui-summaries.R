@@ -1097,37 +1097,64 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
 #' @param top_n Number of candidate extreme values to display.
 #' @param sample_col Name of the sample column in the extreme values table.
 #' @param class_col Name of the class column in the extreme values table.
-#' @param digits_z Number of digits used for z-score display.
-#' @param digits_T2 Number of digits used for Mahalanobis distance display.
+#' @param digits_z Number of digits used for Z-score display.
+#' @param digits_T2 Number of digits used for squared Mahalanobis distance display.
 #'
-#' @return A Shiny tag list containing metric cards and the outlier table.
+#' @return A Shiny tag list containing metric cards and the non-QC outlier table.
 #'
 #' @keywords internal
 #' @noRd
-ui_outliers_table <- function(detect_result,
-                              top_n = 10L,
-                              sample_col = "sample",
-                              class_col = "class",
-                              digits_z = 2L,
-                              digits_T2 = 2L) {
+ui_outliers_table <- function(
+    detect_result,
+    top_n = 10L,
+    sample_col = "sample",
+    class_col = "class",
+    digits_z = 2L,
+    digits_T2 = 2L
+) {
   if (is.null(detect_result)) {
     stop("detect_result is NULL.")
   }
-
+  
   ev <- detect_result$extreme_values
   dres <- detect_result$data
-
+  
   if (is.null(ev)) {
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
-
+  
   if (is.null(dres)) {
     stop("detect_result$data is NULL. Did you pass the correct object?")
   }
-
+  
+  required_cols <- c(
+    sample_col,
+    class_col,
+    "metabolite",
+    "z_class",
+    "abs_z_class",
+    "T2"
+  )
+  missing_cols <- setdiff(required_cols, names(ev))
+  
+  if (length(missing_cols) > 0L) {
+    stop(
+      "Missing columns in extreme_values: ",
+      paste(missing_cols, collapse = ", ")
+    )
+  }
+  
+  qc_label <- detect_result$params$qc_label
+  if (is.null(qc_label)) {
+    qc_label <- "QC"
+  }
+  
+  classes <- ev[[class_col]]
+  ev <- ev[!is.na(classes) & classes != qc_label, , drop = FALSE]
+  
   n_outlier_samples <- sum(dres$is_outlier_sample, na.rm = TRUE)
   n_extreme_values <- nrow(ev)
-
+  
   cards <- shiny::div(
     style = paste(
       "display:flex;",
@@ -1135,63 +1162,43 @@ ui_outliers_table <- function(detect_result,
       "margin-bottom:10px;",
       "flex-wrap:wrap;"
     ),
-    metric_card("Samples outside the Mahalanobis 95% limit", n_outlier_samples),
-    metric_card("Potential extreme metabolite values", n_extreme_values)
+    metric_card(
+      "Samples outside the Mahalanobis limit (including QCs)",
+      n_outlier_samples
+    ),
+    metric_card("Potential extreme metabolite values in non-QC samples", n_extreme_values)
   )
-
-  if (nrow(ev) == 0L) {
+  
+  if (n_extreme_values == 0L) {
     return(
       shiny::tagList(
         cards,
-        shiny::tags$em("No extreme metabolite values detected.")
+        shiny::tags$em("No extreme metabolite values detected in non-QC samples.")
       )
     )
   }
-
-  required_cols <- c(
-    sample_col,
-    class_col,
-    "metabolite",
-    "z_global",
-    "abs_z_global",
-    "z_class",
-    "abs_z_class",
-    "T2"
-  )
-
-  missing_cols <- setdiff(required_cols, names(ev))
-
-  if (length(missing_cols) > 0L) {
-    stop(
-      "Missing columns in extreme_values: ",
-      paste(missing_cols, collapse = ", ")
-    )
-  }
-
+  
   top_n <- as.integer(top_n)
-
   if (length(top_n) != 1L || is.na(top_n) || top_n < 1L) {
     top_n <- 10L
   }
-
-  ev_sorted <- ev[order(-ev$abs_z_global, -ev$abs_z_class, -ev$T2), , drop = FALSE]
-  ev_top <- head(ev_sorted, top_n)
-
-  z_g_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
-  z_c_fmt <- formatC(ev_top$z_class, format = "f", digits = digits_z)
+  
+  ev_sorted <- ev[order(-ev$abs_z_class, -ev$T2), , drop = FALSE]
+  ev_top <- utils::head(ev_sorted, top_n)
+  
+  z_fmt <- formatC(ev_top$z_class, format = "f", digits = digits_z)
   T2_fmt <- formatC(ev_top$T2, format = "f", digits = digits_T2)
-
+  
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
       shiny::tags$td(ev_top[[sample_col]][i]),
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
-      shiny::tags$td(z_g_fmt[i]),
-      shiny::tags$td(z_c_fmt[i]),
+      shiny::tags$td(z_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
-
+  
   table_tag <- shiny::tags$table(
     class = "table table-striped table-condensed table-hover",
     shiny::tags$thead(
@@ -1199,21 +1206,25 @@ ui_outliers_table <- function(detect_result,
         shiny::tags$th("Sample"),
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
-        shiny::tags$th("Global z-score"),
-        shiny::tags$th("Class z-score"),
-        shiny::tags$th("Mahalanobis^2")
+        shiny::tags$th("Class Z-score"),
+        shiny::tags$th("Squared Mahalanobis distance")
       )
     ),
     shiny::tags$tbody(rows)
   )
-
+  
   shiny::tagList(
     cards,
     shiny::tags$p(
-      sprintf("Top %s potential extreme values are listed below. ", top_n),
-      "The full list of potential extreme values ",
-      sprintf("'extreme_values_%s.xlsx' ", Sys.Date()),
-      "is available for download."
+      sprintf(
+        "Showing %d of %d potential extreme values in non-QC samples. ",
+        nrow(ev_top),
+        n_extreme_values
+      ),
+      sprintf(
+        "The full list, including any flagged QC values, is available in 'extreme_values_%s.xlsx'.",
+        Sys.Date()
+      )
     ),
     shiny::tags$div(
       style = "overflow-x:auto; width:100%;",
