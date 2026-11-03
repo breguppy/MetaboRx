@@ -544,12 +544,9 @@ ui_filter_info <- function(fd) {
   if (length(not_detected_mets) > 0L) {
     not_detected_dataset_col <- tags$div(
       tags$strong(
-        "Metabolites not detected in this dataset"
-      ),
-      tags$p(
         paste0(
           length(not_detected_mets),
-          " metabolite(s) are all missing or zero in both ",
+          " metabolite(s) are all zero or missing in both ",
           "study and QC samples."
         )
       ),
@@ -562,12 +559,9 @@ ui_filter_info <- function(fd) {
   if (length(all_missing_zero_non_qc_cols) > 0L) {
     not_detected_study_col <- tags$div(
       tags$strong(
-        "Metabolites not detected in study samples"
-      ),
-      tags$p(
         paste0(
           length(all_missing_zero_non_qc_cols),
-          " metabolite(s) are all missing or zero in ",
+          " metabolite(s) are all zero or missing in ",
           "study samples."
         )
       ),
@@ -580,12 +574,9 @@ ui_filter_info <- function(fd) {
   if (length(all_missing_zero_qc_cols) > 0L) {
     not_detected_qc_col <- tags$div(
       tags$strong(
-        "Metabolites not detected in QC samples"
-      ),
-      tags$p(
         paste0(
           length(all_missing_zero_qc_cols),
-          " metabolite(s) are all missing or zero in ",
+          " metabolite(s) are all zero or missing in ",
           "QC samples."
         )
       ),
@@ -608,7 +599,7 @@ ui_filter_info <- function(fd) {
       style = "margin-bottom: 16px;",
       tags$h5(
         style = "font-weight: bold; margin-top: 0;",
-        "Metabolites not detected"
+        "Metabolites reported with all zero or missing values"
       ),
       not_detected_columns
     )
@@ -617,48 +608,69 @@ ui_filter_info <- function(fd) {
   # ===========================================================================
   # Missing-value filter criteria
   # ===========================================================================
+  threshold_badge <- function(value) {
+    shiny::tags$span(
+      paste0(value, "%"),
+      title = "Current user-selected missing-value threshold",
+      style = paste(
+        "display: inline-block;",
+        "padding: 1px 7px;",
+        "margin: 0 2px;",
+        "font-weight: 700;",
+        "color: #2b2f32;",
+        "background-color: #f1f2f4;",
+        "border: 1px solid #c5c7cb;",
+        "border-radius: 4px;",
+        "white-space: nowrap;"
+      )
+    )
+  }
   
   study_rule_text <- switch(
     filter_rule,
     
-    any = paste0(
-      "A metabolite is removed if at least one study class has more than ",
-      mv_cutoff,
-      "% missing values."
+    any = shiny::tagList(
+      " A metabolite is removed if ",
+      tags$strong("at least one"),
+      " study class has more than ",
+      threshold_badge(mv_cutoff),
+      " missing values."
     ),
     
-    all = paste0(
-      "A metabolite is removed if all study classes have more than ",
-      mv_cutoff,
-      "% missing values."
+    all = shiny::tagList(
+      " A metabolite is removed if ",
+      tags$strong("all"),
+      " study classes have more than ",
+      threshold_badge(mv_cutoff),
+      " missing values."
     ),
     
-    paste0(
-      "Study-sample missing-value cutoff: ",
-      mv_cutoff,
-      "%."
+    shiny::tagList(
+      tags$strong("Study-sample missing-value criterion:"),
+      " No recognized study-sample missing-value rule was selected."
     )
   )
   
   qc_rule_text <- if (is.null(qc_mv_cutoff)) {
     "No QC missing-value threshold was applied."
   } else {
-    paste0(
-      "A metabolite is also removed if more than ",
-      qc_mv_cutoff,
-      "% of QC values are missing."
+    shiny::tagList(
+      " A metabolite is also removed if more than ",
+      threshold_badge(qc_mv_cutoff),
+      " of QC values are missing."
     )
   }
   
   filter_criteria_card <- tags$div(
     class = "alert alert-info",
     style = "margin-bottom: 16px;",
-    tags$strong(
+    tags$h5(
+      style = "font-weight: bold; margin-top: 0;",
       "Missing-value filter criteria"
     ),
     tags$ul(
-      tags$li(study_rule_text),
-      tags$li(qc_rule_text)
+      tags$li(shiny::tagList(tags$strong("Study-sample missing-value criterion:"), study_rule_text)),
+      tags$li(shiny::tagList(tags$strong("QC missing-value criterion:"), qc_rule_text))
     )
   )
   
@@ -689,9 +701,10 @@ ui_filter_info <- function(fd) {
   
   if (length(removed_study_only) > 0L) {
     study_removed_card <- warn_card(
-      title = paste0(
-        length(removed_study_only),
-        " metabolite(s) removed for study-sample missingness"
+      title = shiny::tagList(
+        paste0(length(removed_study_only),
+        " metabolite(s) failed "),
+        tags$strong("study-sample missing-value criterion")
       ),
       body = study_rule_text,
       body_tags = balanced_list(removed_study_only)
@@ -706,14 +719,15 @@ ui_filter_info <- function(fd) {
   
   if (length(removed_both) > 0L) {
     removed_both_card <- warn_card(
-      title = paste0(
-        length(removed_both),
-        " metabolite(s) failed both missing-value criteria"
+      title = shiny::tagList(
+        paste0(length(removed_both),
+        " metabolite(s) failed "),
+        tags$strong("both missing-value criteria")
       ),
-      body = paste0(
-        "The following metabolites exceeded both the study-sample ",
-        "criterion and the QC missingness criterion."
-      ),
+      body = shiny::tagList(
+        paste0("The following metabolites exceeded "),
+        tags$strong("both the study-sample and the QC missing-value criteria."
+      )),
       body_tags = balanced_list(removed_both)
     )
   }
@@ -726,9 +740,10 @@ ui_filter_info <- function(fd) {
   
   if (length(removed_qc_only) > 0L) {
     qc_removed_card <- warn_card(
-      title = paste0(
-        length(removed_qc_only),
-        " metabolite(s) removed for QC missingness"
+      title = shiny::tagList(
+        paste0(length(removed_qc_only),
+        " metabolite(s) failed "),
+        tags$strong("QC missing-value criterion")
       ),
       body = qc_rule_text,
       body_tags = balanced_list(removed_qc_only)
@@ -796,8 +811,8 @@ ui_filter_info <- function(fd) {
   
   removal_columns <- dynamic_columns(
     study_removed_card,
-    removed_both_card,
     qc_removed_card,
+    removed_both_card,
     min_width = 320L
   )
   
