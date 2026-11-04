@@ -1094,13 +1094,13 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
 #' Candidate extreme values summary table UI
 #'
 #' @param detect_result Result returned by `detect_hotelling_nonqc_dual_z()`.
-#' @param top_n Number of candidate extreme values to display.
+#' @param top_n Maximum number of selected study values to display.
 #' @param sample_col Name of the sample column in the extreme values table.
 #' @param class_col Name of the class column in the extreme values table.
 #' @param digits_z Number of digits used for Z-score display.
 #' @param digits_T2 Number of digits used for squared Mahalanobis distance display.
 #'
-#' @return A Shiny tag list containing metric cards and the non-QC outlier table.
+#' @return A Shiny tag list containing metric cards and the study candidate table.
 #'
 #' @keywords internal
 #' @noRd
@@ -1122,7 +1122,6 @@ ui_outliers_table <- function(
   if (is.null(ev)) {
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
-  
   if (is.null(dres)) {
     stop("detect_result$data is NULL. Did you pass the correct object?")
   }
@@ -1131,8 +1130,7 @@ ui_outliers_table <- function(
     sample_col,
     class_col,
     "metabolite",
-    "z_class",
-    "abs_z_class",
+    "z_global",
     "T2"
   )
   missing_cols <- setdiff(required_cols, names(ev))
@@ -1149,6 +1147,16 @@ ui_outliers_table <- function(
     qc_label <- "QC"
   }
   
+  value_z_threshold <- detect_result$params$value_z_threshold
+  flag_fraction <- detect_result$params$flag_fraction
+  
+  if (is.null(value_z_threshold) || is.null(flag_fraction)) {
+    stop(
+      "The detector result must contain value_z_threshold and flag_fraction ",
+      "in params. Recompute it using the updated detection function."
+    )
+  }
+  
   classes <- ev[[class_col]]
   ev <- ev[!is.na(classes) & classes != qc_label, , drop = FALSE]
   
@@ -1163,17 +1171,35 @@ ui_outliers_table <- function(
       "flex-wrap:wrap;"
     ),
     metric_card(
-      "Samples outside the Mahalanobis limit (including QCs)",
+      "Samples outside the Mahalanobis limit",
       n_outlier_samples
     ),
-    metric_card("Potential extreme metabolite values in non-QC samples", n_extreme_values)
+    metric_card(
+      "Selected candidate extreme values in study samples",
+      n_extreme_values
+    )
+  )
+  
+  method_text <- shiny::tags$p(
+    "For each metabolite, Z-scores use all non-QC samples pooled together. ",
+    sprintf(
+      "Values must have |z| > %g. The largest %g%% of qualifying absolute ",
+      value_z_threshold,
+      100 * flag_fraction
+    ),
+    "Z-scores across all metabolites are selected, with the count rounded down. ",
+    "Selection is independent of the sample's Mahalanobis flag. ",
+    "QC values are scored and selected separately."
   )
   
   if (n_extreme_values == 0L) {
     return(
       shiny::tagList(
         cards,
-        shiny::tags$em("No extreme metabolite values detected in non-QC samples.")
+        method_text,
+        shiny::tags$em(
+          "No study values were selected by the threshold and percentage rule."
+        )
       )
     )
   }
@@ -1183,10 +1209,14 @@ ui_outliers_table <- function(
     top_n <- 10L
   }
   
-  ev_sorted <- ev[order(-ev$abs_z_class, -ev$T2), , drop = FALSE]
+  ev_sorted <- ev[
+    order(-abs(ev$z_global), -ev$T2),
+    ,
+    drop = FALSE
+  ]
   ev_top <- utils::head(ev_sorted, top_n)
   
-  z_fmt <- formatC(ev_top$z_class, format = "f", digits = digits_z)
+  z_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
   T2_fmt <- formatC(ev_top$T2, format = "f", digits = digits_T2)
   
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
@@ -1206,7 +1236,7 @@ ui_outliers_table <- function(
         shiny::tags$th("Sample"),
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
-        shiny::tags$th("Class Z-score"),
+        shiny::tags$th("Z-score"),
         shiny::tags$th("Squared Mahalanobis distance")
       )
     ),
@@ -1215,14 +1245,19 @@ ui_outliers_table <- function(
   
   shiny::tagList(
     cards,
+    method_text,
     shiny::tags$p(
       sprintf(
-        "Showing %d of %d potential extreme values in non-QC samples. ",
+        "Showing %d of %d selected candidate extreme values in study samples, ",
         nrow(ev_top),
         n_extreme_values
       ),
+      "ranked by absolute Z-score. ",
       sprintf(
-        "The full list, including any flagged QC values, is available in 'extreme_values_%s.xlsx'.",
+        paste0(
+          "All selected study and QC candidates are available in separate ",
+          "tabs in 'extreme_values_%s.xlsx'."
+        ),
         Sys.Date()
       )
     ),

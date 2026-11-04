@@ -593,27 +593,29 @@ report_text_rsd_cal <- function() {
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "MetaboRx screens for two types of potential outliers in the corrected data. ",
+      "MetaboRx screens for potential outliers in the corrected data. ",
       "The PCA screen flags samples with unusual metabolite profiles, while ",
-      "the class Z-score screen flags individual metabolite values."
+      "the Z-score screen selects individual metabolite values for review."
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
-        htmltools::tags$strong("Log transformation and scaling. "),
-        "By default, MetaboRx applies log2(x + 1) to metabolite intensities ",
-        "and standardizes all samples using the means and standard deviations ",
-        "of pooled study samples."
+        htmltools::tags$strong("Log transformation and PCA scaling. "),
+        "By default, MetaboRx applies log2(x + 1) to metabolite intensities. ",
+        "For PCA, all samples are standardized using the means and standard ",
+        "deviations of pooled study samples. Missing values are imputed ",
+        "for this analysis."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("PCA fit. "),
-        "MetaboRx fits PCA on study samples with complete metabolite data ",
-        "and uses the first two principal components (PC1 and PC2)."
+        "MetaboRx fits PCA on study samples with complete, finite data after ",
+        "imputation and scaling, using the first two principal components ",
+        "(PC1 and PC2)."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Squared Mahalanobis distance. "),
-        "MetaboRx projects complete study and QC samples into the PC1–PC2 space ",
-        "and uses their combined scores to estimate the center and covariance ",
-        "for the squared Mahalanobis distances."
+        "MetaboRx projects study and QC samples with complete, finite data ",
+        "into PC1–PC2 space. Their combined scores determine the center ",
+        "and covariance used to calculate squared Mahalanobis distances."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Sample outlier cutoff. "),
@@ -622,26 +624,40 @@ report_text_ev_detection <- function() {
         "(95% ellipse by default)."
       ),
       htmltools::tags$li(
-        htmltools::tags$strong("Candidate extreme metabolite values. "),
-        "For each metabolite, MetaboRx computes Z-scores using the mean ",
-        "and standard deviation within each study class and within the QC class. ",
-        "A value is flagged when its ",
-        htmltools::tags$strong("absolute class Z-score exceeds 3"),
-        ", regardless of whether its sample falls outside the ellipse."
+        htmltools::tags$strong("Metabolite Z-scores. "),
+        "For each metabolite, MetaboRx calculates Z-scores separately for ",
+        "all study samples pooled together and for QC samples. Each pool ",
+        "uses its own mean and sample standard deviation on the selected ",
+        "transformation scale. Only finite observed values contribute. ",
+        "Metabolites with fewer than two usable values or zero variance ",
+        "within a pool receive no Z-scores for that pool."
+      ),
+      htmltools::tags$li(
+        htmltools::tags$strong("Candidate extreme value selection. "),
+        "Values first qualify when ",
+        htmltools::tags$strong("|z| > 2"),
+        ". MetaboRx then selects the ",
+        htmltools::tags$strong("largest 10% of qualifying absolute Z-scores"),
+        " across all metabolites, separately for study and QC samples. ",
+        "The selected count is rounded down, so fewer than 10 qualifying ",
+        "values in a pool produces no selected candidates. Ties are resolved ",
+        "by sample row, then metabolite column in the input data. ",
+        "Selection is independent of whether a sample falls outside the ellipse."
       )
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
       htmltools::tags$strong("Reading the results. "),
       "Red points in the PCA plot mark samples outside the ellipse. ",
-      "The on-screen candidate table shows flagged values from study samples. ",
-      "The Excel export has separate tabs for potential outlier samples, ",
-      "study candidate values, and QC candidate values."
+      "The on-screen table displays selected study candidates ranked by ",
+      "absolute Z-score. The Excel export contains separate tabs for ",
+      "potential outlier samples, selected study values, and selected QC values."
     ),
     htmltools::tags$p(
       htmltools::tags$strong("Review before removal. ", style = "color: red;"),
-      "Investigate flagged samples and values before deciding whether removal ",
-      "is justified."
+      "Investigate flagged samples and selected values before deciding ",
+      "whether removal is justified. Selection identifies candidates for ",
+      "review and does not establish that a measurement is erroneous."
     )
   )
 }
