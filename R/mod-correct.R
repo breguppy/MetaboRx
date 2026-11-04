@@ -5,7 +5,7 @@
 
 mod_correct_ui <- function(id) {
   ns <- NS(id)
-
+  
   nav_panel(
     title = "2. Correction Settings",
     value = "tab_correct",
@@ -210,18 +210,18 @@ mod_correct_ui <- function(id) {
 .mod_correct_collect_withheld <- function(input, df, prefix = "trn_withhold_col_") {
   withheld <- character(0)
   n_withhold <- input$trn_withhold_n %||% 0L
-
+  
   if (!isTRUE(input$trn_withhold_checkbox) || n_withhold <= 0L) {
     return(withheld)
   }
-
+  
   for (i in seq_len(n_withhold)) {
     col <- input[[paste0(prefix, i)]] %||% ""
     if (nzchar(col) && col %in% names(df)) {
       withheld <- c(withheld, col)
     }
   }
-
+  
   withheld
 }
 
@@ -236,7 +236,7 @@ mod_correct_ui <- function(id) {
   } else {
     "SKIP"
   }
-
+  
   paste0(
     "remove_imputed=", remove_imputed,
     "|transform=", transform_method,
@@ -249,9 +249,9 @@ mod_correct_ui <- function(id) {
 mod_correct_server <- function(id, data, params) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
+    
     d <- reactive(data())
-
+    
     filtered_r <- reactive({
       req(d()$filtered)
       d()$filtered
@@ -259,26 +259,26 @@ mod_correct_server <- function(id, data, params) {
     cleaned_r <- reactive({
       d()$cleaned
     })
-
+    
     #---------- 2.1: Choose Correction Settings server
     # requires filtered data
     output$qc_missing_value_warning <- renderUI({
       df <- filtered_r()$df
       ui_qc_missing_warning(df)
     })
-
+    
     output$qcImpute <- renderUI({
       df <- filtered_r()$df
       mc <- .correction_metab_cols(df)
       ui_qc_impute(df, mc, ns = session$ns)
     })
-
+    
     output$sampleImpute <- renderUI({
       df <- filtered_r()$df
       mc <- .correction_metab_cols(df)
       ui_sample_impute(df, mc, ns = session$ns)
     })
-
+    
     output$correctionMethod <- renderUI({
       ui_correction_method(filtered_r()$df, ns = session$ns)
     })
@@ -289,36 +289,36 @@ mod_correct_server <- function(id, data, params) {
       df <- filtered_r()$df
       ui_how_to_correct(df)
     })
-
+    
     metab_cols_r <- reactive({
       .correction_metab_cols(filtered_r()$df)
     })
-
+    
     has_qc_na_r <- reactive({
       df <- filtered_r()$df
       mc <- metab_cols_r()
       any(is.na(dplyr::filter(df, .data$class == "QC")[, mc, drop = FALSE]))
     })
-
+    
     has_sam_na_r <- reactive({
       df <- filtered_r()$df
       mc <- metab_cols_r()
       any(is.na(dplyr::filter(df, .data$class != "QC")[, mc, drop = FALSE]))
     })
-
+    
     imputed_r <- reactive({
       df <- filtered_r()$df
       mc <- metab_cols_r()
-
+      
       qc_method <- input$qcImputeM %||% "nothing_to_impute"
       sam_method <- input$samImputeM %||% "nothing_to_impute"
-
+      
       if (!has_qc_na_r()) qc_method <- "nothing_to_impute"
       if (!has_sam_na_r()) sam_method <- "nothing_to_impute"
-
+      
       impute_missing(df, mc, qc_method, sam_method)
     })
-
+    
     corrected_r <- eventReactive(input$correct, {
       imputed <- isolate(imputed_r())
       mc <- isolate(metab_cols_r())
@@ -327,7 +327,7 @@ mod_correct_server <- function(id, data, params) {
         reference_df = isolate(filtered_r()$df)
       )
     })
-
+    
     observeEvent(input$correct, ignoreInit = TRUE, {
       shinyjs::disable("correct")
       output$cor_spinner <- renderUI({
@@ -337,7 +337,7 @@ mod_correct_server <- function(id, data, params) {
       })
     })
     output$cor_spinner <- renderUI(NULL)
-
+    
     #--------- 2.2 Post-correction filtering server
     # requires corrected data
     output$post_cor_filter_block <- renderUI({
@@ -347,14 +347,14 @@ mod_correct_server <- function(id, data, params) {
         NULL
       )
     })
-
-
+    
+    
     filtered_corrected_r <- reactive({
       req(filtered_r(), corrected_r())
-
+      
       df_filtered <- filtered_r()$df
       df_corrected <- corrected_r()$df
-
+      
       # remove imputed values if selected:
       if (isTRUE(input$remove_imputed)) {
         df_corrected <- remove_imputed_from_corrected(
@@ -362,42 +362,42 @@ mod_correct_server <- function(id, data, params) {
           corrected_df = df_corrected
         )
       }
-
+      
       pct_threshold <- input$qc_average_pct_threshold %||% 100
       pct_threshold <- as.numeric(pct_threshold)
-
+      
       if (
         length(pct_threshold) != 1L ||
-          is.na(pct_threshold) ||
-          pct_threshold < 0
+        is.na(pct_threshold) ||
+        pct_threshold < 0
       ) {
         pct_threshold <- 100
       }
-
+      
       removed_metabolites <- character(0)
-
+      
       flagged_mets <- get_metabs_pct_diff_vs_qc_average(
         df = df_corrected,
         percent_threshold = pct_threshold
       )
-
+      
       if (isTRUE(input$remove_qc_average_pct_filter)) {
         average_diff_results <- remove_metabs_pct_diff_vs_qc_average(
           df = df_corrected,
           percent_threshold = pct_threshold,
           return_result = TRUE
         )
-
+        
         df_corrected <- average_diff_results$df
         removed_metabolites <- average_diff_results$removed_metabolites
       }
-
+      
       remove_qc_rsd_filter <- isTRUE(input$post_cor_filter)
       remove_imputed <- isTRUE(input$remove_imputed)
       rsd_cutoff <- input$rsd_filter %||% Inf
-
+      
       cutoff_to_use <- if (remove_qc_rsd_filter) rsd_cutoff else Inf
-
+      
       filtered_cor_results <- filter_by_qc_rsd(
         raw_df = df_filtered,
         corrected_df = df_corrected,
@@ -405,30 +405,30 @@ mod_correct_server <- function(id, data, params) {
         remove_imputed = remove_imputed,
         metadata_cols = c("sample", "batch", "class", "order")
       )
-
+      
       filtered_cor_results$percent_threshold <- pct_threshold
       filtered_cor_results$flagged_mets <- flagged_mets
       filtered_cor_results$removed_mets_pct_diff <- removed_metabolites
-
+      
       filtered_cor_results
     })
-
+    
     filtered_corrected_df_r <- reactive({
       req(filtered_corrected_r())
       .mod_correct_pick_df(filtered_corrected_r(), input$remove_imputed)
     })
-
+    
     output$post_cor_filter_info <- renderUI({
       req(corrected_r())
       res <- req(filtered_corrected_r())
-
+      
       remove_imputed <- isTRUE(input$remove_imputed)
       rsd_filter <- input$rsd_filter %||% Inf
       remove_qc_rsd_filter <- isTRUE(input$post_cor_filter)
-
+      
       ui_postcor_filter_info(res, remove_imputed, rsd_filter, remove_qc_rsd_filter, input$remove_qc_average_pct_filter)
     })
-
+    
     output$rsd_comparison_stats <- renderUI({
       d <- list(
         filtered_corrected = filtered_corrected_r(),
@@ -440,7 +440,7 @@ mod_correct_server <- function(id, data, params) {
         d
       )
     })
-
+    
     output$download_cor_rsd_btn <- renderUI({
       req(filtered_corrected_r())
       download_card(
@@ -459,7 +459,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
-
+    
     output$download_cor_rsd_data <- downloadHandler(
       filename = function() {
         sprintf("corrected_rsd_stats_%s.xlsx", Sys.Date())
@@ -469,37 +469,45 @@ mod_correct_server <- function(id, data, params) {
           rsd_compare = "filtered_cor_data",
           remove_imputed = input$remove_imputed
         )
-
+        
         d <- list(
           filtered_corrected = filtered_corrected_r(),
           filtered           = filtered_r()
         )
-
+        
         stats_wb <- export_stats_xlsx(p, d)
         openxlsx::saveWorkbook(stats_wb, file, overwrite = TRUE)
       }
     )
     hotelling_res_r <- reactive({
       req(filtered_corrected_r())
-
-      df <- filtered_corrected_r()$df_no_mv
-
+      
+      corrected <- filtered_corrected_r()
+      df <- corrected$df_no_mv
+      observed_df <- corrected$df_mv
+      req(df, observed_df)
+      
       p <- list(
         qcImputeM = input$qcImputeM,
         samImputeM = input$samImputeM
       )
-
-      detect_hotelling_nonqc_dual_z(df, p)
+      
+      detect_hotelling_nonqc_dual_z(
+        df = df,
+        p = p,
+        observed_df = observed_df,
+        row_key_cols = c("sample", "batch")
+      )
     })
-
+    
     output$hotelling_pca <- renderPlot({
       res <- req(hotelling_res_r())
       res$pca_plot
     })
-
+    
     output$outliers_table <- renderUI({
       res <- req(hotelling_res_r())
-
+      
       ui_outliers_table(
         detect_result = res,
         top_n = 10L,
@@ -507,7 +515,7 @@ mod_correct_server <- function(id, data, params) {
         class_col = "class"
       )
     })
-
+    
     output$download_ev_btn <- renderUI({
       req(filtered_corrected_r())
       download_card(
@@ -526,7 +534,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
-
+    
     output$download_ev_data <- downloadHandler(
       filename = function() {
         sprintf("extreme_values_%s.xlsx", Sys.Date())
@@ -537,12 +545,16 @@ mod_correct_server <- function(id, data, params) {
           qcImputeM = input$qcImputeM,
           samImputeM = input$samImputeM
         )
-
-        outlier_wb <- export_outliers_xlsx(p, d)
+        
+        outlier_wb <- export_outliers_xlsx(
+          p = p,
+          d = d,
+          hotelling_res = req(hotelling_res_r())
+        )
         openxlsx::saveWorkbook(outlier_wb, file, overwrite = TRUE)
       }
     )
-
+    
     #---------- 2.3 Post-correction Transformation server
     # Requires filtered and corrected data
     output$transform_block <- renderUI({
@@ -553,39 +565,39 @@ mod_correct_server <- function(id, data, params) {
         uiOutput(ns("trn_withhold_selectors_ui"))
       )
     })
-
+    
     output$transform_selection_ui <- renderUI({
       req(filtered_corrected_r())
-
+      
       df <- filtered_corrected_df_r()
       mc <- .correction_metab_cols(df)
-
+      
       ui_post_cor_transform(df, mc, ns = session$ns)
     })
-
+    
     transformed_r <- reactive({
       req(filtered_corrected_r())
-
+      
       transform_method <- input$transform %||% "none"
       ex_istd <- isTRUE(input$ex_ISTD)
       withhold_on <- isTRUE(input$trn_withhold_checkbox)
-
+      
       df_filtered <- filtered_corrected_df_r()
       withheld <- if (withhold_on) {
         .mod_correct_collect_withheld(input, df_filtered)
       } else {
         character(0)
       }
-
+      
       transform_data(filtered_corrected_r(), transform_method, withheld, ex_istd)
     })
-
-
+    
+    
     observe({
       req(filtered_corrected_r(), input$trn_withhold_checkbox)
-
+      
       max_withhold <- max(ncol(corrected_r()$df) - 4, 0)
-
+      
       output$trn_withhold_ui <- renderUI({
         if (input$transform == "TRN") {
           numericInput(
@@ -598,23 +610,23 @@ mod_correct_server <- function(id, data, params) {
         }
       })
     })
-
+    
     output$trn_withhold_selectors_ui <- renderUI({
       req(filtered_corrected_r())
       n_withhold <- input$trn_withhold_n %||% 0L
       if (n_withhold <= 0L || !identical(input$transform %||% "none", "TRN")) {
         return(NULL)
       }
-
+      
       ex_istd <- isTRUE(input$ex_ISTD)
-
+      
       cols <- .correction_metab_cols(corrected_r()$df)
       if (ex_istd) {
         cols <- setdiff(cols, c(grep("ISTD", cols, value = TRUE), grep("ITSD", cols, value = TRUE)))
       }
-
+      
       dropdown_choices <- c("Select a column..." = "", cols)
-
+      
       lapply(seq_len(n_withhold), function(i) {
         selectInput(
           inputId  = ns(paste0("trn_withhold_col_", i)),
@@ -624,8 +636,8 @@ mod_correct_server <- function(id, data, params) {
         )
       })
     })
-
-
+    
+    
     output$cor_data <- renderTable({
       req(transformed_r())
       .samples_normalized_export_df(
@@ -635,23 +647,23 @@ mod_correct_server <- function(id, data, params) {
         round_metabolites = TRUE
       )
     })
-
+    
     output$post_transform_rsd_compare <- renderUI({
       req(transformed_r())
-
+      
       d <- list(
         filtered_corrected = filtered_corrected_r(),
         filtered           = filtered_r(),
         transformed        = transformed_r()
       )
-
+      
       ui_rsd_stats(
         compare_to = "transformed_cor_data",
         list(remove_imputed = input$remove_imputed),
         d
       )
     })
-
+    
     output$download_tc_rsd_btn <- renderUI({
       req(transformed_r())
       if (!identical(input$transform, "none")) {
@@ -674,7 +686,7 @@ mod_correct_server <- function(id, data, params) {
         NULL
       }
     })
-
+    
     output$download_tc_rsd_data <- downloadHandler(
       filename = function() {
         sprintf("transformed_rsd_stats_%s.xlsx", Sys.Date())
@@ -684,18 +696,18 @@ mod_correct_server <- function(id, data, params) {
           rsd_compare = "transformed_cor_data",
           remove_imputed = input$remove_imputed
         )
-
+        
         d <- list(
           filtered_corrected = filtered_corrected_r(),
           filtered           = filtered_r(),
           transformed        = transformed_r()
         )
-
+        
         stats_wb <- export_stats_xlsx(p, d)
         openxlsx::saveWorkbook(stats_wb, file, overwrite = TRUE)
       }
     )
-
+    
     output$download_cor_btn <- renderUI({
       req(transformed_r())
       download_card(
@@ -728,7 +740,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
-
+    
     output$download_cor_data <- downloadHandler(
       filename = function() {
         paste0("corrected_data_", Sys.Date(), ".xlsx")
@@ -738,7 +750,7 @@ mod_correct_server <- function(id, data, params) {
         tr <- isolate(transformed_r())
         cr <- isolate(corrected_r())
         p_in <- params()
-
+        
         p <- list(
           sample_col = p_in$sample_col,
           batch_col = p_in$batch_col,
@@ -757,7 +769,7 @@ mod_correct_server <- function(id, data, params) {
           no_control = isTRUE(p_in$no_control),
           control_class = p_in$control_class
         )
-
+        
         rv <- list(
           cleaned            = cleaned_r(),
           filtered           = filtered_r(),
@@ -766,45 +778,45 @@ mod_correct_server <- function(id, data, params) {
           filtered_corrected = fc,
           transformed        = tr
         )
-
+        
         wb <- export_xlsx(p, rv)
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
       }
     )
-
+    
     #---------- 2.4 Metabolite Correlations
     # Requires filtered(), filtered_corrected_r(), and transformed_r()
     output$correlation_slider <- renderUI({
       req(transformed_r())
       ui_correlation_slider(ns = session$ns)
     })
-
+    
     .compute_corr <- function(df) {
       metab <- .correction_metab_cols(df)
       compute_pairwise_metabolite_correlations(df, metab)
     }
-
+    
     all_corr_r <- reactiveVal(NULL)
-
+    
     computed_key_r <- reactiveVal(NA_character_)
-
+    
     corr_key_r <- reactive({
       req(filtered_r(), filtered_corrected_r())
-
+      
       remove_imputed <- isTRUE(input$remove_imputed)
       tr_method <- input$transform %||% "none"
       include_trn <- !identical(tr_method, "none")
-
+      
       raw_df <- filtered_r()$df
       cor_df <- .mod_correct_pick_df(filtered_corrected_r(), remove_imputed)
-
+      
       # Only touch transformed_r() when it should exist for the key
       trn_df <- if (include_trn) {
         .mod_correct_pick_df(req(transformed_r()), remove_imputed)
       } else {
         NULL
       }
-
+      
       .mod_correct_corr_key(
         raw_df = raw_df,
         corrected_df = cor_df,
@@ -814,7 +826,7 @@ mod_correct_server <- function(id, data, params) {
         include_transformed = include_trn
       )
     })
-
+    
     observeEvent(
       list(
         filtered_r(), filtered_corrected_r(), transformed_r(),
@@ -825,19 +837,19 @@ mod_correct_server <- function(id, data, params) {
       },
       ignoreInit = TRUE
     )
-
+    
     output$compute_corr_ui <- renderUI({
       req(filtered_corrected_r())
       key <- corr_key_r()
       req(nzchar(key))
-
+      
       # IMPORTANT: force dependency on computed_key_r()
       ck <- computed_key_r()
-
+      
       if (!is.na(ck) && identical(ck, key)) {
         return(NULL)
       }
-
+      
       tagList(
         div(
           style = "width: 100%; text-align: center;",
@@ -857,17 +869,17 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
-
-
+    
+    
     compute_all_correlations_r <- eventReactive(input$compute_corr, {
       req(filtered_r(), filtered_corrected_r(), transformed_r())
-
+      
       remove_imputed <- isTRUE(input$remove_imputed)
       transform_meth <- input$transform %||% "none"
-
+      
       raw_df <- filtered_r()$df
       cor_df <- .mod_correct_pick_df(filtered_corrected_r(), remove_imputed)
-
+      
       # Only compute transformed correlations if transform != "none"
       do_transformed <- !identical(transform_meth, "none")
       transformed_df <- if (do_transformed) {
@@ -875,7 +887,7 @@ mod_correct_server <- function(id, data, params) {
       } else {
         NULL
       }
-
+      
       list(
         raw = .compute_corr(raw_df),
         corrected = .compute_corr(cor_df),
@@ -884,28 +896,28 @@ mod_correct_server <- function(id, data, params) {
         transform_method = transform_meth
       )
     })
-
-
+    
+    
     observeEvent(input$compute_corr, ignoreInit = TRUE, {
       shinyjs::disable("compute_corr")
       output$corr_spinner <- renderUI({
         on.exit(shinyjs::enable("compute_corr"), add = TRUE)
-
+        
         res <- compute_all_correlations_r()
         all_corr_r(res)
-
+        
         computed_key_r(corr_key_r())
         NULL
       })
     })
     output$corr_spinner <- renderUI(NULL)
-
-
+    
+    
     output$corr_range_info <- renderUI({
       all_corr <- req(all_corr_r())
       ui_corr_range_info(all_corr, input$corr_threshold)
     })
-
+    
     output$download_corr_btn <- renderUI({
       req(all_corr_r())
       download_card(
@@ -924,7 +936,7 @@ mod_correct_server <- function(id, data, params) {
         )
       )
     })
-
+    
     output$download_corr_data <- downloadHandler(
       filename = function() {
         paste0("metabolite_correlations_", Sys.Date(), ".xlsx")
@@ -934,7 +946,7 @@ mod_correct_server <- function(id, data, params) {
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
       }
     )
-
+    
     #---------- Next: Visualize Data
     output$next_visualization_ui <- renderUI({
       # req(all_corr_r())
@@ -952,7 +964,7 @@ mod_correct_server <- function(id, data, params) {
       )
       updateTabsetPanel(session$rootScope(), "main_steps", "tab_visualize")
     })
-
+    
     #--------- Module outputs
     correct_params <- reactive(list(
       qcImputeM = input$qcImputeM %||% "nothing_to_impute",
@@ -967,7 +979,7 @@ mod_correct_server <- function(id, data, params) {
       keep_corrected_qcs = isTRUE(input$keep_corrected_qcs),
       corr_threshold = input$corr_threshold
     ))
-
+    
     list(
       imputed            = imputed_r,
       corrected          = corrected_r,

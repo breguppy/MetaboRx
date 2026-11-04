@@ -10,8 +10,14 @@
 #' counts down and breaking ties by row then column.
 #' Selection is independent of the sample's Mahalanobis flag.
 #'
-#' Missing values are imputed for PCA. Imputed values are excluded from
-#' the metabolite Z-score calculation.
+#' Missing values are imputed for PCA. Supply observed_df containing corrected
+#' intensities with original missing cells restored to NA when df has already
+#' been imputed. Without observed_df, only missing cells still in df can be
+#' excluded. Output rows preserve the input order.
+#'
+#' @param observed_df Optional corrected data frame with observed intensities
+#'   only. Must have the same unique row keys, class labels and metabolites.
+#' @param row_key_cols Columns uniquely identifying samples in both inputs.
 #'
 #' Legacy threshold arguments are accepted for compatibility and ignored.
 #' `z_class` and `abs_z_class` are compatibility aliases for pooled scores.
@@ -36,7 +42,9 @@ detect_hotelling_nonqc_dual_z <- function(
     drop_constant = TRUE,
     const_tol = 1e-12,
     ridge_factor = 1e-6,
-    make_pca_plot = TRUE
+    make_pca_plot = TRUE,
+    observed_df = NULL,
+    row_key_cols = c("sample", "batch")
 ) {
   missing_meta <- setdiff(meta_cols, names(df))
   if (length(missing_meta) > 0L) {
@@ -57,12 +65,57 @@ detect_hotelling_nonqc_dual_z <- function(
     stop("No numeric metabolite columns found.")
   }
   
-  # Preserve observed values for the metabolite screen.
-  X_observed <- as.matrix(df[, met_cols, drop = FALSE])
+  if (length(row_key_cols) == 0L || anyDuplicated(row_key_cols)) {
+    stop("row_key_cols must contain distinct identifying column names.")
+  }
   
-  if (anyNA(X_observed)) {
+  # Length prefixes make keys unambiguous even when labels contain separators.
+  row_keys <- function(x) {
+    missing_keys <- setdiff(row_key_cols, names(x))
+    if (length(missing_keys) > 0L) {
+      stop("Missing row key columns: ", paste(missing_keys, collapse = ", "))
+    }
+    if (anyNA(x[, row_key_cols, drop = FALSE])) {
+      stop("Row key columns must not contain missing values.")
+    }
+    parts <- lapply(x[row_key_cols], function(column) {
+      values <- as.character(column)
+      paste0(nchar(values, type = "bytes"), ":", values)
+    })
+    keys <- do.call(paste0, parts)
+    if (anyDuplicated(keys)) {
+      stop("row_key_cols must uniquely identify every row.")
+    }
+    keys
+  }
+  
+  input_keys <- row_keys(df)
+  align_rows <- function(x) {
+    keys <- row_keys(x)
+    if (length(keys) != length(input_keys) || !setequal(keys, input_keys)) {
+      stop("Input and reference data must contain the same row keys.")
+    }
+    x <- x[match(input_keys, keys), , drop = FALSE]
+    if (!class_col %in% names(x) ||
+        !identical(as.character(x[[class_col]]), as.character(df[[class_col]]))) {
+      stop("Class labels must agree for matching row keys.")
+    }
+    x
+  }
+  
+  observed_source <- if (is.null(observed_df)) df else align_rows(observed_df)
+  if (!all(met_cols %in% names(observed_source)) ||
+      !all(vapply(observed_source[met_cols], is.numeric, logical(1)))) {
+    stop("observed_df must contain all numeric metabolite columns from df.")
+  }
+  X_observed <- as.matrix(observed_source[, met_cols, drop = FALSE])
+  # Cells still missing in the PCA input cannot be treated as observed.
+  X_observed[!is.finite(as.matrix(df[, met_cols, drop = FALSE]))] <- NA_real_
+  
+  if (anyNA(df[, met_cols, drop = FALSE])) {
     results <- impute_missing(df, met_cols, p$qcImputeM, p$samImputeM)
-    df <- results$df
+    # Restore input order before combining PCA data, observed values and metadata.
+    df <- align_rows(results$df)
   }
   
   X_raw <- as.matrix(df[, met_cols, drop = FALSE])
@@ -355,6 +408,8 @@ detect_hotelling_nonqc_dual_z <- function(
     pca_plot = pca_plot,
     pc_loadings = pc_loadings,
     params = list(
+      observed_reference_supplied = !is.null(observed_df),
+      row_key_cols = row_key_cols,
       alpha = alpha,
       cutoff = cutoff,
       value_z_threshold = value_z_threshold,
