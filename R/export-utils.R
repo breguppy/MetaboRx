@@ -614,7 +614,7 @@ report_text_ev_detection <- function() {
       htmltools::tags$li(
         htmltools::tags$strong("Squared Mahalanobis distance. "),
         "MetaboRx projects study and QC samples with complete, finite data ",
-        "into PC1–PC2 space. Their combined scores determine the center ",
+        "into PC1-PC2 space. Their combined scores determine the center ",
         "and covariance used to calculate squared Mahalanobis distances."
       ),
       htmltools::tags$li(
