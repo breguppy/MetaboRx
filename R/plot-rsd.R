@@ -165,16 +165,16 @@ plot_met_rsd_distributions_from_results <- function(rsd_results,
       fill = NULL,
       color = NULL
     ) +
-    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       strip.placement = "outside",
       strip.background = ggplot2::element_rect(fill = "white", colour = "grey30"),
       strip.text = ggplot2::element_text(size = 12, face = "bold"),
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
       axis.title = ggplot2::element_text(size = 14, face = "bold"),
-      axis.text = ggplot2::element_text(size = 10),
+      axis.text = ggplot2::element_text(size = 12),
       legend.position = "top",
-      legend.text = ggplot2::element_text(size = 10),
+      legend.text = ggplot2::element_text(size = 12),
       panel.border = ggplot2::element_rect(
         color = "black",
         fill = NA,
@@ -279,16 +279,16 @@ plot_class_rsd_distributions_from_results <- function(rsd_results,
       fill = NULL,
       color = NULL
     ) +
-    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       strip.placement = "outside",
       strip.background = ggplot2::element_rect(fill = "white", colour = "grey30"),
       strip.text = ggplot2::element_text(size = 12, face = "bold"),
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
       axis.title = ggplot2::element_text(size = 14, face = "bold"),
-      axis.text = ggplot2::element_text(size = 10),
+      axis.text = ggplot2::element_text(size = 12),
       legend.position = "top",
-      legend.text = ggplot2::element_text(size = 10),
+      legend.text = ggplot2::element_text(size = 12),
       panel.border = ggplot2::element_rect(
         color = "black",
         fill = NA,

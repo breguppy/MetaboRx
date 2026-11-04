@@ -687,13 +687,13 @@ plot_pca_from_result <- function(p, pca_pair, compared_to) {
 
   point_size <- if (isTRUE(use_shape)) 2.5 else 2
 
-  big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
+  big_font_theme <- ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
       axis.title = ggplot2::element_text(size = 14, face = "bold"),
-      axis.text = ggplot2::element_text(size = 10),
-      legend.title = ggplot2::element_text(size = 12, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10)
+      axis.text = ggplot2::element_text(size = 12),
+      legend.title = ggplot2::element_text(size = 14, face = "bold"),
+      legend.text = ggplot2::element_text(size = 12)
     )
 
   panel_theme <- ggplot2::theme(
@@ -851,14 +851,14 @@ plot_pca_loading_from_result <- function(
   lim <- max(c(before_top$abs_loading, after_top$abs_loading), na.rm = TRUE)
   y_limits <- c(-lim, lim)
 
-  big_font_theme <- ggplot2::theme_minimal(base_size = 10) +
+  big_font_theme <- ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
       axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      axis.text = ggplot2::element_text(size = 9),
-      strip.text = ggplot2::element_text(size = 11, face = "bold"),
-      legend.title = ggplot2::element_text(size = 11, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10)
+      axis.text = ggplot2::element_text(size = 12),
+      strip.text = ggplot2::element_text(size = 12, face = "bold"),
+      legend.title = ggplot2::element_text(size = 14, face = "bold"),
+      legend.text = ggplot2::element_text(size = 12)
     )
 
   mk_plot <- function(df, title) {

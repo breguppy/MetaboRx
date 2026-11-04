@@ -86,7 +86,25 @@ make_complete_export_fixture <- function(fig_format) {
     ),
     z_global = z_scores,
     z_class = z_scores,
-    pca_plot = ggplot2::ggplot()
+    pca_plot = ggplot2::ggplot(),
+    params = list(
+      alpha = 0.05,
+      cutoff = stats::qchisq(0.95, df = 2L),
+      value_z_threshold = 2,
+      flag_fraction = 0.10,
+      flagging_rule = paste(
+        "Largest 10% of values with absolute Z-score greater than 2",
+        "within each scoring pool"
+      ),
+      z_score_reference = paste(
+        "Non-QC samples pooled together;",
+        "QCs scored separately"
+      ),
+      log_transform = TRUE,
+      log_offset = 1,
+      class_col = "class",
+      qc_label = "QC"
+    )
   )
 
   p <- list(
@@ -245,6 +263,48 @@ if (identical(Sys.getenv("METABORX_RUN_EXPORT_INTEGRATION"), "true")) {
       files = corrected_workbook,
       exdir = extract_dir
     )
+    
+    outlier_workbook <- contents$Name[
+      grepl("^extreme_values_.*\\.xlsx$", contents$Name)
+    ]
+    expect_length(outlier_workbook, 1L)
+    
+    utils::unzip(
+      result$file,
+      files = outlier_workbook,
+      exdir = extract_dir
+    )
+    
+    outlier_path <- file.path(extract_dir, outlier_workbook)
+    
+    expect_identical(
+      openxlsx::getSheetNames(outlier_path),
+      c(
+        "Potential Outlier Samples",
+        "Study Extreme Values",
+        "QC Extreme Values"
+      )
+    )
+    
+    expected_columns <- c(
+      "Sample",
+      "Class",
+      "Metabolite",
+      "Z_score",
+      "Absolute_Z_score",
+      "Squared_Mahalanobis_distance"
+    )
+    
+    for (sheet in c("Study Extreme Values", "QC Extreme Values")) {
+      candidates <- openxlsx::read.xlsx(
+        outlier_path,
+        sheet = sheet,
+        startRow = 3
+      )
+      
+      expect_named(candidates, expected_columns)
+      expect_equal(nrow(candidates), 0L)
+    }
     
     settings <- openxlsx::read.xlsx(
       file.path(extract_dir, corrected_workbook),

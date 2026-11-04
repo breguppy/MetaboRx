@@ -187,7 +187,7 @@ mk_plot <- function(d_all, x, y, facet_labs, compared_to) {
       labeller = ggplot2::as_labeller(facet_labs, default = identity),
       strip.position = "top"
     ) +
-    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       strip.placement = "outside",
       strip.background = ggplot2::element_rect(fill = "white", colour = "grey30"),
@@ -207,7 +207,7 @@ mk_plot <- function(d_all, x, y, facet_labs, compared_to) {
         face = "bold"
       ),
       axis.title = ggplot2::element_text(size = 14, face = "bold"),
-      axis.text = ggplot2::element_text(size = 10),
+      axis.text = ggplot2::element_text(size = 12),
       legend.position = "none",
       panel.border = ggplot2::element_rect(
         color = "black",
@@ -363,14 +363,14 @@ pct_tbl <- function(d) {
 #' @keywords internal
 #' @noRd
 .scatter_theme <- function() {
-  ggplot2::theme_minimal(base_size = 10) +
+  ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
       axis.title = ggplot2::element_text(size = 12),
-      axis.text = ggplot2::element_text(size = 10),
+      axis.text = ggplot2::element_text(size = 12),
       panel.border = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 1),
-      legend.title = ggplot2::element_text(size = 10, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10),
+      legend.title = ggplot2::element_text(size = 14, face = "bold"),
+      legend.text = ggplot2::element_text(size = 12),
       legend.position = "bottom",
       legend.box = "horizontal",
       legend.box.just = "center",

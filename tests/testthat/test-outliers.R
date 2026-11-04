@@ -1,273 +1,391 @@
 # tests/testthat/test-detect_hotelling_nonqc_dual_z.R
 
-testthat::test_that("detect_hotelling_nonqc_dual_z errors when required metadata columns are missing", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
+hotelling_test_params <- function() {
+  list(qcImputeM = "median", samImputeM = "median")
+}
 
-  df <- data.frame(
-    sample = paste0("S", 1:5),
+hotelling_test_data <- function() {
+  n <- 12L
+  i <- seq_len(n)
+  
+  data.frame(
+    sample = paste0("S", seq_len(3L * n)),
     batch = "b1",
-    class = c("A", "A", "A", "QC", "QC"),
-    # order column intentionally missing
-    m1 = rnorm(5),
+    class = rep(c("A", "B", "QC"), each = n),
+    order = seq_len(3L * n),
+    m1 = 100 + rep(i, 3L) + rep(c(0, 2, 8), each = n),
+    m2 = 50 + rep((i %% 4L) * 2, 3L) +
+      rep(c(0, 1, -4), each = n),
+    m3 = 200 + rep((i %% 5L) * 3, 3L) +
+      rep(c(0, -2, 6), each = n),
     stringsAsFactors = FALSE
   )
+}
 
-  testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df = df, p = p),
-    "Missing metadata columns"
-  )
-})
-
-testthat::test_that("detect_hotelling_nonqc_dual_z errors when class column is missing (via meta_cols check)", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-
+# Each metabolite has exactly one qualifying value in each scoring pool.
+# Identical columns also provide exact ties for testing selection order.
+hotelling_selection_data <- function(n_metabolites = 20L) {
+  n <- 40L
+  
   df <- data.frame(
-    sample = paste0("S", 1:5),
+    sample = paste0("S", seq_len(2L * n)),
     batch = "b1",
-    order = 1:5,
-    m1 = rnorm(5),
+    class = c(rep(c("A", "B"), each = n / 2L), rep("QC", n)),
+    order = seq_len(2L * n),
     stringsAsFactors = FALSE
   )
+  
+  study_values <- as.numeric(seq_len(n))
+  study_values[1L] <- 10000
+  
+  qc_values <- as.numeric(seq_len(n))
+  qc_values[1L] <- -10000
+  
+  for (j in seq_len(n_metabolites)) {
+    df[[paste0("m", j)]] <- c(study_values, qc_values)
+  }
+  
+  df
+}
 
+testthat::test_that("required metadata columns must be present", {
+  df <- hotelling_test_data()
+  p <- hotelling_test_params()
+  
+  df$order <- NULL
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df = df, p = p),
+    detect_hotelling_nonqc_dual_z(df, p),
+    "Missing metadata columns in df: order"
+  )
+  
+  df$order <- seq_len(nrow(df))
+  df$class <- NULL
+  testthat::expect_error(
+    detect_hotelling_nonqc_dual_z(df, p),
     "Missing metadata columns in df: class"
   )
 })
 
-
-testthat::test_that("detect_hotelling_nonqc_dual_z errors when no numeric metabolite columns exist", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-
-  df <- data.frame(
-    sample = paste0("S", 1:5),
-    batch = "b1",
-    class = c("A", "A", "A", "QC", "QC"),
-    order = 1:5,
-    m1 = as.character(1:5), # non-numeric
-    stringsAsFactors = FALSE
-  )
-
+testthat::test_that("at least one numeric metabolite column is required", {
+  df <- hotelling_test_data()
+  df$m1 <- as.character(df$m1)
+  df$m2 <- NULL
+  df$m3 <- NULL
+  
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df = df, p = p),
+    detect_hotelling_nonqc_dual_z(df, hotelling_test_params()),
     "No numeric metabolite columns found"
   )
 })
 
-testthat::test_that("detect_hotelling_nonqc_dual_z errors when too few complete non-QC rows exist", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-
-  df <- data.frame(
-    sample = paste0("S", 1:5),
-    batch = "b1",
-    class = c("A", "A", "QC", "QC", "QC"),
-    order = 1:5,
-    m1 = c(1, NA, 1, 1, 1), # only one complete non-QC row
-    m2 = c(1, NA, 1, 1, 1),
-    stringsAsFactors = FALSE
-  )
-
+testthat::test_that("QC rows cannot satisfy the minimum study row count", {
+  df <- hotelling_test_data()
+  df <- df[c(1L, 2L, which(df$class == "QC")), , drop = FALSE]
+  
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df = df, p = p, min_complete = 3L),
+    detect_hotelling_nonqc_dual_z(
+      df,
+      hotelling_test_params(),
+      min_complete = 3L
+    ),
     "Too few complete non-QC rows"
   )
 })
 
-testthat::test_that("detect_hotelling_nonqc_dual_z errors if all metabolites are dropped as constant", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-
-  df <- data.frame(
-    sample = paste0("S", 1:6),
-    batch = "b1",
-    class = c("A", "A", "A", "QC", "QC", "QC"),
-    order = 1:6,
-    m1 = rep(10, 6),
-    m2 = rep(10, 6),
-    stringsAsFactors = FALSE
-  )
-
-  testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df = df, p = p, drop_constant = TRUE, const_tol = 1e-12),
-    "All metabolite columns were dropped as constant"
-  )
-})
-
-testthat::test_that("detect_hotelling_nonqc_dual_z returns expected structure and columns on a clean inlier dataset", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-  set.seed(1)
-
-  df <- data.frame(
-    sample = paste0("S", 1:24),
-    batch = rep(c("b1", "b2"), each = 12),
-    class = c(rep("A", 8), rep("B", 8), rep("QC", 8)),
-    order = 1:24,
-    m1 = c(rnorm(16, 100, 5), rnorm(8, 100, 5)),
-    m2 = c(rnorm(16, 50, 3), rnorm(8, 50, 3)),
-    m3 = c(rnorm(16, 200, 7), rnorm(8, 200, 7)),
-    stringsAsFactors = FALSE
-  )
-
-  # Avoid calling impute_missing by keeping complete data
+testthat::test_that("the result includes pooled scores and typed empty candidates", {
+  df <- hotelling_test_data()
   res <- detect_hotelling_nonqc_dual_z(
-    df = df,
-    p = p,
-    alpha = 0.05,
-    z_threshold = 5, # make "extreme_values" unlikely
-    class_z_threshold = 5,
+    df,
+    hotelling_test_params(),
     make_pca_plot = FALSE
   )
-
-  testthat::expect_type(res, "list")
-  testthat::expect_true(all(c("data", "extreme_values", "pca_plot", "pc_loadings", "params") %in% names(res)))
-  testthat::expect_equal(res$params$outlier_sample_z_threshold, 5)
-  testthat::expect_equal(res$params$inlier_sample_z_threshold, 5)
-
-  out_df <- res$data
-  testthat::expect_true(all(c("T2", "is_outlier_sample", "used_in_fit") %in% names(out_df)))
-  testthat::expect_equal(nrow(out_df), nrow(df))
-
-  # With very high thresholds, extreme_values should be empty in typical data
-  testthat::expect_s3_class(res$extreme_values, "data.frame")
-  testthat::expect_equal(nrow(res$extreme_values), 0L)
-  testthat::expect_true(is.null(res$pca_plot))
-})
-
-testthat::test_that("detect_hotelling_nonqc_dual_z flags an obvious outlier and returns extreme_values", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-  set.seed(2)
-
-  nA <- 15
-  nB <- 15
-  nQC <- 10
-
-  base_A <- data.frame(
-    sample = paste0("A", seq_len(nA)),
-    batch = "b1",
-    class = "A",
-    order = seq_len(nA),
-    m1 = rnorm(nA, 100, 2),
-    m2 = rnorm(nA, 50, 2),
-    m3 = rnorm(nA, 200, 3),
-    stringsAsFactors = FALSE
+  
+  testthat::expect_named(
+    res,
+    c(
+      "data", "extreme_values", "z_global", "z_class",
+      "pca_plot", "pc_loadings", "params"
+    ),
+    ignore.order = TRUE
   )
-
-  base_B <- data.frame(
-    sample = paste0("B", seq_len(nB)),
-    batch = "b1",
-    class = "B",
-    order = nA + seq_len(nB),
-    m1 = rnorm(nB, 100, 2),
-    m2 = rnorm(nB, 50, 2),
-    m3 = rnorm(nB, 200, 3),
-    stringsAsFactors = FALSE
-  )
-
-  base_QC <- data.frame(
-    sample = paste0("QC", seq_len(nQC)),
-    batch = "b1",
-    class = "QC",
-    order = nA + nB + seq_len(nQC),
-    m1 = rnorm(nQC, 100, 2),
-    m2 = rnorm(nQC, 50, 2),
-    m3 = rnorm(nQC, 200, 3),
-    stringsAsFactors = FALSE
-  )
-
-  df <- rbind(base_A, base_B, base_QC)
-
-  # Inject a clear non-QC outlier with a huge deviation in one metabolite
-  df$m1[1] <- df$m1[1] + 2000
-
-  res <- detect_hotelling_nonqc_dual_z(
-    df = df,
-    p = p,
-    alpha = 0.01, # stricter ellipse
-    z_threshold = 3,
-    class_z_threshold = 3,
-    make_pca_plot = FALSE
-  )
-
-  out_df <- res$data
-
-  testthat::expect_true(any(out_df$is_outlier_sample, na.rm = TRUE))
-  testthat::expect_true(out_df$is_outlier_sample[1])
-
-  # extreme_values should include at least the injected metabolite for that row
+  testthat::expect_equal(res$params$value_z_threshold, 2)
+  testthat::expect_equal(res$params$flag_fraction, 0.10)
+  testthat::expect_equal(nrow(res$data), nrow(df))
+  testthat::expect_null(res$pca_plot)
+  testthat::expect_identical(res$z_class, res$z_global)
+  
   ev <- res$extreme_values
   testthat::expect_s3_class(ev, "data.frame")
-  testthat::expect_true(all(c("metabolite", "value_raw", "value_log", "z_global", "z_class", "T2") %in% names(ev)))
-  testthat::expect_true(any(ev$sample == df$sample[1]))
-  testthat::expect_true(any(ev$metabolite %in% c("m1", "m2", "m3")))
+  testthat::expect_equal(nrow(ev), 0L)
+  testthat::expect_named(
+    ev,
+    c(
+      "sample", "batch", "class", "order", "metabolite",
+      "value_raw", "value_log", "z_global", "abs_z_global",
+      "z_class", "abs_z_class", "T2", "is_outlier_sample",
+      "z_threshold_used", "flag_fraction"
+    ),
+    ignore.order = TRUE
+  )
+  testthat::expect_type(ev$z_global, "double")
+  testthat::expect_type(ev$T2, "double")
+  testthat::expect_type(ev$is_outlier_sample, "logical")
 })
 
-testthat::test_that("detect_hotelling_nonqc_dual_z can call impute_missing when NAs exist (mocked) and proceeds", {
-  p <- list(qcImputeM = "median", samImputeM = "median")
-  set.seed(3)
-
-  df <- data.frame(
-    sample = paste0("S", 1:12),
-    batch = "b1",
-    class = c(rep("A", 5), rep("B", 5), rep("QC", 2)),
-    order = 1:12,
-    m1 = rnorm(12, 100, 2),
-    m2 = rnorm(12, 50, 2),
-    m3 = rnorm(12, 200, 3),
-    stringsAsFactors = FALSE
-  )
-
-  # Add missing values to force the imputation branch
-  df$m2[c(2, 7)] <- NA_real_
-
-  called <- 0L
-  imputer <- function(df_in, met_cols, qc_method, sam_method) {
-    called <<- called + 1L
-    df_out <- df_in
-    # Simple deterministic fill to keep PCA valid
-    for (m in met_cols) {
-      if (anyNA(df_out[[m]])) {
-        df_out[[m]][is.na(df_out[[m]])] <- stats::median(df_out[[m]], na.rm = TRUE)
-      }
-    }
-    list(df = df_out)
-  }
-
-  testthat::local_mocked_bindings(impute_missing = imputer)
-
+testthat::test_that("study samples are pooled and QCs are scored separately", {
+  df <- hotelling_test_data()
   res <- detect_hotelling_nonqc_dual_z(
-    df = df,
-    p = p,
+    df,
+    hotelling_test_params(),
     make_pca_plot = FALSE
   )
-
-  testthat::expect_equal(called, 1L)
-  testthat::expect_s3_class(res$data, "data.frame")
-  testthat::expect_true(all(!is.na(res$data$T2) | is.na(res$data$T2))) # existence check
+  
+  groups <- list(
+    study = which(df$class != "QC"),
+    qc = which(df$class == "QC")
+  )
+  
+  for (rows in groups) {
+    for (metabolite in c("m1", "m2", "m3")) {
+      expected <- as.numeric(scale(log2(df[[metabolite]][rows] + 1)))
+      testthat::expect_equal(
+        res$z_global[[metabolite]][rows],
+        expected
+      )
+    }
+  }
 })
 
-testthat::test_that("detect_hotelling_nonqc_dual_z returns a ggplot pca_plot when enabled (if ggplot2 is installed)", {
-  testthat::skip_if_not_installed("ggplot2")
-
-  p <- list(qcImputeM = "median", samImputeM = "median")
-  set.seed(4)
-
-  df <- data.frame(
-    sample = paste0("S", 1:30),
-    batch = rep(c("b1", "b2"), each = 15),
-    class = c(rep("A", 12), rep("B", 12), rep("QC", 6)),
-    order = 1:30,
-    m1 = rnorm(30, 100, 5),
-    m2 = rnorm(30, 50, 3),
-    m3 = rnorm(30, 200, 7),
-    stringsAsFactors = FALSE
-  )
-
+testthat::test_that("PCA uses study rows and distances use study and QC scores", {
+  df <- hotelling_test_data()
+  study <- df$class != "QC"
+  qc_row <- which(!study)[1L]
+  df$m1[qc_row] <- 500
+  
+  alpha <- 0.05
+  ridge_factor <- 1e-6
+  
   res <- detect_hotelling_nonqc_dual_z(
-    df = df,
-    p = p,
+    df,
+    hotelling_test_params(),
+    alpha = alpha,
+    ridge_factor = ridge_factor,
+    make_pca_plot = FALSE
+  )
+  
+  x <- log2(as.matrix(df[c("m1", "m2", "m3")]) + 1)
+  pca <- stats::prcomp(
+    x[study, , drop = FALSE],
+    center = TRUE,
+    scale. = TRUE
+  )
+  scores <- stats::predict(pca, newdata = x)[, 1:2, drop = FALSE]
+  score_cov <- stats::cov(scores)
+  ridge <- ridge_factor * mean(diag(score_cov))
+  
+  expected_t2 <- stats::mahalanobis(
+    scores,
+    colMeans(scores),
+    score_cov + diag(ridge, 2L)
+  )
+  cutoff <- stats::qchisq(1 - alpha, df = 2L)
+  
+  testthat::expect_identical(res$data$used_in_fit, study)
+  testthat::expect_equal(res$data$T2, unname(expected_t2))
+  testthat::expect_equal(res$params$cutoff, cutoff)
+  testthat::expect_identical(
+    res$data$is_outlier_sample,
+    unname(expected_t2 > cutoff)
+  )
+  testthat::expect_true(res$data$is_outlier_sample[qc_row])
+})
+
+testthat::test_that("the largest 10 percent above 2 are selected separately per pool", {
+  df <- hotelling_selection_data()
+  
+  res <- detect_hotelling_nonqc_dual_z(
+    df,
+    hotelling_test_params(),
+    log_transform = FALSE,
+    alpha = 1e-12,
+    make_pca_plot = FALSE
+  )
+  
+  metabolites <- paste0("m", seq_len(20L))
+  study <- df$class != "QC"
+  
+  # There are 20 qualifying values per pool, so two must be selected.
+  study_z <- as.matrix(res$z_global[study, metabolites])
+  qc_z <- as.matrix(res$z_global[!study, metabolites])
+  
+  testthat::expect_equal(sum(abs(study_z) > 2), 20L)
+  testthat::expect_equal(sum(abs(qc_z) > 2), 20L)
+  
+  ev <- res$extreme_values
+  study_ev <- ev[ev$class != "QC", , drop = FALSE]
+  qc_ev <- ev[ev$class == "QC", , drop = FALSE]
+  
+  testthat::expect_equal(nrow(study_ev), 2L)
+  testthat::expect_equal(nrow(qc_ev), 2L)
+  
+  # Exact ties resolve by input row, then input metabolite column.
+  testthat::expect_setequal(study_ev$metabolite, c("m1", "m2"))
+  testthat::expect_setequal(qc_ev$metabolite, c("m1", "m2"))
+  testthat::expect_true(all(study_ev$sample == "S1"))
+  testthat::expect_true(all(qc_ev$sample == "S41"))
+  
+  testthat::expect_true(all(study_ev$z_global > 2))
+  testthat::expect_true(all(qc_ev$z_global < -2))
+  testthat::expect_equal(ev$abs_z_global, abs(ev$z_global))
+  testthat::expect_equal(ev$z_class, ev$z_global)
+  testthat::expect_equal(ev$abs_z_class, ev$abs_z_global)
+  testthat::expect_equal(ev$z_threshold_used, rep(2, nrow(ev)))
+  testthat::expect_equal(ev$flag_fraction, rep(0.10, nrow(ev)))
+  
+  # The wide ellipse keeps these candidates inside the sample cutoff.
+  testthat::expect_false(any(ev$is_outlier_sample))
+})
+
+testthat::test_that("selection counts round down after thresholding", {
+  for (n_metabolites in c(9L, 19L)) {
+    df <- hotelling_selection_data(n_metabolites)
+    
+    res <- detect_hotelling_nonqc_dual_z(
+      df,
+      hotelling_test_params(),
+      log_transform = FALSE,
+      make_pca_plot = FALSE
+    )
+    
+    ev <- res$extreme_values
+    expected_per_pool <- floor(n_metabolites * 0.10)
+    
+    testthat::expect_equal(
+      sum(ev$class != "QC"),
+      expected_per_pool
+    )
+    testthat::expect_equal(
+      sum(ev$class == "QC"),
+      expected_per_pool
+    )
+  }
+})
+
+testthat::test_that("a metabolite constant within QC has missing QC Z-scores", {
+  df <- hotelling_test_data()
+  qc <- df$class == "QC"
+  df$m1[qc] <- 110
+  
+  res <- detect_hotelling_nonqc_dual_z(
+    df,
+    hotelling_test_params(),
+    make_pca_plot = FALSE
+  )
+  
+  testthat::expect_true(all(is.na(res$z_global$m1[qc])))
+  testthat::expect_true(all(is.finite(res$z_global$m1[!qc])))
+  testthat::expect_false(
+    any(
+      res$extreme_values$class == "QC" &
+        res$extreme_values$metabolite == "m1"
+    )
+  )
+})
+
+testthat::test_that("metabolites excluded from PCA still receive pooled Z-scores", {
+  df <- hotelling_test_data()
+  study <- df$class != "QC"
+  df[study, c("m1", "m2", "m3")] <- 10
+  
+  res <- suppressMessages(
+    detect_hotelling_nonqc_dual_z(
+      df,
+      hotelling_test_params(),
+      make_pca_plot = FALSE
+    )
+  )
+  
+  testthat::expect_null(res$pc_loadings)
+  testthat::expect_null(res$pca_plot)
+  testthat::expect_true(all(is.na(res$data$T2)))
+  testthat::expect_false(any(res$data$used_in_fit))
+  testthat::expect_true(all(is.na(res$z_global$m1[study])))
+  testthat::expect_true(all(is.finite(res$z_global$m1[!study])))
+  testthat::expect_setequal(
+    res$params$screened_metabolites,
+    c("m1", "m2", "m3")
+  )
+  testthat::expect_length(res$params$retained_metabolites, 0L)
+})
+
+testthat::test_that("imputation supports PCA but observed values determine Z-scores", {
+  df <- hotelling_test_data()
+  p <- list(qcImputeM = "median", samImputeM = "mean")
+  missing_rows <- c(2L, which(df$class == "QC")[1L])
+  df$m2[missing_rows] <- NA_real_
+  fill <- stats::median(df$m2, na.rm = TRUE)
+  calls <- 0L
+  
+  imputer <- function(df_in, met_cols, qc_method, sam_method) {
+    calls <<- calls + 1L
+    testthat::expect_setequal(met_cols, c("m1", "m2", "m3"))
+    testthat::expect_identical(qc_method, p$qcImputeM)
+    testthat::expect_identical(sam_method, p$samImputeM)
+    
+    df_in$m2[is.na(df_in$m2)] <- fill
+    list(df = df_in)
+  }
+  
+  testthat::local_mocked_bindings(impute_missing = imputer)
+  
+  res <- detect_hotelling_nonqc_dual_z(
+    df,
+    p,
+    make_pca_plot = FALSE
+  )
+  
+  testthat::expect_equal(calls, 1L)
+  testthat::expect_equal(
+    res$data$m2[missing_rows],
+    rep(fill, length(missing_rows))
+  )
+  testthat::expect_true(all(is.finite(res$data$T2)))
+  testthat::expect_true(all(is.na(res$z_global$m2[missing_rows])))
+  
+  for (rows in list(which(df$class != "QC"), which(df$class == "QC"))) {
+    observed_rows <- rows[!is.na(df$m2[rows])]
+    expected <- as.numeric(
+      scale(log2(df$m2[observed_rows] + 1))
+    )
+    
+    testthat::expect_equal(
+      res$z_global$m2[observed_rows],
+      expected
+    )
+  }
+  
+  ev <- res$extreme_values
+  testthat::expect_false(
+    any(ev$sample %in% df$sample[missing_rows] & ev$metabolite == "m2")
+  )
+})
+
+testthat::test_that("the PCA plot and loadings are returned when enabled", {
+  testthat::skip_if_not_installed("ggplot2")
+  df <- hotelling_test_data()
+  
+  res <- detect_hotelling_nonqc_dual_z(
+    df,
+    hotelling_test_params(),
     make_pca_plot = TRUE
   )
-
+  
   testthat::expect_s3_class(res$pca_plot, "ggplot")
+  testthat::expect_equal(nrow(res$pca_plot$data), nrow(df))
   testthat::expect_s3_class(res$pc_loadings, "data.frame")
-  testthat::expect_true(all(c("metabolite", "PC1", "PC2") %in% names(res$pc_loadings)))
+  testthat::expect_named(res$pc_loadings, c("metabolite", "PC1", "PC2"))
+  testthat::expect_setequal(
+    res$pc_loadings$metabolite,
+    c("m1", "m2", "m3")
+  )
 })
