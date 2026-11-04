@@ -1187,7 +1187,6 @@ ui_outliers_table <- function(
       value_z_threshold,
       100 * flag_fraction
     ),
-    "Z-scores across all metabolites are selected, with the count rounded down. ",
     "Selection is independent of the sample's Mahalanobis flag. ",
     "QC values are scored and selected separately."
   )
