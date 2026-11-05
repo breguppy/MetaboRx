@@ -32,7 +32,7 @@ mod_visualize_ui <- function(id) {
         uiOutput(ns("met_plot_selectors")),
         width = 400
       ),
-      plotOutput(ns("metab_scatter"), height = "600px", width = "600px") |> withSpinner(color = "#404040"),
+      plotOutput(ns("metab_scatter"), height = "510px", width = "500px") |> withSpinner(color = "#404040"),
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(
@@ -60,7 +60,7 @@ mod_visualize_ui <- function(id) {
         ui_rsd_eval(ns),
         width = 400
       ),
-      plotOutput(ns("rsd_comparison_plot"), height = "540px", width = "900px") |> withSpinner(color = "#404040")
+      plotOutput(ns("rsd_comparison_plot"), height = "490px", width = "900px") |> withSpinner(color = "#404040")
     )),
     card(layout_sidebar(
       sidebar = ui_sidebar_block(

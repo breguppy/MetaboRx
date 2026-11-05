@@ -48,5 +48,16 @@ met_scatter_rf <- function(data_raw, data_cor, i, scatter_context = NULL) {
       )
   }
 
-  p + lty_scale + .scatter_theme()
+  p +
+    lty_scale +
+    ggplot2::labs(color = "Sample Type:") +
+    ggplot2::guides(
+      colour = ggplot2::guide_legend(order = 2, nrow = 1)
+    ) +
+    .scatter_theme() +
+    ggplot2::theme(
+      legend.box = "vertical",
+      legend.spacing.y = grid::unit(0, "pt"),
+      legend.margin = ggplot2::margin(t = 0, r = 2, b = 0, l = 2)
+    )
 }

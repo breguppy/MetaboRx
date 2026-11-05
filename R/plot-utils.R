@@ -366,7 +366,7 @@ pct_tbl <- function(d) {
   ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"),
-      axis.title = ggplot2::element_text(size = 12),
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
       axis.text = ggplot2::element_text(size = 12),
       panel.border = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 1),
       legend.title = ggplot2::element_text(size = 14, face = "bold"),

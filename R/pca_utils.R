@@ -885,36 +885,50 @@ plot_pca_loading_from_result <- function(
 
   p_before <- mk_plot(before_top, "Before")
   p_after <- mk_plot(after_top, "After")
-
-  p_leg <- ggplot2::ggplot(before_top, ggplot2::aes(x = variable_wrapped, y = loading, fill = sign)) +
-    ggplot2::geom_col() +
+  
+  p_leg <- ggplot2::ggplot(
+    before_top,
+    ggplot2::aes(x = variable_wrapped, y = loading, fill = sign)
+  ) +
+    ggplot2::geom_col(show.legend = TRUE) +
     ggplot2::scale_fill_manual(
-      values = c("Positive" = "#4C9F50", "Negative" = "#BE0032"),
       name = "Sign",
+      values = c("Positive" = "#4C9F50", "Negative" = "#BE0032"),
+      limits = c("Positive", "Negative"),
       drop = FALSE
     ) +
     ggplot2::guides(
-      y = "none",
-      x = "none",
-      fill = ggplot2::guide_legend(override.aes = list(alpha = 1))
+      fill = ggplot2::guide_legend(direction = "horizontal", nrow = 1)
     ) +
     big_font_theme +
-    ggplot2::theme(legend.position = "right")
-
+    ggplot2::theme(
+      legend.position = "bottom",
+      legend.justification = "center"
+    )
+  
   leg <- cowplot::get_legend(p_leg)
-
-  comb <- cowplot::plot_grid(
-    p_before, p_after, leg,
+  
+  panels <- cowplot::plot_grid(
+    p_before,
+    p_after,
     nrow = 1,
-    rel_widths = c(0.7, 0.7, 0.22),
-    labels = NULL,
     align = "hv",
     axis = "tblr"
   )
-
+  
+  comb <- cowplot::plot_grid(
+    panels,
+    leg,
+    ncol = 1,
+    rel_heights = c(1, 0.08)
+  )
+  
   cowplot::ggdraw() +
     cowplot::draw_label(
-      paste0("Top ", top_n, " Loadings for PC1 and PC2, Before vs After ", compared_to),
+      paste0(
+        "Top ", top_n,
+        " Loadings for PC1 and PC2, Before vs After ", compared_to
+      ),
       fontface = "bold",
       x = 0.5,
       y = 0.98,
