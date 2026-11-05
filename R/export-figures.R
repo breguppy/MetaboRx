@@ -56,7 +56,7 @@ export_figures <- function(p,
         plot = plot,
         width = w,
         height = h,
-        units = "in",
+        units = "mm",
         dpi = 300,
         bg = "white"
       )
@@ -68,7 +68,7 @@ export_figures <- function(p,
           plot = plot,
           width = w,
           height = h,
-          units = "in",
+          units = "mm",
           device = pdf_device
         )
       }
@@ -151,13 +151,13 @@ export_figures <- function(p,
 
     for (i in seq_along(rsd_res$rsd_plots)) {
       rsd_path <- file.path(rsd_dir, sprintf("%s.%s", rsd_res$plot_names[i], fmt))
-      rsd_paths[i] <- save_plot(rsd_path, rsd_res$rsd_plots[[i]], 9.375, 5.625)
+      rsd_paths[i] <- save_plot(rsd_path, rsd_res$rsd_plots[[i]], 238, 130)
       shiny::incProgress(1 / total_steps, detail = "Saved: rsd figures")
     }
 
     for (i in seq_along(pca_res$pca_plots)) {
       pca_path <- file.path(pca_dir, sprintf("%s.%s", pca_res$plot_names[i], fmt))
-      pca_paths[i] <- save_plot(pca_path, pca_res$pca_plots[[i]], 12.5, 5.521)
+      pca_paths[i] <- save_plot(pca_path, pca_res$pca_plots[[i]], 317.5, 140)
       shiny::incProgress(1 / total_steps, detail = "Saved: pca figure")
     }
 
@@ -166,8 +166,8 @@ export_figures <- function(p,
       pca_loading_paths[i] <- save_plot(
         loading_path,
         pca_res$pca_loading_plots[[i]],
-        10.417,
-        5.521
+        264.5,
+        140
       )
       shiny::incProgress(1 / total_steps, detail = "Saved: pca loading figure")
     }
@@ -195,7 +195,7 @@ export_figures <- function(p,
         )
         safe <- gsub("[^A-Za-z0-9_\\-]+", "_", metab)
         path <- file.path(met_dir, sprintf("%s.%s", safe, fmt))
-        met_paths[i] <- save_plot(path, fig, 6.25, 6.25)
+        met_paths[i] <- save_plot(path, fig, 132, 135)
       })
       shiny::incProgress(1 / total_steps, detail = paste("Saved:", safe))
     }

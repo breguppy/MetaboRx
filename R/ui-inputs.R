@@ -65,7 +65,7 @@ ui_nonmet_cols <- function(cols, ns = identity) {
     ),
     tooltip(
       selectInput(ns("class_col"), "class column", dropdown_choices, ""),
-      "Column that indicates the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'.",
+      "Column that indicates the type of sample. Must contain QC samples labeled as 'NA', 'QC', 'Qc', or 'qc'. If data contains blanks samples label them as 'blank'.",
       placement = "right"
     ),
     tooltip(
