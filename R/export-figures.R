@@ -27,7 +27,8 @@ export_figures <- function(p,
                            d,
                            out_dir = tempdir(),
                            rsd_export = NULL,
-                           pca_export = NULL) {
+                           pca_export = NULL,
+                           hotelling_pca = NULL)  {
   .require_pkg("ggplot2", "write figures")
   fig_dir <- file.path(out_dir, "figures")
   if (dir.exists(fig_dir)) {
@@ -141,6 +142,7 @@ export_figures <- function(p,
     total_steps <- length(rsd_res$rsd_plots) +
       length(pca_res$pca_plots) +
       length(pca_res$pca_loading_plots) +
+      as.integer(!is.null(hotelling_pca)) +
       n +
       1L
 
@@ -159,6 +161,18 @@ export_figures <- function(p,
       pca_path <- file.path(pca_dir, sprintf("%s.%s", pca_res$plot_names[i], fmt))
       pca_paths[i] <- save_plot(pca_path, pca_res$pca_plots[[i]], 317.5, 140)
       shiny::incProgress(1 / total_steps, detail = "Saved: pca figure")
+    }
+    if (!is.null(hotelling_pca)) {
+      hotelling_path <- file.path(
+        pca_dir,
+        sprintf("potential_outlier_samples_pca.%s", fmt)
+      )
+      
+      save_plot(hotelling_path, hotelling_pca, w = 180, h = 120)
+      shiny::incProgress(
+        1 / total_steps,
+        detail = "Saved: Hotelling PCA figure"
+      )
     }
 
     for (i in seq_along(pca_res$pca_loading_plots)) {

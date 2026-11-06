@@ -34,7 +34,8 @@ app_server <- function(input, output, session) {
    
    viz <- mod_visualize_server("viz",
                                data   = combined_data,
-                               params = base_params)
+                               params = base_params,
+                               hotelling_res = correct$hotelling_res)
    
   combined_params <- reactive( .merge_lists(base_params(), viz$params()) )
  

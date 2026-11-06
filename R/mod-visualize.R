@@ -112,7 +112,7 @@ mod_visualize_ui <- function(id) {
   )
 }
 
-mod_visualize_server <- function(id, data, params) {
+mod_visualize_server <- function(id, data, params, hotelling_res = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     d <- reactive(data())
@@ -302,7 +302,7 @@ mod_visualize_server <- function(id, data, params) {
       },
       content = function(file) {
         .require_pkg("zip", "create a zip archive")
-
+        
         choices <- list(
           rsd_cal = input$rsd_cal,
           rsd_compare = input$rsd_compare,
@@ -316,19 +316,40 @@ mod_visualize_server <- function(id, data, params) {
           qcImputeM = p()$qcImputeM,
           samImputeM = p()$samImputeM
         )
-
-        figs <- export_figures(p = choices, d = d(), out_dir = tempdir())
-
-        fig_dir <- normalizePath(figs$fig_dir, winslash = "/", mustWork = TRUE)
+        
+        hotelling_plot <- NULL
+        if (!is.null(hotelling_res)) {
+          hotelling_plot <- hotelling_res()$pca_plot
+        }
+        
+        export_dir <- tempfile("figure-export-")
         zipfile <- tempfile(fileext = ".zip")
-        zip::zipr(zipfile, files = fig_dir)
-
-        file.copy(zipfile, file, overwrite = TRUE)
-
-        unlink(figs$fig_dir, recursive = TRUE, force = TRUE)
-        unlink(zipfile, force = TRUE)
-
-        progress_reactive(0)
+        on.exit({
+          unlink(export_dir, recursive = TRUE, force = TRUE)
+          unlink(zipfile, force = TRUE)
+          progress_reactive(0)
+        }, add = TRUE)
+        
+        if (!dir.create(export_dir)) {
+          stop("Could not create the temporary figure export directory.")
+        }
+        
+        figs <- export_figures(
+          p = choices,
+          d = d(),
+          out_dir = export_dir,
+          hotelling_pca = hotelling_plot
+        )
+        
+        zip::zipr(
+          zipfile = zipfile,
+          files = basename(figs$fig_dir),
+          root = dirname(figs$fig_dir)
+        )
+        
+        if (!file.copy(zipfile, file, overwrite = TRUE)) {
+          stop("Could not copy the figure archive to the download path.")
+        }
       }
     )
 
