@@ -89,7 +89,7 @@ MetaboRx:::report_text_rsd_table()
 
 ### Candidate Extreme Values
 
-```{r, echo=FALSE, fig.width=7.5, fig.height=5.5}
+```{r, echo=FALSE, fig.width=7.5, fig.height=5.0}
 hp <- params$plots[["Hotelling PCA"]]
 if (!is.null(hp)) {
   print(hp)

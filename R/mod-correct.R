@@ -109,7 +109,7 @@ mod_correct_ui <- function(id) {
         ),
         column(
           width = 5,
-          shiny::plotOutput(ns("hotelling_pca"), height = "400px"),
+          shiny::plotOutput(ns("hotelling_pca"), height = "400px", width = "600px"),
           uiOutput(ns("download_ev_btn"))
         )
       )
