@@ -376,8 +376,8 @@ detect_hotelling_nonqc_dual_z <- function(
         ggplot2::scale_color_manual(
           values = c(
             "QC" = "#F3C300",
-            "Study Sample" =  "#2A4EB3", # "#4169E1",
-            "Potential Outlier" = "#FF0300"# "#D2232A"  #"#E0003C"
+            "Study Sample" = "#6180D9",  #"#2A4EB3", # "#4169E1",
+            "Potential Outlier" = "#FF0328"# "#D2232A"  #"#E0003C"
           )
         ) +
         ggplot2::theme_minimal(base_size = 12) +
