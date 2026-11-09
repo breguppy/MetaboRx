@@ -90,8 +90,8 @@ time_step(
 )
 
 time_step(
-  "detect_hotelling_nonqc_dual_z",
-  detect_hotelling_nonqc_dual_z(
+  "detect_outliers",
+  detect_outliers(
     df = filtered_corrected$df_no_mv,
     p = list(qcImputeM = "median", samImputeM = "mean"),
     make_pca_plot = FALSE

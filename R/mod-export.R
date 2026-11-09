@@ -112,7 +112,7 @@ mod_export_ui <- function(id) {
   if (is.null(cache[["hotelling_res"]])) {
     cache[["hotelling_res"]] <- d$hotelling_res
     if (is.null(cache[["hotelling_res"]])) {
-      cache[["hotelling_res"]] <- detect_hotelling_nonqc_dual_z(d$filtered_corrected$df_no_mv, p)
+      cache[["hotelling_res"]] <- detect_outliers(d$filtered_corrected$df_no_mv, p)
     }
   }
 
