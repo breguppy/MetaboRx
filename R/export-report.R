@@ -72,7 +72,7 @@ render_report <- function(
 
     hotelling_res <- hotelling_res %||% d$hotelling_res
     if (is.null(hotelling_res)) {
-      hotelling_res <- detect_hotelling_nonqc_dual_z(d$filtered_corrected$df_no_mv, p)
+      hotelling_res <- detect_outliers(d$filtered_corrected$df_no_mv, p)
     }
     hotelling_pca_plot <- hotelling_res$pca_plot
 

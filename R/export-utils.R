@@ -593,23 +593,23 @@ report_text_rsd_cal <- function() {
 report_text_ev_detection <- function() {
   htmltools::tagList(
     htmltools::tags$p(
-      "MetaboRx screens for potential outliers in the corrected data. ",
-      "The PCA screen flags samples with unusual metabolite profiles, while ",
-      "the Z-score screen selects individual metabolite values for review."
+      "MetaboRx screens corrected data for potential outliers at two levels. ",
+      "The PCA screen flags samples with unusual metabolite profiles. ",
+      "The within-class screen flags individual metabolite values for review."
     ),
     htmltools::tags$ol(
       htmltools::tags$li(
         htmltools::tags$strong("Log transformation and PCA scaling. "),
-        "By default, MetaboRx applies log2(x + 1) to metabolite intensities. ",
-        "For PCA, all samples are standardized using the means and standard ",
-        "deviations of pooled study samples. Missing values are imputed ",
-        "for this analysis."
+        "By default, MetaboRx applies log2(x + 1) to metabolite intensities ",
+        "for PCA. Missing values are imputed for this analysis, and samples ",
+        "are standardized using the means and standard deviations of ",
+        "the study samples used to fit PCA."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("PCA fit. "),
-        "MetaboRx fits PCA on study samples with complete, finite data after ",
-        "imputation and scaling, using the first two principal components ",
-        "(PC1 and PC2)."
+        "MetaboRx fits PCA on study samples with complete, finite data ",
+        "after imputation and scaling. The sample screen uses the first ",
+        "two principal components (PC1 and PC2)."
       ),
       htmltools::tags$li(
         htmltools::tags$strong("Squared Mahalanobis distance. "),
@@ -624,40 +624,34 @@ report_text_ev_detection <- function() {
         "(95% ellipse by default)."
       ),
       htmltools::tags$li(
-        htmltools::tags$strong("Metabolite Z-scores. "),
-        "For each metabolite, MetaboRx calculates Z-scores separately for ",
-        "all study samples pooled together and for QC samples. Each pool ",
-        "uses its own mean and sample standard deviation on the selected ",
-        "transformation scale. Only finite observed values contribute. ",
-        "Metabolites with fewer than two usable values or zero variance ",
-        "within a pool receive no Z-scores for that pool."
-      ),
-      htmltools::tags$li(
-        htmltools::tags$strong("Candidate extreme value selection. "),
-        "Values first qualify when ",
-        htmltools::tags$strong("|z| > 2"),
-        ". MetaboRx then selects the ",
-        htmltools::tags$strong("largest 10% of qualifying absolute Z-scores"),
-        " across all metabolites, separately for study and QC samples. ",
-        "The selected count is rounded down, so fewer than 10 qualifying ",
-        "values in a pool produces no selected candidates. Ties are resolved ",
-        "by sample row, then metabolite column in the input data. ",
-        "Selection is independent of whether a sample falls outside the ellipse."
+        htmltools::tags$strong("Within-class metabolite value screening. "),
+        "For each metabolite, the test is chosen based on the number of ",
+        "finite observed values in each class, including QC. Classes with ",
+        "fewer than eight values were tested, where estimable, using a ",
+        "two-sided Grubbs-type test (alpha = 0.005). This test used externally ",
+        "studentized one-way ANOVA residuals with the within-class standard ",
+        "deviation pooled across all classes for that metabolite. ",
+        "P-values were Bonferroni-adjusted within each class. Classes with ",
+        "eight or more values were tested using ROUT (Q = 0.1% by default). ",
+        "Both tests used log2-transformed observed intensities. ",
+        "Flagged values were retained, and value screening was independent ",
+        "of whether the sample fell outside the PCA ellipse."
       )
     ),
     htmltools::tags$hr(),
     htmltools::tags$p(
       htmltools::tags$strong("Reading the results. "),
       "Red points in the PCA plot mark samples outside the ellipse. ",
-      "The on-screen table displays selected study candidates ranked by ",
-      "absolute Z-score. The Excel export contains separate tabs for ",
-      "potential outlier samples, selected study values, and selected QC values."
+      "The on-screen table displays study candidates ordered by adjusted ",
+      "p-value, with larger squared Mahalanobis distances shown first ",
+      "when p-values are tied. The Excel export contains separate tabs ",
+      "for potential outlier samples, candidate study values, and ",
+      "candidate QC values."
     ),
     htmltools::tags$p(
       htmltools::tags$strong("Review before removal. ", style = "color: red;"),
-      "Investigate flagged samples and selected values before deciding ",
-      "whether removal is justified. Selection identifies candidates for ",
-      "review and does not establish that a measurement is erroneous."
+      "Investigate flagged samples and values before deciding whether ",
+      "removal is justified. A flag identifies a candidate for review."
     )
   )
 }

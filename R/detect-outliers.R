@@ -3,11 +3,14 @@
 #' Fits PCA on scaled, complete non-QC rows and estimates the PC1-PC2
 #' Mahalanobis reference from all complete projected rows, including QCs.
 #'
-#' Computes metabolite Z-scores separately for pooled study samples and QCs
-#' using finite observed values on the selected transformation scale.
-#' Requires an absolute Z-score greater than 2, then reports the largest
-#' 10% of eligible values across metabolites within each pool, rounding
-#' counts down and breaking ties by row then column.
+#' Groups with fewer than 8 values were tested with a two-sided Grubbs-type
+#' test (alpha = 0.005) that used the within-group SD pooled across all groups
+#' for that metabolite (externally studentized one-way ANOVA residuals,
+#' Bonferroni-adjusted within each group); larger groups were tested with
+#' ROUT (Q = 0.1% by default). Both were applied to log-transformed data,
+#' and flagged values were not excluded. If ROUT's residual scale is zero
+#' in a nonconstant group, values away from the tied center are flagged for
+#' review without a test statistic or p-value.
 #' Selection is independent of the sample's Mahalanobis flag.
 #'
 #' Missing values are imputed for PCA. Supply observed_df containing corrected
@@ -20,12 +23,13 @@
 #' @param row_key_cols Columns uniquely identifying samples in both inputs.
 #'
 #' Legacy threshold arguments are accepted for compatibility and ignored.
-#' `z_class` and `abs_z_class` are compatibility aliases for pooled scores.
+#' Legacy Z-score fields contain signed or absolute test statistics.
+#' @param rout_q Target false discovery rate per metabolite and class.
 #' `used_in_fit` identifies rows used to fit PCA.
 #'
 #' @keywords internal
 #' @noRd
-detect_hotelling_nonqc_dual_z <- function(
+detect_outliers <- function(
     df,
     p,
     meta_cols = c("sample", "batch", "class", "order"),
@@ -44,8 +48,14 @@ detect_hotelling_nonqc_dual_z <- function(
     ridge_factor = 1e-6,
     make_pca_plot = TRUE,
     observed_df = NULL,
-    row_key_cols = c("sample", "batch")
+    row_key_cols = c("sample", "batch"),
+    rout_q = 0.001
 ) {
+  if (!is.numeric(rout_q) || length(rout_q) != 1L ||
+      !is.finite(rout_q) || rout_q <= 0 || rout_q >= 1) {
+    stop("rout_q must be a single number strictly between 0 and 1.")
+  }
+  
   missing_meta <- setdiff(meta_cols, names(df))
   if (length(missing_meta) > 0L) {
     stop(
@@ -131,41 +141,109 @@ detect_hotelling_nonqc_dual_z <- function(
     stop("Too few complete non-QC rows to estimate PCA.")
   }
   
-  # Pooled metabolite Z-scores include every numeric metabolite,
-  # including metabolites subsequently excluded from PCA.
-  X_observed_log <- if (log_transform) {
-    log2(X_observed + log_offset)
-  } else {
-    X_observed
-  }
+  # Value screening always uses log2 intensities, independently of PCA.
+  X_observed_log <- log2(X_observed + log_offset)
   X_observed_log[!is.finite(X_observed_log)] <- NA_real_
   
-  # Compute separate pooled Z-scores for study samples and QCs.
-  # Missing class labels remain unscored.
-  Z_global <- matrix(
+  value_scores <- matrix(
     NA_real_,
     nrow = nrow(df),
     ncol = ncol(X_observed_log),
     dimnames = dimnames(X_observed_log)
   )
+  adjusted_p <- rout_scores <- value_scores
+  value_method <- matrix(NA_character_, nrow(df), ncol(X_observed_log))
+  grubbs_alpha <- 0.005
+  min_rout_observations <- 8L
+  scoring_groups <- split(seq_along(class_vec), class_vec, drop = TRUE)
   
-  scoring_groups <- list(
-    study = which(!is.na(class_vec) & class_vec != qc_label),
-    qc = which(!is.na(class_vec) & class_vec == qc_label)
-  )
-  
-  for (rows in scoring_groups) {
-    if (length(rows) == 0L) {
-      next
+  for (col in seq_len(ncol(X_observed_log))) {
+    column <- X_observed_log[, col]
+    observed_groups <- lapply(scoring_groups, function(rows) {
+      rows[is.finite(column[rows])]
+    })
+    counts <- lengths(observed_groups)
+    pooled_df <- sum(counts[counts > 0L] - 1L)
+    group_sse <- vapply(observed_groups, function(rows) {
+      values <- column[rows]
+      sum((values - mean(values))^2)
+    }, numeric(1))
+    
+    for (group in seq_along(observed_groups)) {
+      observed_rows <- observed_groups[[group]]
+      count <- counts[group]
+      values <- column[observed_rows]
+      
+      if (count < min_rout_observations) {
+        if (count < 2L || pooled_df <= 1L) {
+          next
+        }
+        # Recompute the small group's SSE after deletion to avoid cancellation.
+        other_sse <- sum(group_sse[-group])
+        deleted_sse <- vapply(seq_len(count), function(i) {
+          remaining <- values[-i]
+          other_sse + sum((remaining - mean(remaining))^2)
+        }, numeric(1))
+        deleted_df <- pooled_df - 1L
+        denominator <- sqrt(deleted_sse / deleted_df * (1 - 1 / count))
+        scores <- rep(NA_real_, count)
+        valid <- is.finite(denominator) & denominator > 0
+        scores[valid] <- (values[valid] - mean(values)) / denominator[valid]
+        p_values <- 2 * stats::pt(-abs(scores), df = deleted_df)
+        value_scores[observed_rows, col] <- scores
+        adjusted_p[observed_rows, col] <- stats::p.adjust(
+          p_values, method = "bonferroni", n = count
+        )
+        value_method[observed_rows, col] <- "Grubbs-type"
+        next
+      }
+      
+      # Intercept-only Lorentzian fit with adaptive residual scale.
+      values <- values - stats::median(values)
+      span <- max(abs(values))
+      if (!is.finite(span) || span == 0) {
+        next
+      }
+      values <- values / span
+      
+      center <- 0
+      converged <- FALSE
+      for (iteration in seq_len(200L)) {
+        residuals <- values - center
+        rsdr <- stats::quantile(
+          abs(residuals), 0.6827, names = FALSE, type = 7
+        ) * count / (count - 1L)
+        if (isTRUE(rsdr == 0)) {
+          value_method[observed_rows[residuals != 0], col] <- "ROUT zero-scale"
+          break
+        }
+        if (!is.finite(rsdr) || rsdr < 0) {
+          break
+        }
+        
+        weights <- 1 / (1 + (residuals / rsdr)^2)
+        next_center <- stats::weighted.mean(values, weights)
+        if (abs(next_center - center) <= sqrt(.Machine$double.eps) * rsdr) {
+          converged <- TRUE
+          break
+        }
+        center <- next_center
+      }
+      if (!converged) {
+        next
+      }
+      
+      scores <- residuals / rsdr
+      rout_scores[observed_rows, col] <- scores
+      value_scores[observed_rows, col] <- scores
+      value_method[observed_rows, col] <- "ROUT"
+      # Round the 30% tail up, retaining all observations in the BH denominator.
+      tested <- head(order(abs(scores), decreasing = TRUE), ceiling(0.30 * count))
+      p_values <- 2 * stats::pt(-abs(scores[tested]), df = count - 1L)
+      adjusted_p[observed_rows[tested], col] <- stats::p.adjust(
+        p_values, method = "BH", n = count
+      )
     }
-    
-    X_group <- X_observed_log[rows, , drop = FALSE]
-    group_mean <- colMeans(X_group, na.rm = TRUE)
-    group_sd <- apply(X_group, 2L, stats::sd, na.rm = TRUE)
-    group_sd[!is.finite(group_sd) | group_sd == 0] <- NA_real_
-    
-    Z_group <- sweep(X_group, 2L, group_mean, FUN = "-")
-    Z_global[rows, ] <- sweep(Z_group, 2L, group_sd, FUN = "/")
   }
   
   # Retain all metabolite names for the value-level screen.
@@ -250,44 +328,17 @@ detect_hotelling_nonqc_dual_z <- function(
   
   is_outlier_sample <- !is.na(T2) & T2 > cutoff
   
-  value_z_threshold <- 2
-  flag_fraction <- 0.10
-  extreme_mask <- matrix(
-    FALSE,
-    nrow = nrow(Z_global),
-    ncol = ncol(Z_global),
-    dimnames = dimnames(Z_global)
+  value_cutoff <- ifelse(
+    value_method == "ROUT", rout_q,
+    ifelse(value_method == "Grubbs-type", grubbs_alpha, NA_real_)
   )
-  
-  for (rows in scoring_groups) {
-    if (length(rows) == 0L) {
-      next
-    }
-    
-    group_z <- Z_global[rows, , drop = FALSE]
-    usable <- which(
-      is.finite(group_z) & abs(group_z) > value_z_threshold,
-      arr.ind = TRUE
-    )
-    n_flag <- floor(nrow(usable) * flag_fraction)
-    
-    if (n_flag == 0L) {
-      next
-    }
-    
-    ranked <- order(
-      -abs(group_z[usable]),
-      usable[, "row"],
-      usable[, "col"]
-    )
-    selected <- usable[ranked[seq_len(n_flag)], , drop = FALSE]
-    extreme_mask[cbind(rows[selected[, "row"]], selected[, "col"])] <- TRUE
-  }
-  
+  zero_scale_flag <- !is.na(value_method) & value_method == "ROUT zero-scale"
+  extreme_mask <- zero_scale_flag |
+    (!is.na(adjusted_p) & adjusted_p < value_cutoff)
   idx <- which(extreme_mask, arr.ind = TRUE)
   row_ids <- idx[, "row"]
   col_ids <- idx[, "col"]
-  flagged_z <- Z_global[idx]
+  flagged_z <- value_scores[idx]
   
   extreme_values <- data.frame(
     df[row_ids, meta_cols, drop = FALSE],
@@ -300,13 +351,20 @@ detect_hotelling_nonqc_dual_z <- function(
     abs_z_class = abs(flagged_z),
     T2 = T2[row_ids],
     is_outlier_sample = is_outlier_sample[row_ids],
-    z_threshold_used = rep(value_z_threshold, nrow(idx)),
-    flag_fraction = rep(flag_fraction, nrow(idx)),
+    method = value_method[idx],
+    test_statistic = flagged_z,
+    adjusted_p = adjusted_p[idx],
+    p_cutoff = value_cutoff[idx],
+    rout_score = rout_scores[idx],
+    rout_adjusted_p = replace(adjusted_p[idx], value_method[idx] != "ROUT", NA_real_),
+    z_threshold_used = rep(NA_real_, nrow(idx)),
+    flag_fraction = rep(NA_real_, nrow(idx)),
     stringsAsFactors = FALSE
   )
   
   extreme_values <- extreme_values[
-    order(-extreme_values$abs_z_global, -extreme_values$T2),
+    order(extreme_values$adjusted_p, -abs(extreme_values$test_statistic),
+          -extreme_values$T2),
     ,
     drop = FALSE
   ]
@@ -319,7 +377,7 @@ detect_hotelling_nonqc_dual_z <- function(
   
   z_global_df <- data.frame(
     df[, meta_cols, drop = FALSE],
-    as.data.frame(Z_global, check.names = FALSE),
+    as.data.frame(value_scores, check.names = FALSE),
     stringsAsFactors = FALSE,
     check.names = FALSE
   )
@@ -403,6 +461,12 @@ detect_hotelling_nonqc_dual_z <- function(
   list(
     data = out_df,
     extreme_values = extreme_values,
+    rout_scores = data.frame(
+      df[, meta_cols, drop = FALSE],
+      as.data.frame(rout_scores, check.names = FALSE),
+      check.names = FALSE
+    ),
+    value_scores = z_global_df,
     z_global = z_global_df,
     z_class = z_global_df,
     pca_plot = pca_plot,
@@ -412,10 +476,14 @@ detect_hotelling_nonqc_dual_z <- function(
       row_key_cols = row_key_cols,
       alpha = alpha,
       cutoff = cutoff,
-      value_z_threshold = value_z_threshold,
-      flag_fraction = flag_fraction,
-      flagging_rule = "Largest 10% of values with absolute Z-score greater than 2 within each scoring pool",
-      z_score_reference = "Non-QC samples pooled together; QCs scored separately",
+      value_z_threshold = NA_real_,
+      rout_q = rout_q,
+      flag_fraction = NA_real_,
+      min_score_observations = 2L,
+      min_rout_observations = min_rout_observations,
+      grubbs_alpha = grubbs_alpha,
+      flagging_rule = "Grubbs-type for fewer than 8 observed values; ROUT otherwise",
+      z_score_reference = "Class-specific centers including QC; Grubbs-type scale pooled across classes",
       log_transform = log_transform,
       log_offset = log_offset,
       p = length(met_cols),

@@ -1,4 +1,4 @@
-# tests/testthat/test-detect_hotelling_nonqc_dual_z.R
+# tests/testthat/test-detect_outliers.R
 
 hotelling_test_params <- function() {
   list(qcImputeM = "median", samImputeM = "median")
@@ -22,46 +22,20 @@ hotelling_test_data <- function() {
   )
 }
 
-# Each metabolite has exactly one qualifying value in each scoring pool.
-# Identical columns also provide exact ties for testing selection order.
-hotelling_selection_data <- function(n_metabolites = 20L) {
-  n <- 40L
-  
-  df <- data.frame(
-    sample = paste0("S", seq_len(2L * n)),
-    batch = "b1",
-    class = c(rep(c("A", "B"), each = n / 2L), rep("QC", n)),
-    order = seq_len(2L * n),
-    stringsAsFactors = FALSE
-  )
-  
-  study_values <- as.numeric(seq_len(n))
-  study_values[1L] <- 10000
-  
-  qc_values <- as.numeric(seq_len(n))
-  qc_values[1L] <- -10000
-  
-  for (j in seq_len(n_metabolites)) {
-    df[[paste0("m", j)]] <- c(study_values, qc_values)
-  }
-  
-  df
-}
-
 testthat::test_that("required metadata columns must be present", {
   df <- hotelling_test_data()
   p <- hotelling_test_params()
   
   df$order <- NULL
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df, p),
+    detect_outliers(df, p),
     "Missing metadata columns in df: order"
   )
   
   df$order <- seq_len(nrow(df))
   df$class <- NULL
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df, p),
+    detect_outliers(df, p),
     "Missing metadata columns in df: class"
   )
 })
@@ -73,7 +47,7 @@ testthat::test_that("at least one numeric metabolite column is required", {
   df$m3 <- NULL
   
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(df, hotelling_test_params()),
+    detect_outliers(df, hotelling_test_params()),
     "No numeric metabolite columns found"
   )
 })
@@ -83,7 +57,7 @@ testthat::test_that("QC rows cannot satisfy the minimum study row count", {
   df <- df[c(1L, 2L, which(df$class == "QC")), , drop = FALSE]
   
   testthat::expect_error(
-    detect_hotelling_nonqc_dual_z(
+    detect_outliers(
       df,
       hotelling_test_params(),
       min_complete = 3L
@@ -92,9 +66,9 @@ testthat::test_that("QC rows cannot satisfy the minimum study row count", {
   )
 })
 
-testthat::test_that("the result includes pooled scores and typed empty candidates", {
+testthat::test_that("the result includes method-specific scores and typed empty candidates", {
   df <- hotelling_test_data()
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- detect_outliers(
     df,
     hotelling_test_params(),
     make_pca_plot = FALSE
@@ -103,13 +77,15 @@ testthat::test_that("the result includes pooled scores and typed empty candidate
   testthat::expect_named(
     res,
     c(
-      "data", "extreme_values", "z_global", "z_class",
+      "data", "extreme_values", "rout_scores", "value_scores",
+      "z_global", "z_class",
       "pca_plot", "pc_loadings", "params"
     ),
     ignore.order = TRUE
   )
-  testthat::expect_equal(res$params$value_z_threshold, 2)
-  testthat::expect_equal(res$params$flag_fraction, 0.10)
+  testthat::expect_equal(res$params$grubbs_alpha, 0.005)
+  testthat::expect_equal(res$params$rout_q, 0.001)
+  testthat::expect_equal(res$params$min_rout_observations, 8L)
   testthat::expect_equal(nrow(res$data), nrow(df))
   testthat::expect_null(res$pca_plot)
   testthat::expect_identical(res$z_class, res$z_global)
@@ -123,37 +99,16 @@ testthat::test_that("the result includes pooled scores and typed empty candidate
       "sample", "batch", "class", "order", "metabolite",
       "value_raw", "value_log", "z_global", "abs_z_global",
       "z_class", "abs_z_class", "T2", "is_outlier_sample",
-      "z_threshold_used", "flag_fraction"
+      "method", "test_statistic", "adjusted_p", "p_cutoff",
+      "rout_score", "rout_adjusted_p", "z_threshold_used", "flag_fraction"
     ),
     ignore.order = TRUE
   )
-  testthat::expect_type(ev$z_global, "double")
+  testthat::expect_type(ev$method, "character")
+  testthat::expect_type(ev$test_statistic, "double")
+  testthat::expect_type(ev$adjusted_p, "double")
   testthat::expect_type(ev$T2, "double")
   testthat::expect_type(ev$is_outlier_sample, "logical")
-})
-
-testthat::test_that("study samples are pooled and QCs are scored separately", {
-  df <- hotelling_test_data()
-  res <- detect_hotelling_nonqc_dual_z(
-    df,
-    hotelling_test_params(),
-    make_pca_plot = FALSE
-  )
-  
-  groups <- list(
-    study = which(df$class != "QC"),
-    qc = which(df$class == "QC")
-  )
-  
-  for (rows in groups) {
-    for (metabolite in c("m1", "m2", "m3")) {
-      expected <- as.numeric(scale(log2(df[[metabolite]][rows] + 1)))
-      testthat::expect_equal(
-        res$z_global[[metabolite]][rows],
-        expected
-      )
-    }
-  }
 })
 
 testthat::test_that("PCA uses study rows and distances use study and QC scores", {
@@ -165,7 +120,7 @@ testthat::test_that("PCA uses study rows and distances use study and QC scores",
   alpha <- 0.05
   ridge_factor <- 1e-6
   
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- detect_outliers(
     df,
     hotelling_test_params(),
     alpha = alpha,
@@ -200,125 +155,78 @@ testthat::test_that("PCA uses study rows and distances use study and QC scores",
   testthat::expect_true(res$data$is_outlier_sample[qc_row])
 })
 
-testthat::test_that("the largest 10 percent above 2 are selected separately per pool", {
-  df <- hotelling_selection_data()
+testthat::test_that("seven observed values use Grubbs-type and eight use ROUT", {
+  df <- hotelling_test_data()
+  rows <- c(which(df$class == "A")[1:8], which(df$class == "B")[1:8],
+            which(df$class == "QC"))
+  df <- df[rows, , drop = FALSE]
+  study_a <- which(df$class == "A")
+  study_b <- which(df$class == "B")
+  qc <- which(df$class == "QC")
+  df$m1 <- 2^(10 + c(
+    seq(-0.03, 0.03, length.out = 6L), 5, 0,
+    seq(-0.03, 0.03, length.out = 7L), -5,
+    rep(0, length(qc))
+  )) - 1
+  observed <- df
+  observed$m1[study_a[8L]] <- NA_real_
   
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- detect_outliers(
     df,
     hotelling_test_params(),
     log_transform = FALSE,
-    alpha = 1e-12,
-    make_pca_plot = FALSE
+    make_pca_plot = FALSE,
+    observed_df = observed
   )
-  
-  metabolites <- paste0("m", seq_len(20L))
-  study <- df$class != "QC"
-  
-  # There are 20 qualifying values per pool, so two must be selected.
-  study_z <- as.matrix(res$z_global[study, metabolites])
-  qc_z <- as.matrix(res$z_global[!study, metabolites])
-  
-  testthat::expect_equal(sum(abs(study_z) > 2), 20L)
-  testthat::expect_equal(sum(abs(qc_z) > 2), 20L)
-  
   ev <- res$extreme_values
-  study_ev <- ev[ev$class != "QC", , drop = FALSE]
-  qc_ev <- ev[ev$class == "QC", , drop = FALSE]
+  ev <- ev[ev$metabolite == "m1", , drop = FALSE]
+  testthat::expect_setequal(ev$sample, df$sample[c(study_a[7L], study_b[8L])])
   
-  testthat::expect_equal(nrow(study_ev), 2L)
-  testthat::expect_equal(nrow(qc_ev), 2L)
+  a <- ev[ev$method == "Grubbs-type", , drop = FALSE]
+  b <- ev[ev$method == "ROUT", , drop = FALSE]
+  testthat::expect_identical(a$sample, df$sample[study_a[7L]])
+  testthat::expect_identical(b$sample, df$sample[study_b[8L]])
+  testthat::expect_equal(a$p_cutoff, 0.005)
+  testthat::expect_equal(b$p_cutoff, 0.001)
+  testthat::expect_true(all(ev$adjusted_p < ev$p_cutoff))
+  testthat::expect_equal(ev$value_log, log2(ev$value_raw + 1))
   
-  # Exact ties resolve by input row, then input metabolite column.
-  testthat::expect_setequal(study_ev$metabolite, c("m1", "m2"))
-  testthat::expect_setequal(qc_ev$metabolite, c("m1", "m2"))
-  testthat::expect_true(all(study_ev$sample == "S1"))
-  testthat::expect_true(all(qc_ev$sample == "S41"))
-  
-  testthat::expect_true(all(study_ev$z_global > 2))
-  testthat::expect_true(all(qc_ev$z_global < -2))
-  testthat::expect_equal(ev$abs_z_global, abs(ev$z_global))
-  testthat::expect_equal(ev$z_class, ev$z_global)
-  testthat::expect_equal(ev$abs_z_class, ev$abs_z_global)
-  testthat::expect_equal(ev$z_threshold_used, rep(2, nrow(ev)))
-  testthat::expect_equal(ev$flag_fraction, rep(0.10, nrow(ev)))
-  
-  # The wide ellipse keeps these candidates inside the sample cutoff.
-  testthat::expect_false(any(ev$is_outlier_sample))
+  # Check the small-class result against a one-way model using all classes.
+  reference <- observed[is.finite(observed$m1), , drop = FALSE]
+  fit <- stats::lm(log2(m1 + 1) ~ class, data = reference)
+  scores <- stats::rstudent(fit)[reference$class == "A"]
+  p_values <- 2 * stats::pt(-abs(scores), df = stats::df.residual(fit) - 1L)
+  expected <- stats::p.adjust(p_values, method = "bonferroni")
+  testthat::expect_equal(res$value_scores$m1[study_a[1:7]], unname(scores))
+  testthat::expect_equal(a$adjusted_p, unname(expected[7L]))
+  testthat::expect_lt(b$test_statistic, 0)
+  testthat::expect_true(is.na(res$value_scores$m1[study_a[8L]]))
+  testthat::expect_true(all(is.na(res$rout_scores$m1[c(study_a, qc)])))
+  testthat::expect_equal(res$data$m1, df$m1)
 })
 
-testthat::test_that("selection counts round down after thresholding", {
-  for (n_metabolites in c(9L, 19L)) {
-    df <- hotelling_selection_data(n_metabolites)
-    
-    res <- detect_hotelling_nonqc_dual_z(
-      df,
-      hotelling_test_params(),
-      log_transform = FALSE,
-      make_pca_plot = FALSE
-    )
-    
-    ev <- res$extreme_values
-    expected_per_pool <- floor(n_metabolites * 0.10)
-    
-    testthat::expect_equal(
-      sum(ev$class != "QC"),
-      expected_per_pool
-    )
-    testthat::expect_equal(
-      sum(ev$class == "QC"),
-      expected_per_pool
-    )
-  }
-})
-
-testthat::test_that("a metabolite constant within QC has missing QC Z-scores", {
+testthat::test_that("metabolites excluded from PCA still receive value scores", {
   df <- hotelling_test_data()
-  qc <- df$class == "QC"
-  df$m1[qc] <- 110
+  study <- df$class != "QC"
+  df$m1[study] <- 100
+  df$m1[!study] <- 2^(10 + c(seq(-0.05, 0.05, length.out = 11L), 5)) - 1
   
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- suppressMessages(detect_outliers(
     df,
     hotelling_test_params(),
     make_pca_plot = FALSE
-  )
-  
-  testthat::expect_true(all(is.na(res$z_global$m1[qc])))
-  testthat::expect_true(all(is.finite(res$z_global$m1[!qc])))
-  testthat::expect_false(
-    any(
-      res$extreme_values$class == "QC" &
-        res$extreme_values$metabolite == "m1"
-    )
-  )
+  ))
+  testthat::expect_false("m1" %in% res$pc_loadings$metabolite)
+  testthat::expect_true("m1" %in% res$params$screened_metabolites)
+  testthat::expect_true(all(is.na(res$value_scores$m1[study])))
+  testthat::expect_true(all(is.finite(res$rout_scores$m1[!study])))
+  testthat::expect_true(any(
+    res$extreme_values$metabolite == "m1" &
+      res$extreme_values$class == "QC"
+  ))
 })
 
-testthat::test_that("metabolites excluded from PCA still receive pooled Z-scores", {
-  df <- hotelling_test_data()
-  study <- df$class != "QC"
-  df[study, c("m1", "m2", "m3")] <- 10
-  
-  res <- suppressMessages(
-    detect_hotelling_nonqc_dual_z(
-      df,
-      hotelling_test_params(),
-      make_pca_plot = FALSE
-    )
-  )
-  
-  testthat::expect_null(res$pc_loadings)
-  testthat::expect_null(res$pca_plot)
-  testthat::expect_true(all(is.na(res$data$T2)))
-  testthat::expect_false(any(res$data$used_in_fit))
-  testthat::expect_true(all(is.na(res$z_global$m1[study])))
-  testthat::expect_true(all(is.finite(res$z_global$m1[!study])))
-  testthat::expect_setequal(
-    res$params$screened_metabolites,
-    c("m1", "m2", "m3")
-  )
-  testthat::expect_length(res$params$retained_metabolites, 0L)
-})
-
-testthat::test_that("imputation supports PCA but observed values determine Z-scores", {
+testthat::test_that("imputation supports PCA but observed values determine candidate scores", {
   df <- hotelling_test_data()
   p <- list(qcImputeM = "median", samImputeM = "mean")
   missing_rows <- c(2L, which(df$class == "QC")[1L])
@@ -338,7 +246,7 @@ testthat::test_that("imputation supports PCA but observed values determine Z-sco
   
   testthat::local_mocked_bindings(impute_missing = imputer)
   
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- detect_outliers(
     df,
     p,
     make_pca_plot = FALSE
@@ -350,19 +258,17 @@ testthat::test_that("imputation supports PCA but observed values determine Z-sco
     rep(fill, length(missing_rows))
   )
   testthat::expect_true(all(is.finite(res$data$T2)))
-  testthat::expect_true(all(is.na(res$z_global$m2[missing_rows])))
+  testthat::expect_true(all(is.na(res$value_scores$m2[missing_rows])))
   
-  for (rows in list(which(df$class != "QC"), which(df$class == "QC"))) {
-    observed_rows <- rows[!is.na(df$m2[rows])]
-    expected <- as.numeric(
-      scale(log2(df$m2[observed_rows] + 1))
-    )
-    
-    testthat::expect_equal(
-      res$z_global$m2[observed_rows],
-      expected
-    )
-  }
+  cached <- detect_outliers(
+    res$data[, names(df), drop = FALSE],
+    p,
+    make_pca_plot = FALSE,
+    observed_df = df[nrow(df):1L, , drop = FALSE]
+  )
+  testthat::expect_equal(calls, 1L)
+  testthat::expect_equal(cached$value_scores, res$value_scores)
+  testthat::expect_equal(cached$extreme_values, res$extreme_values)
   
   ev <- res$extreme_values
   testthat::expect_false(
@@ -374,7 +280,7 @@ testthat::test_that("the PCA plot and loadings are returned when enabled", {
   testthat::skip_if_not_installed("ggplot2")
   df <- hotelling_test_data()
   
-  res <- detect_hotelling_nonqc_dual_z(
+  res <- detect_outliers(
     df,
     hotelling_test_params(),
     make_pca_plot = TRUE
@@ -388,4 +294,31 @@ testthat::test_that("the PCA plot and loadings are returned when enabled", {
     res$pc_loadings$metabolite,
     c("m1", "m2", "m3")
   )
+})
+testthat::test_that("ROUT zero-scale groups flag departures from the tied center", {
+  df <- hotelling_test_data()
+  qc_rows <- which(df$class == "QC")
+  spike_row <- qc_rows[length(qc_rows)]
+  
+  df$m1[qc_rows] <- 100
+  df$m1[spike_row] <- 1e6
+  df$m2[qc_rows] <- 50
+  
+  res <- detect_outliers(
+    df,
+    hotelling_test_params(),
+    make_pca_plot = FALSE
+  )
+  
+  candidates <- res$extreme_values
+  qc_candidates <- candidates[candidates$class == "QC", , drop = FALSE]
+  flagged <- qc_candidates[qc_candidates$metabolite == "m1", , drop = FALSE]
+  
+  testthat::expect_identical(flagged$sample, df$sample[spike_row])
+  testthat::expect_identical(flagged$method, "ROUT zero-scale")
+  testthat::expect_equal(flagged$test_statistic, NA_real_)
+  testthat::expect_equal(flagged$adjusted_p, NA_real_)
+  testthat::expect_equal(flagged$p_cutoff, NA_real_)
+  testthat::expect_false(any(qc_candidates$metabolite == "m2"))
+  testthat::expect_equal(res$data$m1, df$m1)
 })

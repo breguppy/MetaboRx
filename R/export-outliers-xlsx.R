@@ -1,4 +1,10 @@
 #' Export outliers Excel file
+#'
+#' @param p MetaboRx preprocessing parameters.
+#' @param d MetaboRx data object.
+#' @param file Optional destination for the workbook.
+#' @param hotelling_res Optional cached result from `detect_outliers()`.
+#'
 #' @keywords internal
 #' @noRd
 export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
@@ -7,50 +13,72 @@ export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
   res <- hotelling_res
   if (is.null(res)) {
     df <- d$filtered_corrected$df_no_mv
-    res <- detect_hotelling_nonqc_dual_z(df, p)
+    res <- detect_outliers(df, p)
   }
   
-  qc_label <- res$params$qc_label
+  params <- res$params
+  required_params <- c(
+    "min_rout_observations",
+    "grubbs_alpha",
+    "rout_q",
+    "log_offset"
+  )
+  missing_params <- required_params[
+    vapply(required_params, function(name) {
+      is.null(params[[name]])
+    }, logical(1))
+  ]
+  
+  if (length(missing_params) > 0L) {
+    stop(
+      "Missing detector parameters: ",
+      paste(missing_params, collapse = ", "),
+      ". Recompute the result using the updated detect_outliers()."
+    )
+  }
+  
+  qc_label <- params$qc_label
   if (is.null(qc_label)) {
     qc_label <- "QC"
   }
   
-  class_col <- res$params$class_col
+  class_col <- params$class_col
   if (is.null(class_col)) {
     class_col <- "class"
   }
   
-  value_z_threshold <- res$params$value_z_threshold
-  flag_fraction <- res$params$flag_fraction
-  
-  if (is.null(value_z_threshold) || is.null(flag_fraction)) {
-    stop(
-      "The detector result must contain value_z_threshold and flag_fraction ",
-      "in params. Recompute it using the updated detection function."
-    )
-  }
-  
   ev <- res$extreme_values
-  required_cols <- c("sample", class_col, "metabolite", "z_global", "T2")
+  required_cols <- c(
+    "sample",
+    class_col,
+    "metabolite",
+    "method",
+    "test_statistic",
+    "adjusted_p",
+    "p_cutoff",
+    "T2"
+  )
   missing_cols <- setdiff(required_cols, names(ev))
   
   if (length(missing_cols) > 0L) {
     stop(
       "Missing columns in extreme_values: ",
-      paste(missing_cols, collapse = ", ")
+      paste(missing_cols, collapse = ", "),
+      ". Recompute the result using the updated detect_outliers()."
     )
   }
   
-  abs_z <- abs(ev$z_global)
-  idx <- order(-abs_z, -ev$T2)
+  ev <- ev[order(ev$adjusted_p, -ev$T2), , drop = FALSE]
   
   candidate_values <- data.frame(
-    Sample = ev$sample[idx],
-    Class = ev[[class_col]][idx],
-    Metabolite = ev$metabolite[idx],
-    Z_score = ev$z_global[idx],
-    Absolute_Z_score = abs_z[idx],
-    Squared_Mahalanobis_distance = ev$T2[idx],
+    Sample = ev$sample,
+    Class = ev[[class_col]],
+    Metabolite = ev$metabolite,
+    Method = ev$method,
+    Test_statistic = ev$test_statistic,
+    Adjusted_p_value = ev$adjusted_p,
+    P_value_cutoff = ev$p_cutoff,
+    Squared_Mahalanobis_distance = ev$T2,
     stringsAsFactors = FALSE
   )
   
@@ -78,30 +106,23 @@ export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
     drop = FALSE
   ]
   
-  transformation_text <- if (isTRUE(res$params$log_transform)) {
-    sprintf(
-      "Z-scores use log2(intensity + %g).",
-      res$params$log_offset
-    )
-  } else {
-    "Z-scores use untransformed intensities."
-  }
-  
-  selection_text <- sprintf(
+  method_description <- sprintf(
     paste(
-      "Values must first have an absolute Z-score greater than %g.",
-      "The largest %g%% of qualifying absolute Z-scores across all metabolites",
-      "in this sample pool are reported."
+      "For each metabolite, classes with fewer than %d observed values",
+      "were screened, where estimable, using a two-sided Grubbs-type",
+      "test (alpha = %g). The test used externally studentized one-way",
+      "ANOVA residuals with within-class variance pooled across all classes",
+      "for that metabolite and p-values Bonferroni-adjusted within each class.",
+      "Classes with %d or more observed values were screened using",
+      "ROUT (Q = %g%%). Both tests used finite observed values transformed",
+      "as log2(intensity + %g). Flagged values were retained.",
+      "Value screening was independent of the sample's Mahalanobis flag."
     ),
-    value_z_threshold,
-    100 * flag_fraction
-  )
-  
-  selection_details <- paste(
-    "The number reported is rounded down.",
-    "Ties at the selection boundary are resolved by sample row,",
-    "then metabolite column in the input data.",
-    "Selection is independent of the sample's Mahalanobis flag."
+    params$min_rout_observations,
+    params$grubbs_alpha,
+    params$min_rout_observations,
+    100 * params$rout_q,
+    params$log_offset
   )
   
   wb <- openxlsx::createWorkbook()
@@ -133,13 +154,8 @@ export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
         wb = wb,
         sheet_name = "Study Extreme Values",
         description = paste(
-          "Tab 2. Selected candidate extreme values in study samples.",
-          "For each metabolite, Z-scores are calculated using the mean",
-          "and sample standard deviation of all non-QC samples pooled together.",
-          transformation_text,
-          "Only finite observed values contribute to the Z-scores.",
-          selection_text,
-          selection_details
+          "Tab 2. Candidate extreme values in study samples.",
+          method_description
         ),
         x = study_values,
         merge_cols = 12L,
@@ -154,13 +170,8 @@ export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
         wb = wb,
         sheet_name = "QC Extreme Values",
         description = paste(
-          "Tab 3. Selected candidate extreme values in QC samples.",
-          "For each metabolite, Z-scores are calculated using the mean",
-          "and sample standard deviation of QC samples only.",
-          transformation_text,
-          "Only finite observed values contribute to the Z-scores.",
-          selection_text,
-          selection_details
+          "Tab 3. Candidate extreme values in QC samples.",
+          method_description
         ),
         x = qc_values,
         merge_cols = 12L,

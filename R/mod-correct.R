@@ -492,7 +492,7 @@ mod_correct_server <- function(id, data, params) {
         samImputeM = input$samImputeM
       )
       
-      detect_hotelling_nonqc_dual_z(
+      detect_outliers(
         df = df,
         p = p,
         observed_df = observed_df,

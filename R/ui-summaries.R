@@ -1093,12 +1093,13 @@ ui_postcor_filter_info <- function(filtered_corrected_result,
 
 #' Candidate extreme values summary table UI
 #'
-#' @param detect_result Result returned by `detect_hotelling_nonqc_dual_z()`.
-#' @param top_n Maximum number of selected study values to display.
+#' @param detect_result Result returned by `detect_outliers()`.
+#' @param top_n Maximum number of flagged study values to display.
 #' @param sample_col Name of the sample column in the extreme values table.
 #' @param class_col Name of the class column in the extreme values table.
-#' @param digits_z Number of digits used for Z-score display.
-#' @param digits_T2 Number of digits used for squared Mahalanobis distance display.
+#' @param digits_z Number of decimal places for the test statistic.
+#'   The argument name is retained for compatibility.
+#' @param digits_T2 Number of decimal places for squared Mahalanobis distance.
 #'
 #' @return A Shiny tag list containing metric cards and the study candidate table.
 #'
@@ -1122,15 +1123,17 @@ ui_outliers_table <- function(
   if (is.null(ev)) {
     stop("detect_result$extreme_values is NULL. Did you pass the correct object?")
   }
-  if (is.null(dres)) {
-    stop("detect_result$data is NULL. Did you pass the correct object?")
+  if (is.null(dres) || !"is_outlier_sample" %in% names(dres)) {
+    stop("detect_result$data must contain is_outlier_sample.")
   }
   
   required_cols <- c(
     sample_col,
     class_col,
     "metabolite",
-    "z_global",
+    "method",
+    "test_statistic",
+    "adjusted_p",
     "T2"
   )
   missing_cols <- setdiff(required_cols, names(ev))
@@ -1138,23 +1141,28 @@ ui_outliers_table <- function(
   if (length(missing_cols) > 0L) {
     stop(
       "Missing columns in extreme_values: ",
-      paste(missing_cols, collapse = ", ")
+      paste(missing_cols, collapse = ", "),
+      ". Recompute the result using the updated detect_outliers()."
     )
   }
   
-  qc_label <- detect_result$params$qc_label
+  params <- detect_result$params
+  required_params <- c("min_rout_observations", "grubbs_alpha", "rout_q")
+  missing_params <- required_params[
+    vapply(params[required_params], is.null, logical(1))
+  ]
+  
+  if (is.null(params) || length(missing_params) > 0L) {
+    stop(
+      "The detector result must contain min_rout_observations, ",
+      "grubbs_alpha, and rout_q in params. ",
+      "Recompute it using the updated detect_outliers()."
+    )
+  }
+  
+  qc_label <- params$qc_label
   if (is.null(qc_label)) {
     qc_label <- "QC"
-  }
-  
-  value_z_threshold <- detect_result$params$value_z_threshold
-  flag_fraction <- detect_result$params$flag_fraction
-  
-  if (is.null(value_z_threshold) || is.null(flag_fraction)) {
-    stop(
-      "The detector result must contain value_z_threshold and flag_fraction ",
-      "in params. Recompute it using the updated detection function."
-    )
   }
   
   classes <- ev[[class_col]]
@@ -1175,20 +1183,30 @@ ui_outliers_table <- function(
       n_outlier_samples
     ),
     metric_card(
-      "Selected candidate extreme values in study samples",
+      "Candidate extreme values in study samples",
       n_extreme_values
     )
   )
   
   method_text <- shiny::tags$p(
-    "For each metabolite, Z-scores use all non-QC samples pooled together. ",
     sprintf(
-      "Values must have |z| > %g. The largest %g%% of qualifying absolute ",
-      value_z_threshold,
-      100 * flag_fraction
+      paste0(
+        "For each metabolite, classes with fewer than %d observed values ",
+        "were screened, where estimable, using a two-sided Grubbs-type ",
+        "test (alpha = %g). The test used externally studentized one-way ",
+        "ANOVA residuals with within-class variance pooled across all ",
+        "classes for that metabolite and p-values Bonferroni-adjusted ",
+        "within each class. Classes with %d or more observed values ",
+        "were screened using ROUT (Q = %g%%)."
+      ),
+      params$min_rout_observations,
+      params$grubbs_alpha,
+      params$min_rout_observations,
+      100 * params$rout_q
     ),
-    "Selection is independent of the sample's Mahalanobis flag. ",
-    "QC values are scored and selected separately."
+    "Both methods used log2-transformed observed intensities.",
+    "Flagged values were retained.",
+    "Value screening was independent of the sample's Mahalanobis flag."
   )
   
   if (n_extreme_values == 0L) {
@@ -1196,9 +1214,7 @@ ui_outliers_table <- function(
       shiny::tagList(
         cards,
         method_text,
-        shiny::tags$em(
-          "No study values were selected by the threshold and percentage rule."
-        )
+        shiny::tags$em("No study values were flagged by either method.")
       )
     )
   }
@@ -1208,22 +1224,26 @@ ui_outliers_table <- function(
     top_n <- 10L
   }
   
-  ev_sorted <- ev[
-    order(-abs(ev$z_global), -ev$T2),
-    ,
-    drop = FALSE
-  ]
+  ev_sorted <- ev[order(ev$adjusted_p, -ev$T2), , drop = FALSE]
   ev_top <- utils::head(ev_sorted, top_n)
   
-  z_fmt <- formatC(ev_top$z_global, format = "f", digits = digits_z)
+  statistic_fmt <- formatC(
+    ev_top$test_statistic,
+    format = "f",
+    digits = digits_z
+  )
+  p_fmt <- format.pval(ev_top$adjusted_p, digits = 3)
   T2_fmt <- formatC(ev_top$T2, format = "f", digits = digits_T2)
+  T2_fmt[is.na(ev_top$T2)] <- "\u2014"
   
   rows <- lapply(seq_len(nrow(ev_top)), function(i) {
     shiny::tags$tr(
       shiny::tags$td(ev_top[[sample_col]][i]),
       shiny::tags$td(ev_top[[class_col]][i]),
       shiny::tags$td(ev_top$metabolite[i]),
-      shiny::tags$td(z_fmt[i]),
+      shiny::tags$td(ev_top$method[i]),
+      shiny::tags$td(statistic_fmt[i]),
+      shiny::tags$td(p_fmt[i]),
       shiny::tags$td(T2_fmt[i])
     )
   })
@@ -1235,8 +1255,10 @@ ui_outliers_table <- function(
         shiny::tags$th("Sample"),
         shiny::tags$th("Class"),
         shiny::tags$th("Metabolite"),
-        shiny::tags$th("Z-score"),
-        shiny::tags$th("Squared Mahalanobis distance")
+        shiny::tags$th("Method"),
+        shiny::tags$th("Test statistic"),
+        shiny::tags$th("Adjusted p-value"),
+        shiny::tags$th("Mahalanobis distance^2")
       )
     ),
     shiny::tags$tbody(rows)
@@ -1247,17 +1269,12 @@ ui_outliers_table <- function(
     method_text,
     shiny::tags$p(
       sprintf(
-        "Showing %d of %d selected candidate extreme values in study samples, ",
+        paste0(
+          "Showing %d of %d candidate extreme values in study samples, ",
+          "ordered by adjusted p-value."
+        ),
         nrow(ev_top),
         n_extreme_values
-      ),
-      "ranked by absolute Z-score. ",
-      sprintf(
-        paste0(
-          "All selected study and QC candidates are available in separate ",
-          "tabs in 'extreme_values_%s.xlsx'."
-        ),
-        Sys.Date()
       )
     ),
     shiny::tags$div(
