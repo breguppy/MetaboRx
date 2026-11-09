@@ -78,7 +78,16 @@ make_complete_export_fixture <- function(fig_format) {
   z_scores[c("met_a", "met_b", "met_c")] <- 0
   hotelling_res <- list(
     data = outlier_data,
-    extreme_values = empty_extremes,
+    extreme_values = data.frame(
+      sample = character(),
+      class = character(),
+      metabolite = character(),
+      method = character(),
+      test_statistic = numeric(),
+      adjusted_p = numeric(),
+      p_cutoff = numeric(),
+      T2 = numeric()
+    ),
     pc_loadings = data.frame(
       metabolite = c("met_a", "met_b", "met_c"),
       PC1 = c(0.8, 0.4, 0.2),
@@ -88,19 +97,9 @@ make_complete_export_fixture <- function(fig_format) {
     z_class = z_scores,
     pca_plot = ggplot2::ggplot(),
     params = list(
-      alpha = 0.05,
-      cutoff = stats::qchisq(0.95, df = 2L),
-      value_z_threshold = 2,
-      flag_fraction = 0.10,
-      flagging_rule = paste(
-        "Largest 10% of values with absolute Z-score greater than 2",
-        "within each scoring pool"
-      ),
-      z_score_reference = paste(
-        "Non-QC samples pooled together;",
-        "QCs scored separately"
-      ),
-      log_transform = TRUE,
+      min_rout_observations = 8L,
+      grubbs_alpha = 0.005,
+      rout_q = 0.001,
       log_offset = 1,
       class_col = "class",
       qc_label = "QC"
@@ -290,8 +289,10 @@ if (identical(Sys.getenv("METABORX_RUN_EXPORT_INTEGRATION"), "true")) {
       "Sample",
       "Class",
       "Metabolite",
-      "Z_score",
-      "Absolute_Z_score",
+      "Method",
+      "Test_statistic",
+      "Adjusted_p_value",
+      "P_value_cutoff",
       "Squared_Mahalanobis_distance"
     )
     
@@ -302,8 +303,8 @@ if (identical(Sys.getenv("METABORX_RUN_EXPORT_INTEGRATION"), "true")) {
         startRow = 3
       )
       
-      expect_named(candidates, expected_columns)
-      expect_equal(nrow(candidates), 0L)
+      testthat::expect_named(candidates, expected_columns)
+      testthat::expect_equal(nrow(candidates), 0L)
     }
     
     settings <- openxlsx::read.xlsx(
