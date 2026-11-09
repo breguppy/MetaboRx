@@ -8,7 +8,9 @@
 #' for that metabolite (externally studentized one-way ANOVA residuals,
 #' Bonferroni-adjusted within each group); larger groups were tested with
 #' ROUT (Q = 0.1% by default). Both were applied to log-transformed data,
-#' and flagged values were not excluded.
+#' and flagged values were not excluded. If ROUT's residual scale is zero
+#' in a nonconstant group, values away from the tied center are flagged for
+#' review without a test statistic or p-value.
 #' Selection is independent of the sample's Mahalanobis flag.
 #'
 #' Missing values are imputed for PCA. Supply observed_df containing corrected
@@ -211,7 +213,11 @@ detect_outliers <- function(
         rsdr <- stats::quantile(
           abs(residuals), 0.6827, names = FALSE, type = 7
         ) * count / (count - 1L)
-        if (!is.finite(rsdr) || rsdr <= 0) {
+        if (isTRUE(rsdr == 0)) {
+          value_method[observed_rows[residuals != 0], col] <- "ROUT zero-scale"
+          break
+        }
+        if (!is.finite(rsdr) || rsdr < 0) {
           break
         }
         
@@ -322,8 +328,13 @@ detect_outliers <- function(
   
   is_outlier_sample <- !is.na(T2) & T2 > cutoff
   
-  value_cutoff <- ifelse(value_method == "ROUT", rout_q, grubbs_alpha)
-  extreme_mask <- !is.na(adjusted_p) & adjusted_p < value_cutoff
+  value_cutoff <- ifelse(
+    value_method == "ROUT", rout_q,
+    ifelse(value_method == "Grubbs-type", grubbs_alpha, NA_real_)
+  )
+  zero_scale_flag <- !is.na(value_method) & value_method == "ROUT zero-scale"
+  extreme_mask <- zero_scale_flag |
+    (!is.na(adjusted_p) & adjusted_p < value_cutoff)
   idx <- which(extreme_mask, arr.ind = TRUE)
   row_ids <- idx[, "row"]
   col_ids <- idx[, "col"]

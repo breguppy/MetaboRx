@@ -1193,7 +1193,7 @@ ui_outliers_table <- function(
       paste0(
         "For each metabolite, classes with fewer than %d observed values ",
         "were screened, where estimable, using a two-sided Grubbs-type ",
-        "test (α = %g). The test used externally studentized one-way ",
+        "test (alpha = %g). The test used externally studentized one-way ",
         "ANOVA residuals with within-class variance pooled across all ",
         "classes for that metabolite and p-values Bonferroni-adjusted ",
         "within each class. Classes with %d or more observed values ",
@@ -1204,7 +1204,7 @@ ui_outliers_table <- function(
       params$min_rout_observations,
       100 * params$rout_q
     ),
-    "Both methods used log₂-transformed observed intensities.",
+    "Both methods used log2-transformed observed intensities.",
     "Flagged values were retained.",
     "Value screening was independent of the sample's Mahalanobis flag."
   )

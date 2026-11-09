@@ -295,3 +295,30 @@ testthat::test_that("the PCA plot and loadings are returned when enabled", {
     c("m1", "m2", "m3")
   )
 })
+testthat::test_that("ROUT zero-scale groups flag departures from the tied center", {
+  df <- hotelling_test_data()
+  qc_rows <- which(df$class == "QC")
+  spike_row <- qc_rows[length(qc_rows)]
+  
+  df$m1[qc_rows] <- 100
+  df$m1[spike_row] <- 1e6
+  df$m2[qc_rows] <- 50
+  
+  res <- detect_outliers(
+    df,
+    hotelling_test_params(),
+    make_pca_plot = FALSE
+  )
+  
+  candidates <- res$extreme_values
+  qc_candidates <- candidates[candidates$class == "QC", , drop = FALSE]
+  flagged <- qc_candidates[qc_candidates$metabolite == "m1", , drop = FALSE]
+  
+  testthat::expect_identical(flagged$sample, df$sample[spike_row])
+  testthat::expect_identical(flagged$method, "ROUT zero-scale")
+  testthat::expect_equal(flagged$test_statistic, NA_real_)
+  testthat::expect_equal(flagged$adjusted_p, NA_real_)
+  testthat::expect_equal(flagged$p_cutoff, NA_real_)
+  testthat::expect_false(any(qc_candidates$metabolite == "m2"))
+  testthat::expect_equal(res$data$m1, df$m1)
+})

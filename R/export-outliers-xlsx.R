@@ -110,7 +110,7 @@ export_outliers_xlsx <- function(p, d, file = NULL, hotelling_res = NULL) {
     paste(
       "For each metabolite, classes with fewer than %d observed values",
       "were screened, where estimable, using a two-sided Grubbs-type",
-      "test (α = %g). The test used externally studentized one-way",
+      "test (alpha = %g). The test used externally studentized one-way",
       "ANOVA residuals with within-class variance pooled across all classes",
       "for that metabolite and p-values Bonferroni-adjusted within each class.",
       "Classes with %d or more observed values were screened using",

@@ -614,7 +614,7 @@ report_text_ev_detection <- function() {
       htmltools::tags$li(
         htmltools::tags$strong("Squared Mahalanobis distance. "),
         "MetaboRx projects study and QC samples with complete, finite data ",
-        "into PC1–PC2 space. Their combined scores determine the center ",
+        "into PC1-PC2 space. Their combined scores determine the center ",
         "and covariance used to calculate squared Mahalanobis distances."
       ),
       htmltools::tags$li(
@@ -628,12 +628,12 @@ report_text_ev_detection <- function() {
         "For each metabolite, the test is chosen based on the number of ",
         "finite observed values in each class, including QC. Classes with ",
         "fewer than eight values were tested, where estimable, using a ",
-        "two-sided Grubbs-type test (α = 0.005). This test used externally ",
+        "two-sided Grubbs-type test (alpha = 0.005). This test used externally ",
         "studentized one-way ANOVA residuals with the within-class standard ",
         "deviation pooled across all classes for that metabolite. ",
         "P-values were Bonferroni-adjusted within each class. Classes with ",
         "eight or more values were tested using ROUT (Q = 0.1% by default). ",
-        "Both tests used log₂-transformed observed intensities. ",
+        "Both tests used log2-transformed observed intensities. ",
         "Flagged values were retained, and value screening was independent ",
         "of whether the sample fell outside the PCA ellipse."
       )
