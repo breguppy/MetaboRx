@@ -118,6 +118,8 @@ export_bundle <- function(p, d, file, export_date = Sys.Date()) {
     openxlsx::saveWorkbook(corr_wb, corr_xlsx_path, overwrite = TRUE)
   }
 
+  hotelling_res <- .export_cached_hotelling(export_cache, p, d)
+  
   outlier_xlsx_path <- file.path(
     base_dir,
     sprintf("extreme_values_%s.xlsx", export_date)
@@ -125,18 +127,19 @@ export_bundle <- function(p, d, file, export_date = Sys.Date()) {
   outlier_wb <- export_outliers_xlsx(
     p,
     d,
-    hotelling_res = .export_cached_hotelling(export_cache, p, d)
+    hotelling_res = hotelling_res
   )
   openxlsx::saveWorkbook(outlier_wb, outlier_xlsx_path, overwrite = TRUE)
-
+  
   figs <- export_figures(
     p,
     d,
     out_dir = base_dir,
     rsd_export = .export_cached_rsd_plots(export_cache, p, d),
-    pca_export = .export_cached_pca_plots(export_cache, p, d)
+    pca_export = .export_cached_pca_plots(export_cache, p, d),
+    hotelling_pca = hotelling_res$pca_plot
   )
-
+  
   render_report(
     p,
     d,
@@ -148,7 +151,7 @@ export_bundle <- function(p, d, file, export_date = Sys.Date()) {
       d
     ),
     pca_pair = .export_cached_pca_pair(export_cache, p, d),
-    hotelling_res = .export_cached_hotelling(export_cache, p, d)
+    hotelling_res = hotelling_res
   )
 
   figure_paths <- .exported_figure_paths(figs$fig_dir)
