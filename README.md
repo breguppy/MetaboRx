@@ -36,7 +36,7 @@ Installation is required only once. In RStudio, click inside the Console pane, c
 install.packages(c("BiocManager", "remotes"))
 BiocManager::install(c("impute", "pmp"), ask = FALSE, update = FALSE)
 remotes::install_github(
-  "breguppy/MetaboRx",
+  "ETaylorLab/MetaboRx",
   dependencies = NA,
   upgrade = "never"
 )
